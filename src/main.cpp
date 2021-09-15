@@ -854,6 +854,43 @@ int main ( int argc, char** argv )
         }
     }
 
+    CRpcServer* pRpcServer = nullptr;
+
+    if ( iJsonRpcPortNumber != INVALID_PORT )
+    {
+        if ( strJsonRpcSecretFileName.isEmpty() )
+        {
+            qCritical() << qUtf8Printable ( QString ( "- JSON-RPC: --jsonrpcsecretfile is required. Exiting." ) );
+            exit ( 1 );
+        }
+
+        QFile qfJsonRpcSecretFile ( strJsonRpcSecretFileName );
+        if ( !qfJsonRpcSecretFile.open ( QFile::OpenModeFlag::ReadOnly ) )
+        {
+            qCritical() << qUtf8Printable ( QString ( "- JSON-RPC: Unable to open secret file %1. Exiting." ).arg ( strJsonRpcSecretFileName ) );
+            exit ( 1 );
+        }
+        QTextStream qtsJsonRpcSecretStream ( &qfJsonRpcSecretFile );
+        QString     strJsonRpcSecret = qtsJsonRpcSecretStream.readLine();
+        if ( strJsonRpcSecret.length() < JSON_RPC_MINIMUM_SECRET_LENGTH )
+        {
+            qCritical() << qUtf8Printable ( QString ( "JSON-RPC: Refusing to run with secret of length %1 (required: %2). Exiting." )
+                                                .arg ( strJsonRpcSecret.length() )
+                                                .arg ( JSON_RPC_MINIMUM_SECRET_LENGTH ) );
+            exit ( 1 );
+        }
+
+        qWarning() << "- JSON-RPC: This interface is experimental and is subject to breaking changes even on patch versions "
+                      "(not subject to semantic versioning) during the initial phase.";
+
+        pRpcServer = new CRpcServer ( pApp, iJsonRpcPortNumber, strJsonRpcSecret );
+        if ( !pRpcServer->Start() )
+        {
+            qCritical() << qUtf8Printable ( QString ( "- JSON-RPC: Server failed to start. Exiting." ) );
+            exit ( 1 );
+        }
+    }
+
     try
     {
 #ifndef SERVER_ONLY
