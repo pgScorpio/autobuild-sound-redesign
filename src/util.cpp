@@ -1237,6 +1237,22 @@ QString CLocale::GetCountryFlagIconsResourceReference ( const QLocale::Country e
     if ( !QFile::exists ( strReturn ) )
     {
         return "";
+    }
+
+    QStringList vstrLocParts = vCurLocaleList.at ( 0 ).name().split ( "_" );
+
+    // the second split contains the name we need
+    if ( vstrLocParts.size() <= 1 )
+    {
+        return "";
+    }
+
+    strReturn = ":/png/flags/res/flags/" + vstrLocParts.at ( 1 ).toLower() + ".png";
+
+    // check if file actually exists, if not then invalidate reference
+    if ( !QFile::exists ( strReturn ) )
+    {
+        return "";
     return strReturn;
 }
 
