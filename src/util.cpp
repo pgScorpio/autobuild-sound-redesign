@@ -1237,8 +1237,6 @@ QString CLocale::GetCountryFlagIconsResourceReference ( const QLocale::Country e
     if ( !QFile::exists ( strReturn ) )
     {
         return "";
-    }
-
     return strReturn;
 }
 
