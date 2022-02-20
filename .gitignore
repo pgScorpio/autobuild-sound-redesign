@@ -4,6 +4,7 @@ Jamulus.ini
 Makefile
 **.cppe
 **.he
+.vs
 .cproject
 .project
 .settings
