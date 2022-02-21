@@ -7,7 +7,7 @@ Makefile
 .vs
 .cproject
 .project
-.settings
+.settings           
 .idea
 .xcode
 .vscode
@@ -47,6 +47,11 @@ distributions/claudio_piano.sf2
 distributions/fluidsynth*
 distributions/jamulus.desktop
 distributions/jamulus-server.desktop
+.xcode
+*.xcodeproj
+._*
+*.bak
+*.log
 Debug-iphoneos/
 jamulus_plugin_import.cpp
 autoLatestChangelog.md
