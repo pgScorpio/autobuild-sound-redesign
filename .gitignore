@@ -49,3 +49,4 @@ distributions/jamulus-server.desktop
 Debug-iphoneos/
 jamulus_plugin_import.cpp
 autoLatestChangelog.md
+debian/
