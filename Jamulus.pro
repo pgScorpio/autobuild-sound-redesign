@@ -238,7 +238,7 @@ win32 {
     SOURCES += android/sound.cpp \
         android/androiddebug.cpp
 
-    LIBS += -lOpenSLES -loboe
+    LIBS += -lOpenSLES
     ANDROID_PACKAGE_SOURCE_DIR = $$PWD/android
     DISTFILES += android/AndroidManifest.xml
 
