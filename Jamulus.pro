@@ -74,17 +74,6 @@ DEFINES += QT_NO_DEPRECATED_WARNINGS
 win32 {
     DEFINES -= UNICODE # fixes issue with ASIO SDK (asiolist.cpp is not unicode compatible)
     DEFINES += NOMINMAX # solves a compiler error in qdatetime.h (Qt5)
-<<<<<<< HEAD
-=======
-    INCLUDEPATH += windows/ASIOSDK2/common
-    HEADERS += windows/ASIOSDK2/common/asio.h \
-        windows/ASIOSDK2/common/iasiodrv.h \
-        windows/asiosys.h \
-        windows/asiodrivers.h \
-        windows/sound.h
-    SOURCES += windows/asiodrivers.cpp \
-        windows/sound.cpp
->>>>>>> 19808ea0 (Re-included the ASIOSDK2 folder (but only using the 2 needed headers from the SDK's common folder))
     RC_FILE = windows/mainicon.rc
     mingw* {
         LIBS += -lole32 \
@@ -166,8 +155,10 @@ win32 {
     }
 
     QT += macextras
-    HEADERS += mac/activity.h
-    OBJECTIVE_SOURCES += mac/activity.mm
+    HEADERS += mac/activity.h \
+        mac/sound.h
+    SOURCES +=  mac/sound.cpp
+ OBJECTIVE_SOURCES += mac/activity.mm
     CONFIG += x86
     QMAKE_TARGET_BUNDLE_PREFIX = io.jamulus
 
@@ -205,8 +196,12 @@ win32 {
                  error("Error: jack.h was not found at the usual place, maybe jack is not installed")
             }
         }
-        HEADERS += linux/sound.h
-        SOURCES += linux/sound.cpp
+        HEADERS -= mac/sound.h
+        SOURCES -= mac/sound.cpp
+        HEADERS += linux/sound.h \
+        linux/jackclient.h
+        SOURCES += linux/sound.cpp \
+        linux/jackclient.cpp
         DEFINES += WITH_JACK
         DEFINES += JACK_REPLACES_COREAUDIO
         INCLUDEPATH += /usr/local/include

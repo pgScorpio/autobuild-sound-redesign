@@ -348,25 +348,25 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument, 
     // overwritten by the defaults
     //
     // sound card left input channel mapping
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdinlch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
+    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdinlch", 0, DRV_MAX_NUM_IN_CHANNELS - 1, iValue ) )
     {
         pClient->SetSndCrdLeftInputChannel ( iValue );
     }
 
     // sound card right input channel mapping
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdinrch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
+    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdinrch", 0, DRV_MAX_NUM_IN_CHANNELS - 1, iValue ) )
     {
         pClient->SetSndCrdRightInputChannel ( iValue );
     }
 
     // sound card left output channel mapping
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutlch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
+    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutlch", 0, DRV_MAX_NUM_OUT_CHANNELS - 1, iValue ) )
     {
         pClient->SetSndCrdLeftOutputChannel ( iValue );
     }
 
     // sound card right output channel mapping
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutrch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
+    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutrch", 0, DRV_MAX_NUM_OUT_CHANNELS - 1, iValue ) )
     {
         pClient->SetSndCrdRightOutputChannel ( iValue );
     }
@@ -502,7 +502,7 @@ else if ( GetNumericIniSet ( IniXMLDocument, "client", "centservaddrtype", 0, st
     }
     else
     {
-        // if directory is not set to custom, or if no custom directory index is found in the settings .ini file, then initialize to zero
+        // if directory is not set to custom, or if no custom directory index is found in the settings .ini file, then initialise to zero
         iCustomDirectoryIndex = 0;
     }
 
