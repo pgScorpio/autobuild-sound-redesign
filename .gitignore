@@ -55,4 +55,10 @@ distributions/jamulus-server.desktop
 Debug-iphoneos/
 jamulus_plugin_import.cpp
 autoLatestChangelog.md
-debian/
+*.pro.user
+*.pro.user.*
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+Jamulus*.ps1

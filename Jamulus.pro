@@ -71,12 +71,14 @@ win32 {
 <<<<<<< HEAD
 =======
     INCLUDEPATH += windows/ASIOSDK2/common
-    HEADERS += windows/ASIOSDK2/common/asio.h \
+    HEADERS += \
+        windows/ASIOSDK2/common/asio.h \
         windows/ASIOSDK2/common/iasiodrv.h \
         windows/asiosys.h \
-        windows/asiodrivers.h \
+        windows/asiodriver.h \
         windows/sound.h
-    SOURCES += windows/asiodrivers.cpp \
+    SOURCES += \
+        windows/asiodriver.cpp \
         windows/sound.cpp
 >>>>>>> 19808ea0 (Re-included the ASIOSDK2 folder (but only using the 2 needed headers from the SDK's common folder))
     RC_FILE = windows/mainicon.rc
@@ -115,8 +117,12 @@ win32 {
             error("Error: jack.h was not found in the expected location ($${programfilesdir}). Ensure that the right JACK2 variant is installed (32bit vs. 64bit).")
         }
 
-        HEADERS += linux/sound.h
-        SOURCES += linux/sound.cpp
+        HEADERS -= windows/sound.h
+        SOURCES -= windows/sound.cpp
+        HEADERS += linux/sound.h \
+        linux/jackclient.h
+        SOURCES += linux/sound.cpp \
+        linux/jackclient.cpp
         DEFINES += WITH_JACK
         DEFINES += JACK_ON_WINDOWS
         DEFINES += _STDINT_H # supposed to solve compilation error in systemdeps.h
@@ -155,8 +161,10 @@ win32 {
     }
 
     QT += macextras
-    HEADERS += mac/activity.h
-    OBJECTIVE_SOURCES += mac/activity.mm
+    HEADERS += mac/activity.h \
+        mac/sound.h
+    SOURCES +=  mac/sound.cpp
+ OBJECTIVE_SOURCES += mac/activity.mm
     CONFIG += x86
     QMAKE_TARGET_BUNDLE_PREFIX = io.jamulus
 
@@ -194,8 +202,12 @@ win32 {
                  error("Error: jack.h was not found at the usual place, maybe jack is not installed")
             }
         }
-        HEADERS += linux/sound.h
-        SOURCES += linux/sound.cpp
+        HEADERS -= mac/sound.h
+        SOURCES -= mac/sound.cpp
+        HEADERS += linux/sound.h \
+        linux/jackclient.h
+        SOURCES += linux/sound.cpp \
+        linux/jackclient.cpp
         DEFINES += WITH_JACK
         DEFINES += JACK_REPLACES_COREAUDIO
         INCLUDEPATH += /usr/local/include
@@ -269,8 +281,10 @@ win32 {
     # unnecessarily without this workaround (#741):
     QMAKE_LFLAGS += -Wl,--as-needed
 
-    HEADERS += linux/sound.h
-    SOURCES += linux/sound.cpp
+    HEADERS += linux/sound.h \
+    linux/jackclient.h
+    SOURCES += linux/sound.cpp \
+    linux/jackclient.cpp
 
     # we assume to have lrintf() one moderately modern linux distributions
     # would be better to have that tested, though
