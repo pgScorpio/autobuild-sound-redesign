@@ -254,6 +254,8 @@ public:
     void OnTimerRemoteChanGain();
     void StartDelayTimer();
 
+    void OnTimerRemoteChanGain();
+
     void SetRemoteChanPan ( const int iId, const float fPan ) { Channel.SetRemoteChanPan ( iId, fPan ); }
 
     void SetLeftInputBoost ( const int iNewBoost ) { Sound.SetLeftInputGain ( iNewBoost ); }
