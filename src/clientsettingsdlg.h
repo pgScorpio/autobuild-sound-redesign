@@ -84,7 +84,7 @@ public slots:
     void OnEnableOPUS64StateChanged ( int value );
     void OnFeedbackDetectionChanged ( int value );
     void OnCustomDirectoriesEditingFinished();
-    void OnNewClientLevelEditingFinished() { pSettings->iNewClientFaderLevel = edtNewClientLevel->text().toInt(); }
+    void OnNewClientLevel() { pSettings->iNewClientFaderLevel = spnNewClientLevel->value(); }
     void OnInputBoostChanged();
     void OnSndCrdBufferDelayButtonGroupClicked ( QAbstractButton* button );
     void OnSoundcardActivated ( int iSndDevIdx );
@@ -106,6 +106,10 @@ public slots:
     void OnMakeTabChange ( int iTabIdx );
     void OnAudioPanValueChanged ( int value );
     void OnDriverSetupClicked();
+    void OnLocalJitterBufferLedChange ( bool bBufferOk );
+    void OnServerJitterBufferLedChange ( bool bBufferOk );
+    void OnConnected();
+    void OnDisconnected();
 
 signals:
     void GUIDesignChanged();
