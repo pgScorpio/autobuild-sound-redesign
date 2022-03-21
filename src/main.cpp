@@ -52,6 +52,9 @@ extern void qt_set_sequence_auto_mnemonic ( bool bEnable );
 int    CCommandlineOptions::appArgc = 0;
 char** CCommandlineOptions::appArgv = NULL;
 
+QDialog* CMsgBoxes::pMainForm       = NULL;
+QString  CMsgBoxes::strMainFormName = APP_NAME;
+
 int main ( int argc, char** argv )
 {
     CCommandlineOptions::appArgc = argc;
@@ -860,6 +863,8 @@ int main ( int argc, char** argv )
                                        bMuteStream,
                                        bEnableIPv6,
                                        nullptr );
+
+                CMsgBoxes::init ( &ClientDlg, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
 
                 // show dialog
                 ClientDlg.show();
