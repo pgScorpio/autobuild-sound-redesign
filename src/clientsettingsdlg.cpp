@@ -75,17 +75,17 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
     sldAudioPan_5->setAccessibleName ( tr ( "Local audio input fader (left/right)" ) );
 
     // jitter buffer
-    QString strJitterBufferSize = "<b>" + tr ( "Jitter Buffer Size" ) + ":</b> " +
+    QString strJitterBufferSize = htmlBold ( tr ( "Jitter Buffer Size: " ) ) +
                                   tr ( "The jitter buffer compensates for network and sound card timing jitters. The "
                                        "size of the buffer therefore influences the quality of "
                                        "the audio stream (how many dropouts occur) and the overall delay "
-                                       "(the longer the buffer, the higher the delay)." ) +
+                                       "(the higher the buffer size, the higher the delay)." ) +
                                   "<br>" +
                                   tr ( "You can set the jitter buffer size manually for the local client "
                                        "and the remote server. For the local jitter buffer, dropouts in the "
                                        "audio stream are indicated by the light below the "
                                        "jitter buffer size faders. If the light turns to red, a buffer "
-                                       "overrun/underrun has taken place and the audio stream is interrupted." ) +
+                                       "under-run has taken place and the audio stream is interrupted." ) +
                                   "<br>" +
                                   tr ( "The jitter buffer setting is therefore a trade-off between audio "
                                        "quality and overall delay." ) +
@@ -96,29 +96,58 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
                                        "Auto is enabled, the jitter buffer size faders are "
                                        "disabled (they cannot be moved with the mouse)." );
 
-    QString strJitterBufferSizeTT = tr ( "If the Auto setting "
-                                         "is enabled, the network buffers of the local client and "
-                                         "the remote server are set to a conservative "
-                                         "value to minimize the audio dropout probability. To tweak the "
-                                         "audio delay/latency it is recommended to disable the Auto setting "
-                                         "and to lower the jitter buffer size manually by "
-                                         "using the sliders until your personal acceptable amount "
-                                         "of dropouts is reached. The LED indicator will display the audio "
-                                         "dropouts of the local jitter buffer with a red light." ) +
-                                    TOOLTIP_COM_END_TEXT;
+    QString strJitterBufferSettingsTT = tr ( "If the Auto setting "
+                                             "is enabled, the network buffers of the local client and "
+                                             "the remote server are set to a conservative "
+                                             "value to minimize the audio dropout probability. To tweak the "
+                                             "audio delay/latency it is recommended to disable the Auto setting "
+                                             "and to lower the jitter buffer size manually by "
+                                             "using the sliders until your personal acceptable amount "
+                                             "of dropouts is reached. The LED indicator will display the audio "
+                                             "dropouts of that jitter buffer with a red light." ) +
+                                        TOOLTIP_COM_END_TEXT;
 
-    lblNetBuf->setWhatsThis ( strJitterBufferSize );
-    lblNetBuf->setToolTip ( strJitterBufferSizeTT );
-    grbJitterBuffer->setWhatsThis ( strJitterBufferSize );
-    grbJitterBuffer->setToolTip ( strJitterBufferSizeTT );
-    sldNetBuf->setWhatsThis ( strJitterBufferSize );
-    sldNetBuf->setAccessibleName ( tr ( "Local jitter buffer slider control" ) );
-    sldNetBuf->setToolTip ( strJitterBufferSizeTT );
+    // Jitter Buffer Settings
+    grbJitterBuffer->setToolTip(htmlBold(tr("Jitter Buffer Settings: ")) + strJitterBufferSettingsTT);
+
+    lblNetBufLocal->setWhatsThis ( strJitterBufferSize );
+    lblNetBufServer->setWhatsThis ( strJitterBufferSize );
+    //    lblNetBuf->setToolTip (strJitterBufferSettingsTT);
+    //    grbJitterBuffer->setWhatsThis ( strJitterBufferSize );
+
+    chbAutoJitBuf->setWhatsThis ( strJitterBufferSettingsTT );
+    chbAutoJitBuf->setAccessibleName ( tr ( "Auto jitter buffer switch" ) );
+    chbAutoJitBuf->setToolTip ( strJitterBufferSettingsTT );
+
+    // network buffer sliders
+    sldNetBufLocal->setWhatsThis ( strJitterBufferSize );
+    sldNetBufLocal->setAccessibleName ( tr ( "Local jitter buffer slider control" ) );
+    sldNetBufLocal->setToolTip ( strJitterBufferSize );
     sldNetBufServer->setWhatsThis ( strJitterBufferSize );
     sldNetBufServer->setAccessibleName ( tr ( "Server jitter buffer slider control" ) );
-    sldNetBufServer->setToolTip ( strJitterBufferSizeTT );
-    chbAutoJitBuf->setAccessibleName ( tr ( "Auto jitter buffer switch" ) );
-    chbAutoJitBuf->setToolTip ( strJitterBufferSizeTT );
+    sldNetBufServer->setToolTip ( strJitterBufferSize );
+
+    sldNetBufLocal->setRange ( MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL );
+    sldNetBufServer->setRange ( MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL );
+
+    ledLocalBuffers->SetType ( CMultiColorLED::MT_INDICATOR );
+    ledServerBuffers->SetType ( CMultiColorLED::MT_INDICATOR );
+
+    ledLocalBuffers->setWhatsThis ( tr ( "Local Jitter Buffer LED indicator. This led turns red whenever a local buffer under-run occurs. If this "
+                                         "happens regularly you should increase the local jitter buffer size." ) );
+    ledServerBuffers->setWhatsThis (
+        tr ( "Server Jitter Buffer LED indicator. This led turns red whenever a server buffer under-run occurs. If this "
+             "happens regularly you should increase the server jitter buffer size." ) +
+        htmlNewLine() + tr ( "Note: This led is only available when connected to a newer server that indeed do report buffer errors.)" ) );
+    ledLocalBuffers->setAccessibleName ( tr ( "Local jitter buffer status LED indicator" ) );
+    ledServerBuffers->setAccessibleName ( tr ( "Server jitter buffer status LED indicator" ) );
+    ledLocalBuffers->Reset();
+    ledServerBuffers->Reset();
+
+    ledLocalBuffers->Reset();
+    ledServerBuffers->Reset();
+
+    UpdateJitterBufferFrame();
 
     // sound card device
     gbAudioDevice->setWhatsThis ( soundProperties.AudioDeviceWhatsThis() );
@@ -202,9 +231,9 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
                                 tr ( "Some sound card drivers do not allow the buffer delay to be changed "
                                      "from within %1. "
                                      "In this case the buffer delay setting is disabled and has to be "
-                                     "changed using the sound card driver. On Windows, use the "
-                                     "ASIO Device Settings button to open the driver settings panel. On Linux, "
-                                     "use the JACK configuration tool to change the buffer size." )
+                                     "changed using the sound card driver. Use the "
+                                     "Device Settings button, when available, to open the driver settings panel. Otherwise "
+                                     "use the drivers configuration tool to change the buffer size." )
                                     .arg ( APP_NAME ) +
                                 "<br>" +
                                 tr ( "If no buffer size is selected and all settings are disabled, this means a "
@@ -225,13 +254,14 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
     QString strSndCrdBufDelayTT = tr ( "If the buffer delay settings are "
                                        "disabled, it is prohibited by the audio driver to modify this "
                                        "setting from within %1. "
-                                       "On Windows, press the ASIO Device Settings button to open the "
-                                       "driver settings panel. On Linux, use the JACK configuration tool to "
+                                       "Press the Device Settings button, when available, to open the "
+                                       "driver settings panel. Otherwise use the devices configuration tool to "
                                        "change the buffer size." )
                                       .arg ( APP_NAME ) +
                                   TOOLTIP_COM_END_TEXT;
 
     gbBufferDelay->setWhatsThis ( strSndCrdBufDelay );
+
     rbtBufferDelayPreferred->setWhatsThis ( strSndCrdBufDelay );
     rbtBufferDelayPreferred->setAccessibleName ( tr ( "64 samples setting radio button" ) );
     rbtBufferDelayPreferred->setToolTip ( strSndCrdBufDelayTT );
@@ -382,26 +412,6 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
     // init delay and other information controls
     lblUpstreamValue->setText ( "---" );
     lblUpstreamUnit->setText ( "" );
-
-    // init slider controls ---
-    // network buffer sliders
-    sldNetBuf->setRange ( MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL );
-    sldNetBufServer->setRange ( MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL );
-
-    ledLocalBuffers->SetType ( CMultiColorLED::MT_INDICATOR );
-    ledServerBuffers->SetType ( CMultiColorLED::MT_INDICATOR );
-
-    ledLocalBuffers->setWhatsThis ( tr ( "Local Jitter Buffer Status LED" ) );
-    ledServerBuffers->setWhatsThis ( tr ( "Server Jitter Buffer Status LED" ) );
-    ledLocalBuffers->setAccessibleName ( tr ( "Local Jitter Buffer status LED indicator" ) );
-    ledServerBuffers->setAccessibleName ( tr ( "Server Jitter Buffer status LED indicator" ) );
-    ledLocalBuffers->Reset();
-    ledServerBuffers->Reset();
-
-    ledLocalBuffers->Reset();
-    ledServerBuffers->Reset();
-
-    UpdateJitterBufferFrame();
 
     // init sound card channel selection frame
     UpdateSoundDeviceChannelSelectionFrame();
@@ -606,7 +616,7 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
     QObject::connect ( &TimerStatus, &QTimer::timeout, this, &CClientSettingsDlg::OnTimerStatus );
 
     // slider controls
-    QObject::connect ( sldNetBuf, &QSlider::valueChanged, this, &CClientSettingsDlg::OnNetBufValueChanged );
+    QObject::connect ( sldNetBufLocal, &QSlider::valueChanged, this, &CClientSettingsDlg::OnNetBufLocalValueChanged );
 
     QObject::connect ( sldNetBufServer, &QSlider::valueChanged, this, &CClientSettingsDlg::OnNetBufServerValueChanged );
 
@@ -776,9 +786,9 @@ void CClientSettingsDlg::OnDisconnected()
 void CClientSettingsDlg::UpdateJitterBufferFrame()
 {
     // update slider value and text
-    const int iCurNumNetBuf = pClient->GetSockBufNumFrames();
-    sldNetBuf->setValue ( iCurNumNetBuf );
-    lblNetBuf->setText ( tr ( "Size: " ) + QString::number ( iCurNumNetBuf ) );
+    const int iCurNumNetBufLocal = pClient->GetLocalSockBufNumFrames();
+    sldNetBufLocal->setValue ( iCurNumNetBufLocal);
+    lblNetBufLocal->setText ( tr ( "Size: " ) + QString::number ( iCurNumNetBufLocal) );
 
     const int iCurNumNetBufServer = pClient->GetServerSockBufNumFrames();
     sldNetBufServer->setValue ( iCurNumNetBufServer );
@@ -788,9 +798,9 @@ void CClientSettingsDlg::UpdateJitterBufferFrame()
     const bool bIsAutoSockBufSize = pClient->GetDoAutoSockBufSize();
 
     chbAutoJitBuf->setChecked ( bIsAutoSockBufSize );
-    sldNetBuf->setEnabled ( !bIsAutoSockBufSize );
-    lblNetBuf->setEnabled ( !bIsAutoSockBufSize );
-    lblNetBufLabel->setEnabled ( !bIsAutoSockBufSize );
+    sldNetBufLocal->setEnabled ( !bIsAutoSockBufSize );
+    lblNetBufLocal->setEnabled ( !bIsAutoSockBufSize );
+    lblNetBufLocalLabel->setEnabled ( !bIsAutoSockBufSize );
     sldNetBufServer->setEnabled ( !bIsAutoSockBufSize );
     lblNetBufServer->setEnabled ( !bIsAutoSockBufSize );
     lblNetBufServerLabel->setEnabled ( !bIsAutoSockBufSize );
@@ -924,9 +934,9 @@ void CClientSettingsDlg::SetEnableFeedbackDetection ( bool enable )
 
 void CClientSettingsDlg::OnDriverSetupClicked() { pClient->OpenSndCrdDriverSetup(); }
 
-void CClientSettingsDlg::OnNetBufValueChanged ( int value )
+void CClientSettingsDlg::OnNetBufLocalValueChanged ( int value )
 {
-    pClient->SetSockBufNumFrames ( value, true );
+    pClient->SetLocalSockBufNumFrames ( value, true );
     UpdateJitterBufferFrame();
 }
 

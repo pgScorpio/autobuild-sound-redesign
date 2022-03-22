@@ -168,8 +168,8 @@ public:
     void SetDoAutoSockBufSize ( const bool bValue );
     bool GetDoAutoSockBufSize() const { return Channel.GetDoAutoSockBufSize(); }
 
-    void SetSockBufNumFrames ( const int iNumBlocks, const bool bPreserve = false ) { Channel.SetSockBufNumFrames ( iNumBlocks, bPreserve ); }
-    int  GetSockBufNumFrames() { return Channel.GetSockBufNumFrames(); }
+    void SetLocalSockBufNumFrames ( const int iNumBlocks, const bool bPreserve = false ) { Channel.SetSockBufNumFrames ( iNumBlocks, bPreserve ); }
+    int  GetLocalSockBufNumFrames() { return Channel.GetSockBufNumFrames(); }
 
     void SetServerSockBufNumFrames ( const int iNumBlocks )
     {

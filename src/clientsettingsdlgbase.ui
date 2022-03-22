@@ -1511,7 +1511,7 @@
             <item>
              <layout class="QHBoxLayout" name="Box_LocalServer">
               <item>
-               <widget class="QLabel" name="lblNetBufLabel">
+               <widget class="QLabel" name="lblNetBufLocalLabel">
                 <property name="text">
                  <string>Local</string>
                 </property>
@@ -1541,7 +1541,7 @@
             <item>
              <layout class="QHBoxLayout" name="Box_JitterBufferSizeSize">
               <item>
-               <widget class="QLabel" name="lblNetBuf">
+               <widget class="QLabel" name="lblNetBufLocal">
                 <property name="text">
                  <string>Size</string>
                 </property>
@@ -1573,7 +1573,7 @@
               <item>
                <layout class="QVBoxLayout" name="verticalLayout_16">
                 <item>
-                 <widget class="QSlider" name="sldNetBuf">
+                 <widget class="QSlider" name="sldNetBufLocal">
                   <property name="sizePolicy">
                    <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
                     <horstretch>0</horstretch>

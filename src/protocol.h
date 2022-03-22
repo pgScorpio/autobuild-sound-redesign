@@ -292,7 +292,7 @@ signals:
     void CLMessReadyForSending ( CHostAddress InetAddr, CVector<uint8_t> vecMessage );
 
     // receiving
-    void JittBufSizeError();
+    void JittBufSizeErrorMessage();
     void ChangeJittBufSize ( int iNewJitBufSize );
     void ReqJittBufSize();
     void ChangeNetwBlSiFact ( int iNewNetwBlSiFact );
