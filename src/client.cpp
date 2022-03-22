@@ -1108,7 +1108,7 @@ int CClient::EstimatedOverallDelay ( const int iPingTimeMs )
     // length. Since that is usually not the case but the buffers are usually
     // a bit larger than necessary, we introduce some factor for compensation.
     // Consider the jitter buffer on the client and on the server side, too.
-    const float fTotalJitterBufferDelayMs = fSystemBlockDurationMs * ( GetSockBufNumFrames() + GetServerSockBufNumFrames() ) * 0.7f;
+    const float fTotalJitterBufferDelayMs = fSystemBlockDurationMs * ( GetLocalSockBufNumFrames() + GetServerSockBufNumFrames() ) * 0.7f;
 
     // consider delay introduced by the sound card conversion buffer by using
     // "GetSndCrdConvBufAdditionalDelayMonoBlSize()"

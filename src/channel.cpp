@@ -69,7 +69,7 @@ qRegisterMetaType<CHostAddress> ( "CHostAddress" );
 
     QObject::connect ( &Protocol, &CProtocol::MessReadyForSending, this, &CChannel::OnSendProtMessage );
 
-    QObject::connect ( &Protocol, &CProtocol::JittBufSizeError, this, &CChannel::OnJittBufSizeError );
+    QObject::connect ( &Protocol, &CProtocol::JittBufSizeErrorMessage, this, &CChannel::OnJittBufSizeErrorMessage);
     QObject::connect ( &Protocol, &CProtocol::ChangeJittBufSize, this, &CChannel::OnJittBufSizeChange );
 
     QObject::connect ( &Protocol, &CProtocol::ReqJittBufSize, this, &CChannel::ReqJittBufSize );
@@ -376,7 +376,7 @@ void CChannel::OnSendProtMessage ( CVector<uint8_t> vecMessage )
     }
 }
 
-void CChannel::OnJittBufSizeError()
+void CChannel::OnJittBufSizeErrorMessage()
 {
     // JitterBuffer under-run error message from the other side...
     if ( bIsServer )
@@ -627,19 +627,6 @@ EGetDataStat CChannel::GetData ( CVector<uint8_t>& vecbyData, const int iNumByte
             // the socket access must be inside a mutex
             const bool bSockBufState = SockBuf.Get ( vecbyData, iNumBytes );
 
-            if ( !bSockBufState )
-            {
-                // JitterBuffer under-run error
-                if ( bIsServer )
-                {
-                    bServerJittBuffError = true;
-                }
-                else
-                {
-                    bClientJittBuffError = true;
-                }
-            }
-
             // decrease time-out counter
             if ( iConTimeOut > 0 )
             {
@@ -669,6 +656,15 @@ EGetDataStat CChannel::GetData ( CVector<uint8_t>& vecbyData, const int iNumByte
                     {
                         // channel is not yet disconnected but no data in buffer
                         eGetStatus = GS_BUFFER_UNDERRUN;
+
+                        if (bIsServer)
+                        {
+                            bServerJittBuffError = true;
+                        }
+                        else
+                        {
+                            bClientJittBuffError = true;
+                        }
                     }
                 }
             }

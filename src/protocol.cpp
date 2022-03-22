@@ -952,7 +952,7 @@ bool CProtocol::EvaluateJitBufMes ( const CVector<uint8_t>& vecData )
     if ( iData == 0 )
     {
         // invoke message action
-        emit JittBufSizeError();
+        emit JittBufSizeErrorMessage();
 
         return false; // no error
     }

@@ -78,7 +78,7 @@ protected:
 
 public slots:
     void OnTimerStatus() { UpdateDisplay(); }
-    void OnNetBufValueChanged ( int value );
+    void OnNetBufLocalValueChanged ( int value );
     void OnNetBufServerValueChanged ( int value );
     void OnAutoJitBufStateChanged ( int value );
     void OnEnableOPUS64StateChanged ( int value );

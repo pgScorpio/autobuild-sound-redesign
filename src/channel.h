@@ -259,7 +259,7 @@ protected:
 
 public slots:
     void OnSendProtMessage ( CVector<uint8_t> vecMessage );
-    void OnJittBufSizeError();
+    void OnJittBufSizeErrorMessage();
     void OnJittBufSizeChange ( int iNewJitBufSize );
     void OnChangeChanGain ( int iChanID, float fNewGain );
     void OnChangeChanPan ( int iChanID, float fNewPan );

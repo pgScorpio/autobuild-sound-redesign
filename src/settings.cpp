@@ -402,7 +402,7 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument, 
     // network jitter buffer size
     if ( GetNumericIniSet ( IniXMLDocument, "client", "jitbuf", MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL, iValue ) )
     {
-        pClient->SetSockBufNumFrames ( iValue );
+        pClient->SetLocalSockBufNumFrames ( iValue );
     }
 
     // network jitter buffer size for server
@@ -687,7 +687,7 @@ void CClientSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )
     SetFlagIniSet ( IniXMLDocument, "client", "autojitbuf", pClient->GetDoAutoSockBufSize() );
 
     // network jitter buffer size
-    SetNumericIniSet ( IniXMLDocument, "client", "jitbuf", pClient->GetSockBufNumFrames() );
+    SetNumericIniSet ( IniXMLDocument, "client", "jitbuf", pClient->GetLocalSockBufNumFrames() );
 
     // network jitter buffer size for server
     SetNumericIniSet ( IniXMLDocument, "client", "jitbufserver", pClient->GetServerSockBufNumFrames() );
