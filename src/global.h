@@ -583,10 +583,11 @@ public:
 #define CMDLN_JSONRPCSECRETFILE   "--jsonrpcsecretfile",   "--jsonrpcsecretfile"
 // Backwards compatibilyty:
 #define CMDLN_CENTRALSERVER       "--centralserver",       "--centralserver"
-// pgScorpio: TODO These are NOT in help !:
+// pgScorpio: Debug options (not in help):
 #define CMDLN_SHOWALLSERVERS      "--showallservers",      "--showallservers"
 #define CMDLN_SHOWANALYZERCONSOLE "--showanalyzerconsole", "--showanalyzerconsole"
 // CMDLN_SPECIAL: Mostly used for debugging, any option after --special is accepted, should NOT be in help !
 #define CMDLN_SPECIAL             "--special",             "--special"
+// Special options for sound-redesign testing
 #define CMDLN_JACKINPUTS          "--jackinputs",          "--jackinputs"
 // clang-format on

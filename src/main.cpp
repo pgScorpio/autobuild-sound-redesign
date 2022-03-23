@@ -575,8 +575,7 @@ int main ( int argc, char** argv )
         if ( ServerOnlyOptions.size() != 0 )
         {
             qCritical() << qUtf8Printable ( QString ( "%1: Server only option(s) '%2' used.  Did you omit '--server'?" )
-                                                .arg ( argv[0] )
-                                                .arg ( ServerOnlyOptions.join ( ", " ) ) );
+                                                .arg ( CCommandlineOptions::GetProgramPath(), ServerOnlyOptions.join ( ", " ) ) );
             exit ( 1 );
         }
 
@@ -910,6 +909,7 @@ int main ( int argc, char** argv )
                                        bEnableIPv6,
                                        nullptr );
 
+                // initialise message boxes
                 CMsgBoxes::init ( &ClientDlg, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
 
                 // show dialog
