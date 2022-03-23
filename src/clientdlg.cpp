@@ -1063,7 +1063,8 @@ void CClientDlg::OnTimerSigMet()
         // show message box about feedback issue
         QCheckBox* chb = new QCheckBox ( tr ( "Enable feedback detection" ) );
         chb->setCheckState ( pSettings->bEnableFeedbackDetection ? Qt::Checked : Qt::Unchecked );
-        QMessageBox msgbox;
+        QMessageBox msgbox ( CMsgBoxes::MainForm());
+        msgbox.setWindowTitle(CMsgBoxes::MainFormName() + ": " + tr( "Warning" ));
         msgbox.setText ( tr ( "Audio feedback or loud signal detected.\n\n"
                               "We muted your channel and activated 'Mute Myself'. Please solve "
                               "the feedback issue first and unmute yourself afterwards." ) );
