@@ -667,7 +667,9 @@ void CLanguageComboBox::OnLanguageActivated ( int iLanguageIdx )
     // only update if the language selection is different from the current selected language
     if ( iIdxSelectedLanguage != iLanguageIdx )
     {
-        QMessageBox::information ( CMsgBoxes::MainForm(), CMsgBoxes::MainFormName() + ": " + tr ( "Restart Required" ), tr ( "Please restart the application for the language change to take effect." ) );
+        QMessageBox::information ( CMsgBoxes::MainForm(),
+                                   CMsgBoxes::MainFormName() + ": " + tr ( "Restart Required" ),
+                                   tr ( "Please restart the application for the language change to take effect." ) );
 
         emit LanguageChanged ( itemData ( iLanguageIdx ).toString() );
     }
@@ -1254,184 +1256,184 @@ QString CLocale::GetCountryFlagIconsResourceReference ( const QLocale::Country e
     if ( !QFile::exists ( strReturn ) )
     {
         return "";
-    return strReturn;
-}
-
-QMap<QString, QString> CLocale::GetAvailableTranslations()
-{
-    QMap<QString, QString> TranslMap;
-    QDirIterator           DirIter ( ":/translations" );
-
-    // add english language (default which is in the actual source code)
-    TranslMap["en"] = ""; // empty file name means that the translation load fails and we get the default english language
-
-    while ( DirIter.hasNext() )
-    {
-        // get alias of translation file
-        const QString strCurFileName = DirIter.next();
-
-        // extract only language code (must be at the end, separated with a "_")
-        const QString strLoc = strCurFileName.right ( strCurFileName.length() - strCurFileName.indexOf ( "_" ) - 1 );
-
-        TranslMap[strLoc] = strCurFileName;
+        return strReturn;
     }
 
-    return TranslMap;
-}
-
-QPair<QString, QString> CLocale::FindSysLangTransFileName ( const QMap<QString, QString>& TranslMap )
-{
-    QPair<QString, QString> PairSysLang ( "", "" );
-    QStringList             slUiLang = QLocale().uiLanguages();
-
-    if ( !slUiLang.isEmpty() )
+    QMap<QString, QString> CLocale::GetAvailableTranslations()
     {
-        QString strUiLang = QLocale().uiLanguages().at ( 0 );
-        strUiLang.replace ( "-", "_" );
+        QMap<QString, QString> TranslMap;
+        QDirIterator           DirIter ( ":/translations" );
 
-        // first try to find the complete language string
-        if ( TranslMap.constFind ( strUiLang ) != TranslMap.constEnd() )
+        // add english language (default which is in the actual source code)
+        TranslMap["en"] = ""; // empty file name means that the translation load fails and we get the default english language
+
+        while ( DirIter.hasNext() )
         {
-            PairSysLang.first  = strUiLang;
-            PairSysLang.second = TranslMap[PairSysLang.first];
+            // get alias of translation file
+            const QString strCurFileName = DirIter.next();
+
+            // extract only language code (must be at the end, separated with a "_")
+            const QString strLoc = strCurFileName.right ( strCurFileName.length() - strCurFileName.indexOf ( "_" ) - 1 );
+
+            TranslMap[strLoc] = strCurFileName;
+        }
+
+        return TranslMap;
+    }
+
+    QPair<QString, QString> CLocale::FindSysLangTransFileName ( const QMap<QString, QString>& TranslMap )
+    {
+        QPair<QString, QString> PairSysLang ( "", "" );
+        QStringList             slUiLang = QLocale().uiLanguages();
+
+        if ( !slUiLang.isEmpty() )
+        {
+            QString strUiLang = QLocale().uiLanguages().at ( 0 );
+            strUiLang.replace ( "-", "_" );
+
+            // first try to find the complete language string
+            if ( TranslMap.constFind ( strUiLang ) != TranslMap.constEnd() )
+            {
+                PairSysLang.first  = strUiLang;
+                PairSysLang.second = TranslMap[PairSysLang.first];
+            }
+            else
+            {
+                // only extract two first characters to identify language (ignoring
+                // location for getting a simpler implementation -> if the language
+                // is not correct, the user can change it in the GUI anyway)
+                if ( strUiLang.length() >= 2 )
+                {
+                    PairSysLang.first  = strUiLang.left ( 2 );
+                    PairSysLang.second = TranslMap[PairSysLang.first];
+                }
+            }
+        }
+
+        return PairSysLang;
+    }
+
+    void CLocale::LoadTranslation ( const QString strLanguage, QCoreApplication* pApp )
+    {
+        // The translator objects must be static!
+        static QTranslator myappTranslator;
+        static QTranslator myqtTranslator;
+
+        QMap<QString, QString> TranslMap              = CLocale::GetAvailableTranslations();
+        const QString          strTranslationFileName = TranslMap[strLanguage];
+
+        if ( myappTranslator.load ( strTranslationFileName ) )
+        {
+            pApp->installTranslator ( &myappTranslator );
+        }
+
+        // allows the Qt messages to be translated in the application
+        if ( myqtTranslator.load ( QLocale ( strLanguage ), "qt", "_", QLibraryInfo::location ( QLibraryInfo::TranslationsPath ) ) )
+        {
+            pApp->installTranslator ( &myqtTranslator );
+        }
+    }
+
+    /******************************************************************************\
+    * Global Functions Implementation                                              *
+    \******************************************************************************/
+    QString GetVersionAndNameStr ( const bool bDisplayInGui )
+    {
+        QString strVersionText = "";
+
+        // name, short description and GPL hint
+        if ( bDisplayInGui )
+        {
+            strVersionText += "<b>";
         }
         else
         {
-            // only extract two first characters to identify language (ignoring
-            // location for getting a simpler implementation -> if the language
-            // is not correct, the user can change it in the GUI anyway)
-            if ( strUiLang.length() >= 2 )
-            {
-                PairSysLang.first  = strUiLang.left ( 2 );
-                PairSysLang.second = TranslMap[PairSysLang.first];
-            }
-        }
-    }
-
-    return PairSysLang;
-}
-
-void CLocale::LoadTranslation ( const QString strLanguage, QCoreApplication* pApp )
-{
-    // The translator objects must be static!
-    static QTranslator myappTranslator;
-    static QTranslator myqtTranslator;
-
-    QMap<QString, QString> TranslMap              = CLocale::GetAvailableTranslations();
-    const QString          strTranslationFileName = TranslMap[strLanguage];
-
-    if ( myappTranslator.load ( strTranslationFileName ) )
-    {
-        pApp->installTranslator ( &myappTranslator );
-    }
-
-    // allows the Qt messages to be translated in the application
-    if ( myqtTranslator.load ( QLocale ( strLanguage ), "qt", "_", QLibraryInfo::location ( QLibraryInfo::TranslationsPath ) ) )
-    {
-        pApp->installTranslator ( &myqtTranslator );
-    }
-}
-
-/******************************************************************************\
-* Global Functions Implementation                                              *
-\******************************************************************************/
-QString GetVersionAndNameStr ( const bool bDisplayInGui )
-{
-    QString strVersionText = "";
-
-    // name, short description and GPL hint
-    if ( bDisplayInGui )
-    {
-        strVersionText += "<b>";
-    }
-    else
-    {
 #ifdef _WIN32
-        // start with newline to print nice in windows command prompt
-        strVersionText += "\n";
+            // start with newline to print nice in windows command prompt
+            strVersionText += "\n";
 #endif
-        strVersionText += " *** ";
+            strVersionText += " *** ";
+        }
+
+        strVersionText += APP_NAME + QCoreApplication::tr ( ", Version " ) + VERSION;
+
+        if ( bDisplayInGui )
+        {
+            strVersionText += "</b><br>";
+        }
+        else
+        {
+            strVersionText += "\n *** ";
+        }
+
+        if ( !bDisplayInGui )
+        {
+            strVersionText += QCoreApplication::tr ( "Internet Jam Session Software" );
+            strVersionText += "\n *** ";
+        }
+
+        strVersionText += QCoreApplication::tr ( "Released under the GNU General Public License version 2 or later (GPLv2)" );
+
+        if ( !bDisplayInGui )
+        {
+            // additional text to show in console output
+            strVersionText += "\n *** ";
+            strVersionText += "<https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>";
+            strVersionText += "\n *** ";
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "This program is free software; you can redistribute it and/or modify it under" );
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "the terms of the GNU General Public License as published by the Free Software" );
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "Foundation; either version 2 of the License, or (at your option) any later version." );
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "There is NO WARRANTY, to the extent permitted by law." );
+            strVersionText += "\n *** ";
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "Using the following libraries, resources or code snippets:" );
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "Qt framework " ) + QT_VERSION_STR;
+            strVersionText += " <https://doc.qt.io/qt-5/lgpl.html>";
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "Opus Interactive Audio Codec" );
+            strVersionText += " <https://www.opus-codec.org>";
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "Audio reverberation code by Perry R. Cook and Gary P. Scavone" );
+            strVersionText += " <https://ccrma.stanford.edu/software/stk>";
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "Some pixmaps are from the Open Clip Art Library (OCAL)" );
+            strVersionText += " <https://openclipart.org>";
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "Flag icons by Mark James" );
+            strVersionText += " <http://www.famfamfam.com>";
+            strVersionText += "\n *** ";
+            strVersionText += "\n *** ";
+            strVersionText += QCoreApplication::tr ( "Copyright (C) 2005-2022 The Jamulus Development Team" );
+            strVersionText += "\n";
+        }
+
+        return strVersionText;
     }
 
-    strVersionText += APP_NAME + QCoreApplication::tr ( ", Version " ) + VERSION;
-
-    if ( bDisplayInGui )
+    QString MakeClientNameTitle ( QString win, QString client )
     {
-        strVersionText += "</b><br>";
+        QString sReturnString = win;
+        if ( !client.isEmpty() )
+        {
+            sReturnString += " - " + client;
+        }
+        return ( sReturnString );
     }
-    else
+
+    QString TruncateString ( QString str, int position )
     {
-        strVersionText += "\n *** ";
+        QTextBoundaryFinder tbfString ( QTextBoundaryFinder::Grapheme, str );
+
+        tbfString.setPosition ( position );
+        if ( !tbfString.isAtBoundary() )
+        {
+            tbfString.toPreviousBoundary();
+            position = tbfString.position();
+        }
+        return str.left ( position );
     }
-
-    if ( !bDisplayInGui )
-    {
-        strVersionText += QCoreApplication::tr ( "Internet Jam Session Software" );
-        strVersionText += "\n *** ";
-    }
-
-    strVersionText += QCoreApplication::tr ( "Released under the GNU General Public License version 2 or later (GPLv2)" );
-
-    if ( !bDisplayInGui )
-    {
-        // additional text to show in console output
-        strVersionText += "\n *** ";
-        strVersionText += "<https://www.gnu.org/licenses/old-licenses/gpl-2.0.html>";
-        strVersionText += "\n *** ";
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "This program is free software; you can redistribute it and/or modify it under" );
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "the terms of the GNU General Public License as published by the Free Software" );
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "Foundation; either version 2 of the License, or (at your option) any later version." );
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "There is NO WARRANTY, to the extent permitted by law." );
-        strVersionText += "\n *** ";
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "Using the following libraries, resources or code snippets:" );
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "Qt framework " ) + QT_VERSION_STR;
-        strVersionText += " <https://doc.qt.io/qt-5/lgpl.html>";
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "Opus Interactive Audio Codec" );
-        strVersionText += " <https://www.opus-codec.org>";
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "Audio reverberation code by Perry R. Cook and Gary P. Scavone" );
-        strVersionText += " <https://ccrma.stanford.edu/software/stk>";
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "Some pixmaps are from the Open Clip Art Library (OCAL)" );
-        strVersionText += " <https://openclipart.org>";
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "Flag icons by Mark James" );
-        strVersionText += " <http://www.famfamfam.com>";
-        strVersionText += "\n *** ";
-        strVersionText += "\n *** ";
-        strVersionText += QCoreApplication::tr ( "Copyright (C) 2005-2022 The Jamulus Development Team" );
-        strVersionText += "\n";
-    }
-
-    return strVersionText;
-}
-
-QString MakeClientNameTitle ( QString win, QString client )
-{
-    QString sReturnString = win;
-    if ( !client.isEmpty() )
-    {
-        sReturnString += " - " + client;
-    }
-    return ( sReturnString );
-}
-
-QString TruncateString ( QString str, int position )
-{
-    QTextBoundaryFinder tbfString ( QTextBoundaryFinder::Grapheme, str );
-
-    tbfString.setPosition ( position );
-    if ( !tbfString.isAtBoundary() )
-    {
-        tbfString.toPreviousBoundary();
-        position = tbfString.position();
-    }
-    return str.left ( position );
-}
