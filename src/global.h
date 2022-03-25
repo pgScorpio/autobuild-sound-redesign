@@ -71,10 +71,6 @@ LED bar:      lbr
 //#define _DEBUG_
 #undef _DEBUG_
 
-// html text macro's:
-#define htmlBold( T ) "<b>" + T + "</b>"
-#define htmlNewLine() "<br>"
-
 // version and application name (use version from qt prject file)
 #undef VERSION
 #define VERSION  APP_VERSION
@@ -390,7 +386,13 @@ extern QString UsageArguments ( QString appPath );
 //============================================================================
 #ifndef HEADLESS
 #    include <QMessageBox>
+#else
+#    define QDialog void
 #endif
+
+// html text macro's (for use in gui texts)
+#define htmlBold( T ) "<b>" + T + "</b>"
+#define htmlNewLine() "<br>"
 
 class CMsgBoxes
 {
@@ -409,26 +411,9 @@ public:
     static const QString& MainFormName() { return strMainFormName; }
 
     // Message boxes:
-    static void ShowError ( QString strError )
-    {
-#ifndef HEADLESS
-        QMessageBox::critical ( pMainForm, strMainFormName + ": " + QObject::tr ( "Error" ), strError, QObject::tr ( "Ok" ), nullptr );
-#endif
-    }
-
-    static void ShowWarning ( QString strWarning )
-    {
-#ifndef HEADLESS
-        QMessageBox::warning ( pMainForm, strMainFormName + ": " + QObject::tr ( "Warning" ), strWarning, QObject::tr ( "Ok" ), nullptr );
-#endif
-    }
-
-    static void ShowInfo ( QString strInfo )
-    {
-#ifndef HEADLESS
-        QMessageBox::information ( pMainForm, strMainFormName + ": " + QObject::tr ( "Information" ), strInfo, QObject::tr ( "Ok" ), nullptr );
-#endif
-    }
+    static void ShowError ( QString strError );
+    static void ShowWarning ( QString strWarning );
+    static void ShowInfo ( QString strInfo );
 };
 
 //============================================================================
@@ -449,8 +434,80 @@ private:
     static int    appArgc;
     static char** appArgv;
 
+public:
+    static QString GetProgramPath() { return QString ( *appArgv ); }
+
+public:
+    // sequencial parse functions using the argument index:
+
+    static bool GetFlagArgument ( int& i, const QString& strShortOpt, const QString& strLongOpt );
+
+    static bool GetStringArgument ( int& i, const QString& strShortOpt, const QString& strLongOpt, QString& strArg );
+
+    static bool GetNumericArgument ( int&           i,
+                                     const QString& strShortOpt,
+                                     const QString& strLongOpt,
+                                     double         rRangeStart,
+                                     double         rRangeStop,
+                                     double&        rValue );
+
+public:
+    // find and get a specific argument:
+
+    static bool GetFlagArgument ( const QString& strShortOpt, const QString& strLongOpt )
+    {
+        int i = 1;
+        while ( i < appArgc )
+        {
+            if ( GetFlagArgument ( i, strShortOpt, strLongOpt ) )
+            {
+                return true;
+            }
+
+            i++;
+        }
+
+        return false;
+    }
+
+    static bool GetStringArgument ( const QString& strShortOpt, const QString& strLongOpt, QString& strArg )
+    {
+        int i = 1;
+        while ( i < appArgc )
+        {
+            if ( GetStringArgument ( i, strShortOpt, strLongOpt, strArg ) )
+            {
+                return true;
+            }
+
+            i++;
+        }
+
+        return false;
+    }
+
+    static bool GetNumericArgument ( const QString& strShortOpt, const QString& strLongOpt, double rRangeStart, double rRangeStop, double& rValue )
+    {
+        int i = 1;
+        while ( i < appArgc )
+        {
+            if ( GetNumericArgument ( i, strShortOpt, strLongOpt, rRangeStart, rRangeStop, rValue ) )
+            {
+                return true;
+            }
+
+            i++;
+        }
+
+        return false;
+    }
+
+    //=================================================
+    // Non statics to parse bare arguments
+    // (These need an instance of CCommandlineOptions)
+    //=================================================
+
 protected:
-    // GetFirstArgument/GetNextArgument:
     int    currentIndex;
     char** currentArgv;
 
@@ -461,12 +518,10 @@ protected:
     }
 
 public:
-    // GetFirstArgument/GetNextArgument:
-
     QString GetFirstArgument()
     {
         reset();
-        // Skip program path
+        // Skipping program path
         return GetNextArgument();
     }
 
@@ -484,70 +539,6 @@ public:
         }
 
         return QString();
-    }
-
-public:
-    QString GetProgramPath() { return QString ( *appArgv ); }
-
-public:
-    // sequencial parse functions:
-
-    bool GetFlagArgument ( int& i, const QString& strShortOpt, const QString& strLongOpt ) const;
-
-    bool GetStringArgument ( int& i, const QString& strShortOpt, const QString& strLongOpt, QString& strArg ) const;
-
-    bool GetNumericArgument ( int& i, const QString& strShortOpt, const QString& strLongOpt, double rRangeStart, double rRangeStop, double& rValue )
-        const;
-
-public:
-    // Get specific argument:
-
-    bool GetFlagArgument ( const QString& strShortOpt, const QString& strLongOpt ) const
-    {
-        int i = 1;
-        while ( i < appArgc )
-        {
-            if ( GetFlagArgument ( i, strShortOpt, strLongOpt ) )
-            {
-                return true;
-            }
-
-            i++;
-        }
-
-        return false;
-    }
-
-    bool GetStringArgument ( const QString& strShortOpt, const QString& strLongOpt, QString& strArg ) const
-    {
-        int i = 1;
-        while ( i < appArgc )
-        {
-            if ( GetStringArgument ( i, strShortOpt, strLongOpt, strArg ) )
-            {
-                return true;
-            }
-
-            i++;
-        }
-
-        return false;
-    }
-
-    bool GetNumericArgument ( const QString& strShortOpt, const QString& strLongOpt, double rRangeStart, double rRangeStop, double& rValue ) const
-    {
-        int i = 1;
-        while ( i < appArgc )
-        {
-            if ( GetNumericArgument ( i, strShortOpt, strLongOpt, rRangeStart, rRangeStop, rValue ) )
-            {
-                return true;
-            }
-
-            i++;
-        }
-
-        return false;
     }
 };
 

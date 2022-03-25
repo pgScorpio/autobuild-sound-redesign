@@ -169,29 +169,8 @@ void CreateReqChannelLevelListMes() { Protocol.CreateReqChannelLevelListMes(); }
 
     double UpdateAndGetLevelForMeterdB ( const CVector<short>& vecsAudio, const int iInSize, const bool bIsStereoIn );
 
-    bool GetAndResetServerJittBuffError()
-    {
-        if ( bServerJittBuffError )
-        {
-            bServerJittBuffError = false;
-
-            return true;
-        }
-
-        return false;
-    }
-
-    bool GetAndResetClientJittBuffError()
-    {
-        if ( bClientJittBuffError )
-        {
-            bClientJittBuffError = false;
-
-            return true;
-        }
-
-        return false;
-    }
+    bool GetAndResetServerJittBuffError();
+    bool GetAndResetClientJittBuffError();
 
 protected:
     bool ProtocolIsEnabled();
@@ -259,7 +238,7 @@ protected:
 
 public slots:
     void OnSendProtMessage ( CVector<uint8_t> vecMessage );
-    void OnJittBufSizeErrorMessage();
+    void OnJittBufSizeError();
     void OnJittBufSizeChange ( int iNewJitBufSize );
     void OnChangeChanGain ( int iChanID, float fNewGain );
     void OnChangeChanPan ( int iChanID, float fNewPan );

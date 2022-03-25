@@ -1125,6 +1125,8 @@ contains(CONFIG, "disable_version_check") {
     DEFINES += DISABLE_VERSION_CHECK
 }
 
+ANDROID_ABIS = armeabi-v7a arm64-v8a x86 x86_64
+
 # Enable formatting all code via `make clang_format`.
 # Note: When extending the list of file extensions or when adding new code directories,
 # be sure to update .github/workflows/coding-style-check.yml and .clang-format-ignore as well.

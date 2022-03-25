@@ -108,7 +108,7 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSet
                                         TOOLTIP_COM_END_TEXT;
 
     // Jitter Buffer Settings
-    grbJitterBuffer->setToolTip(htmlBold(tr("Jitter Buffer Settings: ")) + strJitterBufferSettingsTT);
+    grbJitterBuffer->setToolTip ( htmlBold ( tr ( "Jitter Buffer Settings: " ) ) + strJitterBufferSettingsTT );
 
     lblNetBufLocal->setWhatsThis ( strJitterBufferSize );
     lblNetBufServer->setWhatsThis ( strJitterBufferSize );
@@ -787,8 +787,8 @@ void CClientSettingsDlg::UpdateJitterBufferFrame()
 {
     // update slider value and text
     const int iCurNumNetBufLocal = pClient->GetLocalSockBufNumFrames();
-    sldNetBufLocal->setValue ( iCurNumNetBufLocal);
-    lblNetBufLocal->setText ( tr ( "Size: " ) + QString::number ( iCurNumNetBufLocal) );
+    sldNetBufLocal->setValue ( iCurNumNetBufLocal );
+    lblNetBufLocal->setText ( tr ( "Size: " ) + QString::number ( iCurNumNetBufLocal ) );
 
     const int iCurNumNetBufServer = pClient->GetServerSockBufNumFrames();
     sldNetBufServer->setValue ( iCurNumNetBufServer );
