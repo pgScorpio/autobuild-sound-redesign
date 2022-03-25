@@ -68,8 +68,6 @@ DEFINES += QT_NO_DEPRECATED_WARNINGS
 win32 {
     DEFINES -= UNICODE # fixes issue with ASIO SDK (asiolist.cpp is not unicode compatible)
     DEFINES += NOMINMAX # solves a compiler error in qdatetime.h (Qt5)
-<<<<<<< HEAD
-=======
     INCLUDEPATH += windows/ASIOSDK2/common
     HEADERS += \
         windows/ASIOSDK2/common/asio.h \
@@ -80,7 +78,6 @@ win32 {
     SOURCES += \
         windows/asiodriver.cpp \
         windows/sound.cpp
->>>>>>> 19808ea0 (Re-included the ASIOSDK2 folder (but only using the 2 needed headers from the SDK's common folder))
     RC_FILE = windows/mainicon.rc
     mingw* {
         LIBS += -lole32 \
@@ -1113,6 +1110,8 @@ contains(CONFIG, "disable_version_check") {
     message(The version check is disabled.)
     DEFINES += DISABLE_VERSION_CHECK
 }
+
+ANDROID_ABIS = armeabi-v7a arm64-v8a x86 x86_64
 
 # Enable formatting all code via `make clang_format`.
 # Note: When extending the list of file extensions or when adding new code directories,

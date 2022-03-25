@@ -69,7 +69,7 @@ qRegisterMetaType<CHostAddress> ( "CHostAddress" );
 
     QObject::connect ( &Protocol, &CProtocol::MessReadyForSending, this, &CChannel::OnSendProtMessage );
 
-    QObject::connect ( &Protocol, &CProtocol::JittBufSizeErrorMessage, this, &CChannel::OnJittBufSizeErrorMessage);
+    QObject::connect ( &Protocol, &CProtocol::ErrorJittBufSize, this, &CChannel::OnJittBufSizeError );
     QObject::connect ( &Protocol, &CProtocol::ChangeJittBufSize, this, &CChannel::OnJittBufSizeChange );
 
     QObject::connect ( &Protocol, &CProtocol::ReqJittBufSize, this, &CChannel::ReqJittBufSize );
@@ -376,7 +376,31 @@ void CChannel::OnSendProtMessage ( CVector<uint8_t> vecMessage )
     }
 }
 
-void CChannel::OnJittBufSizeErrorMessage()
+bool CChannel::GetAndResetServerJittBuffError()
+{
+    if ( bServerJittBuffError )
+    {
+        bServerJittBuffError = false;
+
+        return true;
+    }
+
+    return false;
+}
+
+bool CChannel::GetAndResetClientJittBuffError()
+{
+    if ( bClientJittBuffError )
+    {
+        bClientJittBuffError = false;
+
+        return true;
+    }
+
+    return false;
+}
+
+void CChannel::OnJittBufSizeError()
 {
     // JitterBuffer under-run error message from the other side...
     if ( bIsServer )
@@ -657,13 +681,17 @@ EGetDataStat CChannel::GetData ( CVector<uint8_t>& vecbyData, const int iNumByte
                         // channel is not yet disconnected but no data in buffer
                         eGetStatus = GS_BUFFER_UNDERRUN;
 
-                        if (bIsServer)
+                        if ( bIsServer )
                         {
                             bServerJittBuffError = true;
+
+                            // Only the Server sends a JittBuffError message to Client
+                            Protocol.CreateJitBufMes ( 0 );
                         }
                         else
                         {
                             bClientJittBuffError = true;
+                            // JittBuffError message from Client to server has no use.
                         }
                     }
                 }
@@ -686,10 +714,6 @@ EGetDataStat CChannel::GetData ( CVector<uint8_t>& vecbyData, const int iNumByte
 
         // emit message
         emit Disconnected();
-    }
-    else if ( ( eGetStatus == GS_BUFFER_UNDERRUN ) && bIsServer )
-    {
-        Protocol.CreateJitBufMes ( 0 );
     }
 
     return eGetStatus;
