@@ -193,7 +193,7 @@ int main ( int argc, char** argv )
         }
 
         // JSON-RPC port number ------------------------------------------------
-        if ( GetNumericArgument ( argc, argv, i, "--jsonrpcport", "--jsonrpcport", 0, 65535, rDbleArgument ) )
+        if (cmdLine.GetNumericArgument ( i, CMDLN_JSONRPCPORT, 0, 65535, rDbleArgument ) )
         {
             iJsonRpcPortNumber = static_cast<quint16> ( rDbleArgument );
             qInfo() << qUtf8Printable ( QString ( "- JSON-RPC port number: %1" ).arg ( iJsonRpcPortNumber ) );
@@ -202,7 +202,7 @@ int main ( int argc, char** argv )
         }
 
         // JSON-RPC secret file name -------------------------------------------
-        if ( GetStringArgument ( argc, argv, i, "--jsonrpcsecretfile", "--jsonrpcsecretfile", strArgument ) )
+        if (cmdLine.GetStringArgument ( i, CMDLN_JSONRPCSECRETFILE, strArgument ) )
         {
             strJsonRpcSecretFileName = strArgument;
             qInfo() << qUtf8Printable ( QString ( "- JSON-RPC secret file: %1" ).arg ( strJsonRpcSecretFileName ) );

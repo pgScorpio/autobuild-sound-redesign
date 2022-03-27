@@ -161,6 +161,7 @@ win32 {
  OBJECTIVE_SOURCES += mac/activity.mm
     CONFIG += x86
     QMAKE_TARGET_BUNDLE_PREFIX = io.jamulus
+    QMAKE_APPLICATION_BUNDLE_NAME. = $$TARGET
 
     OSX_ENTITLEMENTS.files = mac/Jamulus.entitlements
     OSX_ENTITLEMENTS.path = Contents/Resources
@@ -206,10 +207,6 @@ win32 {
         DEFINES += JACK_REPLACES_COREAUDIO
         INCLUDEPATH += /usr/local/include
         LIBS += /usr/local/lib/libjack.dylib
-    } else {
-        message(Using CoreAudio.)
-        HEADERS += mac/sound.h
-        SOURCES += mac/sound.cpp
     }
 
 } else:ios {

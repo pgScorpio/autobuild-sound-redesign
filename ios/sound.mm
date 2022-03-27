@@ -40,14 +40,14 @@ CSound::CSound ( void ( *fpProcessCallback ) ( CVector<short>& psData, void* arg
 
         [[AVAudioSession sharedInstance] setCategory:AVAudioSessionCategoryPlayAndRecord error:&audioSessionError];
         [[AVAudioSession sharedInstance] requestRecordPermission:^( BOOL granted ) {
-          if ( granted )
-          {
-              // ok
-          }
-          else
-          {
-              // TODO - alert user
-          }
+            if ( granted )
+            {
+                // ok
+            }
+            else
+            {
+                // TODO - alert user
+            }
         }];
         [[AVAudioSession sharedInstance] setMode:AVAudioSessionModeMeasurement error:&audioSessionError];
     }
@@ -248,12 +248,12 @@ bool CSound::init() // pgScorpio: Some of these function results could be stored
                             object:nil
                              queue:nil
                         usingBlock:^( NSNotification* notification ) {
-                          UInt8 reason = [[notification.userInfo valueForKey:AVAudioSessionRouteChangeReasonKey] intValue];
-                          if ( reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable or
-                               reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable )
-                          {
-                              emit reinitRequest ( RS_RELOAD_RESTART_AND_INIT ); // reload the available devices frame
-                          }
+                            UInt8 reason = [[notification.userInfo valueForKey:AVAudioSessionRouteChangeReasonKey] intValue];
+                            if ( reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable or
+                                 reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable )
+                            {
+                                emit reinitRequest ( RS_RELOAD_RESTART_AND_INIT ); // reload the available devices frame
+                            }
                         }];
             isInitialized = true;
         }
