@@ -579,6 +579,8 @@ public:
 #define CMDLN_MUTEMYOWN           "--mutemyown",           "--mutemyown"
 #define CMDLN_CLIENTNAME          "--clientname",          "--clientname"
 #define CMDLN_CTRLMIDICH          "--ctrlmidich",          "--ctrlmidich"
+#define CMDLN_JSONRPCPORT         "--jsonrpcport",         "--jsonrpcport"
+#define CMDLN_JSONRPCSECRETFILE   "--jsonrpcsecretfile",   "--jsonrpcsecretfile"
 // Backwards compatibilyty:
 #define CMDLN_CENTRALSERVER       "--centralserver",       "--centralserver"
 // pgScorpio: TODO These are NOT in help !:
