@@ -114,8 +114,6 @@ win32 {
             error("Error: jack.h was not found in the expected location ($${programfilesdir}). Ensure that the right JACK2 variant is installed (32bit vs. 64bit).")
         }
 
-        HEADERS -= windows/sound.h
-        SOURCES -= windows/sound.cpp
         HEADERS += linux/sound.h \
         linux/jackclient.h
         SOURCES += linux/sound.cpp \
@@ -161,10 +159,9 @@ win32 {
     HEADERS += mac/activity.h \
         mac/sound.h
     SOURCES +=  mac/sound.cpp
- OBJECTIVE_SOURCES += mac/activity.mm
+    OBJECTIVE_SOURCES += mac/activity.mm
     CONFIG += x86
     QMAKE_TARGET_BUNDLE_PREFIX = io.jamulus
-    QMAKE_APPLICATION_BUNDLE_NAME. = $$TARGET
 
     OSX_ENTITLEMENTS.files = Jamulus.entitlements
     OSX_ENTITLEMENTS.path = Contents/Resources
@@ -200,8 +197,6 @@ win32 {
                  error("Error: jack.h was not found at the usual place, maybe jack is not installed")
             }
         }
-        HEADERS -= mac/sound.h
-        SOURCES -= mac/sound.cpp
         HEADERS += linux/sound.h \
         linux/jackclient.h
         SOURCES += linux/sound.cpp \
@@ -210,6 +205,10 @@ win32 {
         DEFINES += JACK_REPLACES_COREAUDIO
         INCLUDEPATH += /usr/local/include
         LIBS += /usr/local/lib/libjack.dylib
+    } else {
+        message(Using CoreAudio.)
+        HEADERS += mac/sound.h
+        SOURCES += mac/sound.cpp
     }
 
 } else:ios {
@@ -1107,8 +1106,6 @@ contains(CONFIG, "disable_version_check") {
     message(The version check is disabled.)
     DEFINES += DISABLE_VERSION_CHECK
 }
-
-ANDROID_ABIS = armeabi-v7a arm64-v8a x86 x86_64
 
 # Enable formatting all code via `make clang_format`.
 # Note: When extending the list of file extensions or when adding new code directories,

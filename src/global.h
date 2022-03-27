@@ -376,8 +376,6 @@ public:
 //                       pgScorpio: A Class is there now !
 //                                 (Still containing these functions)
 
-extern QString UsageArguments ( QString appPath );
-
 //============================================================================
 // CMsgBoxes class:
 //  Use this static class to show basic Error, Warning and Info messageboxes
@@ -419,7 +417,7 @@ public:
 //============================================================================
 // CCommandlineOptions class:
 //  Note that passing commandline arguments to classes is no longer required,
-//  since an instance of this class can get commandline options anywhere.
+//  since via this class we can get commandline options anywhere.
 //============================================================================
 
 class CCommandlineOptions
@@ -588,5 +586,6 @@ public:
 #define CMDLN_SHOWANALYZERCONSOLE "--showanalyzerconsole", "--showanalyzerconsole"
 // CMDLN_SPECIAL: Mostly used for debugging, any option after --special is accepted, should NOT be in help !
 #define CMDLN_SPECIAL             "--special",             "--special"
+// Special options for sound-redesign testing
 #define CMDLN_JACKINPUTS          "--jackinputs",          "--jackinputs"
 // clang-format on

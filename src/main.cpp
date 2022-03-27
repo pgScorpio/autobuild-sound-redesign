@@ -55,6 +55,8 @@ char** CCommandlineOptions::appArgv = NULL;
 QDialog* CMsgBoxes::pMainForm       = NULL;
 QString  CMsgBoxes::strMainFormName = APP_NAME;
 
+QString UsageArguments(QString appPath);
+
 int main ( int argc, char** argv )
 {
     CCommandlineOptions::appArgc = argc;
@@ -569,8 +571,7 @@ int main ( int argc, char** argv )
         if ( ServerOnlyOptions.size() != 0 )
         {
             qCritical() << qUtf8Printable ( QString ( "%1: Server only option(s) '%2' used.  Did you omit '--server'?" )
-                                                .arg ( argv[0] )
-                                                .arg ( ServerOnlyOptions.join ( ", " ) ) );
+                                                .arg ( CCommandlineOptions::GetProgramPath(), ServerOnlyOptions.join ( ", " ) ) );
             exit ( 1 );
         }
 
@@ -864,6 +865,7 @@ int main ( int argc, char** argv )
                                        bEnableIPv6,
                                        nullptr );
 
+                // initialise message boxes
                 CMsgBoxes::init ( &ClientDlg, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
 
                 // show dialog
@@ -957,7 +959,7 @@ int main ( int argc, char** argv )
 #ifndef HEADLESS
         if ( bUseGUI )
         {
-            QMessageBox::critical ( nullptr, APP_NAME, generr.GetErrorText(), "Quit", nullptr );
+            CMsgBoxes::ShowError ( generr.GetErrorText() );
         }
         else
 #endif
@@ -1074,6 +1076,12 @@ QString UsageArguments ( QString appPath )
            "                        (not supported for headless server mode)\n"
            "  -n, --nogui           disable GUI (\"headless\")\n"
            "  -p, --port            set the local port number\n"
+           "      --jsonrpcport     enable JSON-RPC server, set TCP port number\n"
+           "                        (EXPERIMENTAL, APIs might still change;\n"
+           "                        only accessible from localhost)\n"
+           "      --jsonrpcsecretfile\n"
+           "                        path to a single-line file which contains a freely\n"
+           "                        chosen secret to authenticate JSON-RPC users.\n"
            "  -Q, --qos             set the QoS value. Default is 128. Disable with 0\n"
            "                        (see the Jamulus website to enable QoS on Windows)\n"
            "  -t, --notranslation   disable translation (use English language)\n"

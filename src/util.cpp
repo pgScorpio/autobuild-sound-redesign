@@ -498,51 +498,6 @@ CAboutDlg::CAboutDlg ( QWidget* parent ) : CBaseDlg ( parent )
         tr ( "For details on the contributions check out the %1" )
             .arg ( "<a href=\"https://github.com/jamulussoftware/jamulus/graphs/contributors\">" + tr ( "Github Contributors list" ) + "</a>." ) );
 
-    // translators
-    txvTranslation->setText ( "<p><b>" + tr ( "Spanish" ) +
-                              "</b></p>"
-                              "<p>Daryl Hanlon (<a href=\"https://github.com/ignotus666\">ignotus666</a>)</p>"
-                              "<p><b>" +
-                              tr ( "French" ) +
-                              "</b></p>"
-                              "<p>Olivier Humbert (<a href=\"https://github.com/trebmuh\">trebmuh</a>)</p>"
-                              "<p>Julien Taverna (<a href=\"https://github.com/jujudusud\">jujudusud</a>)</p>"
-                              "<p><b>" +
-                              tr ( "Portuguese" ) +
-                              "</b></p>"
-                              "<p>Miguel de Matos (<a href=\"https://github.com/Snayler\">Snayler</a>)</p>"
-                              "<p>Melcon Moraes (<a href=\"https://github.com/melcon\">melcon</a>)</p>"
-                              "<p><b>" +
-                              tr ( "Dutch" ) +
-                              "</b></p>"
-                              "<p>Jeroen Geertzen (<a href=\"https://github.com/jerogee\">jerogee</a>)</p>"
-                              "<p>Henk De Groot (<a href=\"https://github.com/henkdegroot\">henkdegroot</a>)</p>"
-                              "<p><b>" +
-                              tr ( "Italian" ) +
-                              "</b></p>"
-                              "<p>Giuseppe Sapienza (<a href=\"https://github.com/dzpex\">dzpex</a>)</p>"
-                              "<p><b>" +
-                              tr ( "German" ) +
-                              "</b></p>"
-                              "<p>Volker Fischer (<a href=\"https://github.com/corrados\">corrados</a>)</p>"
-                              "<p>Roland Moschel (<a href=\"https://github.com/rolamos\">rolamos</a>)</p>"
-                              "<p><b>" +
-                              tr ( "Polish" ) +
-                              "</b></p>"
-                              "<p>Martyna Danysz (<a href=\"https://github.com/Martyna27\">Martyna27</a>)</p>"
-                              "<p>Tomasz Bojczuk (<a href=\"https://github.com/SeeLook\">SeeLook</a>)</p>"
-                              "<p><b>" +
-                              tr ( "Swedish" ) +
-                              "</b></p>"
-                              "<p>Daniel (<a href=\"https://github.com/genesisproject2020\">genesisproject2020</a>)</p>"
-                              "<p><b>" +
-                              tr ( "Slovak" ) +
-                              "</b></p>"
-                              "<p>Jose Riha (<a href=\"https://github.com/jose1711\">jose1711</a>)</p>" +
-                              "<p><b>" + tr ( "Simplified Chinese" ) +
-                              "</b></p>"
-                              "<p>Gary Wang (<a href=\"https://github.com/BLumia\">BLumia</a>)</p>" );
-
     // set version number in about dialog
     lblVersion->setText ( GetVersionAndNameStr() );
 
@@ -665,7 +620,9 @@ void CLanguageComboBox::OnLanguageActivated ( int iLanguageIdx )
     // only update if the language selection is different from the current selected language
     if ( iIdxSelectedLanguage != iLanguageIdx )
     {
-        QMessageBox::information ( this, tr ( "Restart Required" ), tr ( "Please restart the application for the language change to take effect." ) );
+        QMessageBox::information ( CMsgBoxes::MainForm(),
+                                   CMsgBoxes::MainFormName() + ": " + tr ( "Restart Required" ),
+                                   tr ( "Please restart the application for the language change to take effect." ) );
 
         emit LanguageChanged ( itemData ( iLanguageIdx ).toString() );
     }
