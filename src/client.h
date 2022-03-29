@@ -29,7 +29,6 @@
 #include <QString>
 #include <QDateTime>
 #include <QMutex>
-#include <QMessageBox>
 #ifdef USE_OPUS_SHARED_LIB
 #    include "opus/opus_custom.h"
 #else
@@ -150,7 +149,7 @@ public:
     EAudChanConf GetAudioChannels() const { return eAudioChannelConf; }
     void         SetAudioChannels ( const EAudChanConf eNAudChanConf );
 
-    bool GetAudioXFade() const { return eAudioChannelConf == CC_MONO; } // only use attenuation in pan center for mono mode
+    bool GetAudioXFade() const { return eAudioChannelConf == CC_MONO; }
 
     int  GetAudioInFader() const { return iAudioInFader; }
     void SetAudioInFader ( const int iNV ) { iAudioInFader = iNV; }
@@ -290,12 +289,6 @@ public:
     // settings
     CChannelCoreInfo ChannelInfo;
     QString          strClientName;
-
-#ifdef LLCON_VST_PLUGIN
-    // VST version must have direct access to sound object.
-    // pgScorpio: We can now use CSound::pInstance() to get a pointer to it's CSoundBase interface
-    CSound* GetSound() { return &Sound; }
-#endif
 
 protected:
     // callback function must be static, otherwise it does not work
@@ -437,10 +430,15 @@ signals:
     void RecorderStateReceived ( ERecorderState eRecorderState );
 
     void CLServerListReceived ( CHostAddress InetAddr, CVector<CServerInfo> vecServerInfo );
+
     void CLRedServerListReceived ( CHostAddress InetAddr, CVector<CServerInfo> vecServerInfo );
+
     void CLConnClientsListMesReceived ( CHostAddress InetAddr, CVector<CChannelInfo> vecChanInfo );
+
     void CLPingTimeWithNumClientsReceived ( CHostAddress InetAddr, int iPingTime, int iNumClients );
+
     void CLVersionAndOSReceived ( CHostAddress InetAddr, COSUtil::EOpSystemType eOSType, QString strVersion );
+
     void CLChannelLevelListReceived ( CHostAddress InetAddr, CVector<uint16_t> vecLevelList );
 
     void SoundDeviceChanged();
