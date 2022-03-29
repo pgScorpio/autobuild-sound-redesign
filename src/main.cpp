@@ -29,11 +29,15 @@
 #ifndef HEADLESS
 #    include <QApplication>
 #    include <QMessageBox>
-#    include "clientdlg.h"
 #    include "serverdlg.h"
+#    ifndef SERVER_ONLY
+#        include "clientdlg.h"
+#    endif
 #endif
 #include "settings.h"
-#include "testbench.h"
+#ifndef SERVER_ONLY
+#    include "testbench.h"
+#endif
 #include "util.h"
 #ifdef ANDROID
 #    include <QtAndroidExtras/QtAndroid>
@@ -45,7 +49,9 @@ extern void qt_set_sequence_auto_mnemonic ( bool bEnable );
 #include <memory>
 #include "rpcserver.h"
 #include "serverrpc.h"
-#include "clientrpc.h"
+#ifndef SERVER_ONLY
+#    include "clientrpc.h"
+#endif
 
 // Implementation **************************************************************
 
@@ -76,7 +82,7 @@ int main ( int argc, char** argv )
 
     // initialize all flags and string which might be changed by command line
     // arguments
-#if defined( SERVER_BUNDLE ) && ( defined( Q_OS_MACX ) )
+#if defined( SERVER_BUNDLE ) && defined( Q_OS_MACX )
     // if we are on MacOS and we are building a server bundle, starts Jamulus in server mode
     bool bIsClient = false;
 #else
@@ -538,7 +544,7 @@ int main ( int argc, char** argv )
 #ifdef SERVER_ONLY
     if ( bIsClient )
     {
-        qCritical() << "Only --server mode is supported in this build with nosound.";
+        qCritical() << "Only --server mode is supported in this build.";
         exit ( 1 );
     }
 #endif
@@ -765,10 +771,12 @@ int main ( int argc, char** argv )
     // init resources
     Q_INIT_RESOURCE ( resources );
 
+#ifndef SERVER_ONLY
     // clang-format off
 // TEST -> activate the following line to activate the test bench,
 //CTestbench Testbench ( "127.0.0.1", DEFAULT_PORT_NUMBER );
-    // clang-format on
+// clang-format on
+#endif
 
     CRpcServer* pRpcServer = nullptr;
 
@@ -809,6 +817,7 @@ int main ( int argc, char** argv )
 
     try
     {
+#ifndef SERVER_ONLY
         if ( bIsClient )
         {
             // Client:
@@ -838,7 +847,7 @@ int main ( int argc, char** argv )
                 new CClientRpc ( &Client, pRpcServer, pRpcServer );
             }
 
-#ifndef HEADLESS
+#    ifndef HEADLESS
             if ( bUseGUI )
             {
                 // GUI object
@@ -860,7 +869,7 @@ int main ( int argc, char** argv )
                 pApp->exec();
             }
             else
-#endif
+#    endif
             {
                 // only start application without using the GUI
                 qInfo() << qUtf8Printable ( GetVersionAndNameStr ( false ) );
@@ -869,6 +878,7 @@ int main ( int argc, char** argv )
             }
         }
         else
+#endif
         {
             // Server:
             // actual server object
