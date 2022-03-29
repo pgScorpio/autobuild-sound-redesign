@@ -286,8 +286,12 @@ win32 {
     } else {
         message(Jack Audio Interface Enabled.)
 
-        HEADERS += linux/sound.h
-        SOURCES += linux/sound.cpp
+        HEADERS += \
+            linux/jackclient.h \
+            linux/sound.h
+        SOURCES += \
+            linux/jackclient.cpp \
+            linux/sound.cpp
 
         contains(CONFIG, "raspijamulus") {
             message(Using Jack Audio in raspijamulus.sh mode.)
