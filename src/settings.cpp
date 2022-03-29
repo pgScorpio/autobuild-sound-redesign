@@ -200,6 +200,7 @@ void CSettings::PutIniSetting ( QDomDocument& xmlFile, const QString& sSection, 
     xmlKey.appendChild ( currentValue );
 }
 
+#ifndef SERVER_ONLY
 // Client settings -------------------------------------------------------------
 void CClientSettings::LoadFaderSettings ( const QString& strCurFileName )
 {
@@ -762,6 +763,7 @@ void CClientSettings::WriteFaderSettingsToXML ( QDomDocument& IniXMLDocument )
         SetNumericIniSet ( IniXMLDocument, "client", QString ( "storedgroupid%1" ).arg ( iIdx ), vecStoredFaderGroupID[iIdx] );
     }
 }
+#endif
 
 // Server settings -------------------------------------------------------------
 // that this gets called means we are not headless
