@@ -795,7 +795,6 @@ int main ( int argc, char** argv )
 //CTestbench Testbench ( "127.0.0.1", DEFAULT_PORT_NUMBER );
 // clang-format on
 #endif
-
     CRpcServer* pRpcServer = nullptr;
 
     if ( iJsonRpcPortNumber != INVALID_PORT )
