@@ -165,9 +165,7 @@ win32 {
     }
 
     QT += macextras
-    HEADERS += mac/activity.h \
-        mac/sound.h
-    SOURCES +=  mac/sound.cpp
+    HEADERS += mac/activity.h
     OBJECTIVE_SOURCES += mac/activity.mm
     CONFIG += x86
     QMAKE_TARGET_BUNDLE_PREFIX = io.jamulus
@@ -297,8 +295,12 @@ win32 {
     } else {
         message(Jack Audio Interface Enabled.)
 
-        HEADERS += linux/sound.h
-        SOURCES += linux/sound.cpp
+        HEADERS += \
+            linux/jackclient.h \
+            linux/sound.h
+        SOURCES += \
+            linux/jackclient.cpp \
+            linux/sound.cpp
 
         contains(CONFIG, "raspijamulus") {
             message(Using Jack Audio in raspijamulus.sh mode.)
