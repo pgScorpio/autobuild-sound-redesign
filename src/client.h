@@ -29,7 +29,6 @@
 #include <QString>
 #include <QDateTime>
 #include <QMutex>
-#include <QMessageBox>
 #ifdef USE_OPUS_SHARED_LIB
 #    include "opus/opus_custom.h"
 #else
@@ -41,28 +40,25 @@
 #include "util.h"
 #include "buffer.h"
 #include "signalhandler.h"
-#ifdef LLCON_VST_PLUGIN
-#    include "vstsound.h"
+
+#if defined( _WIN32 ) && !defined( JACK_ON_WINDOWS )
+#    include "../windows/sound.h"
 #else
-#    if defined( _WIN32 ) && !defined( JACK_REPLACES_ASIO )
-#        include "../windows/sound.h"
+#    if ( defined( Q_OS_MACX ) ) && !defined( JACK_REPLACES_COREAUDIO )
+#        include "../mac/sound.h"
 #    else
-#        if ( defined( Q_OS_MACX ) ) && !defined( JACK_REPLACES_COREAUDIO )
-#            include "../mac/sound.h"
+#        if defined( Q_OS_IOS )
+#            include "../ios/sound.h"
 #        else
-#            if defined( Q_OS_IOS )
-#                include "../ios/sound.h"
+#            ifdef ANDROID
+#                include "../android/sound.h"
 #            else
-#                ifdef ANDROID
-#                    include "../android/sound.h"
-#                else
-#                    include "../linux/sound.h"
-#                    ifndef JACK_REPLACES_ASIO // these headers are not available in Windows OS
-#                        include <sched.h>
-#                        include <netdb.h>
-#                    endif
-#                    include <socket.h>
+#                include "../linux/sound.h"
+#                ifndef JACK_ON_WINDOWS // these headers are not available in Windows OS
+#                    include <sched.h>
+#                    include <netdb.h>
 #                endif
+#                include <socket.h>
 #            endif
 #        endif
 #    endif
@@ -76,6 +72,10 @@
 
 // audio reverberation range
 #define AUD_REVERB_MAX 100
+
+// default delay period between successive gain updates (ms)
+// this will be increased to double the ping time if connected to a distant server
+#define DEFAULT_GAIN_DELAY_PERIOD_MS 50
 
 // OPUS number of coded bytes per audio packet
 // TODO we have to use new numbers for OPUS to avoid that old CELT packets
@@ -149,7 +149,7 @@ public:
     EAudChanConf GetAudioChannels() const { return eAudioChannelConf; }
     void         SetAudioChannels ( const EAudChanConf eNAudChanConf );
 
-    bool GetAudioXFade() const { return eAudioChannelConf == CC_MONO; } // only use attenuation in pan center for mono mode
+    bool GetAudioXFade() const { return eAudioChannelConf == CC_MONO; }
 
     int  GetAudioInFader() const { return iAudioInFader; }
     void SetAudioInFader ( const int iNV ) { iAudioInFader = iNV; }
@@ -247,6 +247,8 @@ public:
     void SetMuteOutStream ( const bool bDoMute ) { bMuteOutStream = bDoMute; }
 
     void SetRemoteChanGain ( const int iId, const float fGain, const bool bIsMyOwnFader );
+    void OnTimerRemoteChanGain();
+    void StartDelayTimer();
 
     void SetRemoteChanPan ( const int iId, const float fPan ) { Channel.SetRemoteChanPan ( iId, fPan ); }
 
@@ -281,12 +283,6 @@ public:
     // settings
     CChannelCoreInfo ChannelInfo;
     QString          strClientName;
-
-#ifdef LLCON_VST_PLUGIN
-    // VST version must have direct access to sound object.
-    // pgScorpio: We can now use CSound::pInstance() to get a pointer to it's CSoundBase interface
-    CSound* GetSound() { return &Sound; }
-#endif
 
 protected:
     // callback function must be static, otherwise it does not work
@@ -372,6 +368,15 @@ protected:
     // for ping measurement
     QElapsedTimer PreciseTime;
 
+    // for gain rate limiting
+    QMutex MutexGain;
+    QTimer TimerGain;
+    int    minGainId;
+    int    maxGainId;
+    float  oldGain[MAX_NUM_CHANNELS];
+    float  newGain[MAX_NUM_CHANNELS];
+    int    iCurPingTime;
+
     CSignalHandler* pSignalHandler;
 
 protected slots:
@@ -419,10 +424,15 @@ signals:
     void RecorderStateReceived ( ERecorderState eRecorderState );
 
     void CLServerListReceived ( CHostAddress InetAddr, CVector<CServerInfo> vecServerInfo );
+
     void CLRedServerListReceived ( CHostAddress InetAddr, CVector<CServerInfo> vecServerInfo );
+
     void CLConnClientsListMesReceived ( CHostAddress InetAddr, CVector<CChannelInfo> vecChanInfo );
+
     void CLPingTimeWithNumClientsReceived ( CHostAddress InetAddr, int iPingTime, int iNumClients );
+
     void CLVersionAndOSReceived ( CHostAddress InetAddr, COSUtil::EOpSystemType eOSType, QString strVersion );
+
     void CLChannelLevelListReceived ( CHostAddress InetAddr, CVector<uint16_t> vecLevelList );
 
     void SoundDeviceChanged();

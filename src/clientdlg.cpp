@@ -1207,9 +1207,9 @@ void CClientDlg::OnConnecting ( QString strServerName )
         // running state but show error message
         try
         {
-            if ( !pClient->IsRunning() )
+            if ( !pClient->ConnectionIsStarted() )
             {
-                pClient->Start();
+                pClient->Connect ( strServerName, strServerName );
             }
         }
 
@@ -1229,13 +1229,12 @@ void CClientDlg::OnConnecting ( QString strServerName )
         butConnect->setText ( tr ( "&Disconnect" ) );
 
         // set server name in audio mixer group box title
-        MainMixerBoard->SetServerName ( strMixerBoardLabel );
+        MainMixerBoard->SetServerName ( strServerName );
 
         // start timer for level meter bar and ping time measurement
         TimerSigMet.start ( LEVELMETER_UPDATE_TIME_MS );
         TimerBuffersLED.start ( BUFFER_LED_UPDATE_TIME_MS );
         TimerPing.start ( PING_UPDATE_TIME_MS );
-        TimerCheckAudioDeviceOk.start ( CHECK_AUDIO_DEV_OK_TIME_MS ); // is single shot timer
 
         // audio feedback detection
         if ( pSettings->bEnableFeedbackDetection )
