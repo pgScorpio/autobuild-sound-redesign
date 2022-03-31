@@ -61,7 +61,7 @@ char** CCommandlineOptions::appArgv = NULL;
 QDialog* CMsgBoxes::pMainForm       = NULL;
 QString  CMsgBoxes::strMainFormName = APP_NAME;
 
-QString UsageArguments(QString appPath);
+QString UsageArguments ( QString appPath );
 
 int main ( int argc, char** argv )
 {
