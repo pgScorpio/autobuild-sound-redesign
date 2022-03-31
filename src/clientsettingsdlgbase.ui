@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1030</width>
-    <height>603</height>
+    <width>648</width>
+    <height>520</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -326,6 +326,9 @@
                 </item>
                 <item>
                  <layout class="QVBoxLayout" name="verticalLayout_7">
+                  <property name="sizeConstraint">
+                   <enum>QLayout::SetMinAndMaxSize</enum>
+                  </property>
                   <item>
                    <widget class="QComboBox" name="cbxSkin">
                     <property name="sizePolicy">
@@ -333,6 +336,18 @@
                       <horstretch>0</horstretch>
                       <verstretch>0</verstretch>
                      </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>0</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>16777215</width>
+                      <height>20</height>
+                     </size>
                     </property>
                    </widget>
                   </item>
@@ -343,6 +358,18 @@
                       <horstretch>0</horstretch>
                       <verstretch>0</verstretch>
                      </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>0</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>16777215</width>
+                      <height>20</height>
+                     </size>
                     </property>
                    </widget>
                   </item>
@@ -357,7 +384,13 @@
                     <property name="minimumSize">
                      <size>
                       <width>150</width>
-                      <height>0</height>
+                      <height>20</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>16777215</width>
+                      <height>20</height>
                      </size>
                     </property>
                    </widget>
@@ -370,10 +403,16 @@
                       <verstretch>0</verstretch>
                      </sizepolicy>
                     </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>70</width>
+                      <height>20</height>
+                     </size>
+                    </property>
                     <property name="maximumSize">
                      <size>
                       <width>70</width>
-                      <height>16777215</height>
+                      <height>20</height>
                      </size>
                     </property>
                     <property name="alignment">
@@ -405,10 +444,16 @@
                           <verstretch>0</verstretch>
                          </sizepolicy>
                         </property>
+                        <property name="minimumSize">
+                         <size>
+                          <width>70</width>
+                          <height>20</height>
+                         </size>
+                        </property>
                         <property name="maximumSize">
                          <size>
                           <width>70</width>
-                          <height>16777215</height>
+                          <height>20</height>
                          </size>
                         </property>
                         <property name="alignment">
@@ -422,9 +467,6 @@
                         </property>
                         <property name="maximum">
                          <number>100</number>
-                        </property>
-                        <property name="stepType">
-                         <enum>QAbstractSpinBox::AdaptiveDecimalStepType</enum>
                         </property>
                         <property name="value">
                          <number>60</number>
@@ -462,6 +504,18 @@
                <layout class="QVBoxLayout" name="verticalLayout_22">
                 <item>
                  <widget class="QComboBox" name="cbxCustomDirectories">
+                  <property name="minimumSize">
+                   <size>
+                    <width>200</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>16777215</width>
+                    <height>20</height>
+                   </size>
+                  </property>
                   <property name="editable">
                    <bool>true</bool>
                   </property>
@@ -498,10 +552,19 @@
       <layout class="QVBoxLayout" name="verticalLayout_6">
        <item>
         <layout class="QHBoxLayout" name="horizontalLayout_7">
+         <property name="sizeConstraint">
+          <enum>QLayout::SetMinAndMaxSize</enum>
+         </property>
          <item>
           <layout class="QVBoxLayout" name="verticalLayout_13">
+           <property name="sizeConstraint">
+            <enum>QLayout::SetMinAndMaxSize</enum>
+           </property>
            <item>
             <layout class="QHBoxLayout" name="horizontalLayout_16">
+             <property name="sizeConstraint">
+              <enum>QLayout::SetMinAndMaxSize</enum>
+             </property>
              <item>
               <widget class="QGroupBox" name="gbAudioDevice">
                <property name="sizePolicy">
@@ -698,6 +761,9 @@
                          </item>
                          <item>
                           <layout class="QVBoxLayout" name="verticalLayout_25">
+                           <property name="sizeConstraint">
+                            <enum>QLayout::SetMinAndMaxSize</enum>
+                           </property>
                            <item>
                             <widget class="QComboBox" name="cbxLInChan">
                              <property name="sizePolicy">
@@ -832,6 +898,9 @@
                        </item>
                        <item>
                         <layout class="QVBoxLayout" name="verticalLayout_17">
+                         <property name="sizeConstraint">
+                          <enum>QLayout::SetMinAndMaxSize</enum>
+                         </property>
                          <item>
                           <widget class="QComboBox" name="cbxLOutChan">
                            <property name="sizePolicy">
@@ -893,6 +962,9 @@
              </item>
              <item>
               <layout class="QVBoxLayout" name="verticalLayout_32">
+               <property name="sizeConstraint">
+                <enum>QLayout::SetMinAndMaxSize</enum>
+               </property>
                <property name="leftMargin">
                 <number>4</number>
                </property>
@@ -925,6 +997,9 @@
                  <layout class="QVBoxLayout" name="verticalLayout_26">
                   <item>
                    <layout class="QVBoxLayout" name="verticalLayout_14">
+                    <property name="sizeConstraint">
+                     <enum>QLayout::SetMinAndMaxSize</enum>
+                    </property>
                     <item>
                      <layout class="QHBoxLayout" name="horizontalLayout_10">
                       <item>
@@ -938,7 +1013,7 @@
                         <property name="minimumSize">
                          <size>
                           <width>20</width>
-                          <height>25</height>
+                          <height>20</height>
                          </size>
                         </property>
                         <property name="maximumSize">
@@ -998,7 +1073,7 @@
                         <property name="minimumSize">
                          <size>
                           <width>20</width>
-                          <height>25</height>
+                          <height>20</height>
                          </size>
                         </property>
                         <property name="maximumSize">
@@ -1049,6 +1124,18 @@
                    <verstretch>0</verstretch>
                   </sizepolicy>
                  </property>
+                 <property name="minimumSize">
+                  <size>
+                   <width>200</width>
+                   <height>20</height>
+                  </size>
+                 </property>
+                 <property name="maximumSize">
+                  <size>
+                   <width>200</width>
+                   <height>20</height>
+                  </size>
+                 </property>
                  <property name="text">
                   <string>Feedback Detection</string>
                  </property>
@@ -1082,6 +1169,9 @@
                    <layout class="QVBoxLayout" name="verticalLayout_4">
                     <item>
                      <layout class="QGridLayout" name="gridLayoutAudioMode">
+                      <property name="sizeConstraint">
+                       <enum>QLayout::SetMinAndMaxSize</enum>
+                      </property>
                       <item row="0" column="0">
                        <widget class="QLabel" name="lblAudioChannels">
                         <property name="sizePolicy">
@@ -1093,7 +1183,7 @@
                         <property name="minimumSize">
                          <size>
                           <width>70</width>
-                          <height>0</height>
+                          <height>20</height>
                          </size>
                         </property>
                         <property name="maximumSize">
@@ -1121,7 +1211,7 @@
                         <property name="minimumSize">
                          <size>
                           <width>70</width>
-                          <height>0</height>
+                          <height>20</height>
                          </size>
                         </property>
                         <property name="maximumSize">
@@ -1183,6 +1273,9 @@
                     </item>
                     <item>
                      <layout class="QHBoxLayout" name="horizontalLayout_19">
+                      <property name="sizeConstraint">
+                       <enum>QLayout::SetMinAndMaxSize</enum>
+                      </property>
                       <item>
                        <widget class="QLabel" name="lblAudioStreamRate">
                         <property name="sizePolicy">
@@ -1210,6 +1303,12 @@
                       </item>
                       <item>
                        <widget class="QLabel" name="lblUpstreamValue">
+                        <property name="minimumSize">
+                         <size>
+                          <width>0</width>
+                          <height>20</height>
+                         </size>
+                        </property>
                         <property name="maximumSize">
                          <size>
                           <width>16777215</width>
@@ -1234,6 +1333,12 @@
                           <horstretch>0</horstretch>
                           <verstretch>0</verstretch>
                          </sizepolicy>
+                        </property>
+                        <property name="minimumSize">
+                         <size>
+                          <width>0</width>
+                          <height>20</height>
+                         </size>
                         </property>
                         <property name="maximumSize">
                          <size>
@@ -1288,6 +1393,18 @@
                       <verstretch>0</verstretch>
                      </sizepolicy>
                     </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>0</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>16777215</width>
+                      <height>20</height>
+                     </size>
+                    </property>
                     <property name="text">
                      <string>(preferred)</string>
                     </property>
@@ -1301,6 +1418,18 @@
                       <verstretch>0</verstretch>
                      </sizepolicy>
                     </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>0</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>16777215</width>
+                      <height>20</height>
+                     </size>
+                    </property>
                     <property name="text">
                      <string>(default)</string>
                     </property>
@@ -1313,6 +1442,18 @@
                       <horstretch>0</horstretch>
                       <verstretch>0</verstretch>
                      </sizepolicy>
+                    </property>
+                    <property name="minimumSize">
+                     <size>
+                      <width>0</width>
+                      <height>20</height>
+                     </size>
+                    </property>
+                    <property name="maximumSize">
+                     <size>
+                      <width>16777215</width>
+                      <height>20</height>
+                     </size>
                     </property>
                     <property name="text">
                      <string>(safe)</string>
@@ -1332,14 +1473,14 @@
                  </property>
                  <property name="minimumSize">
                   <size>
-                   <width>0</width>
-                   <height>0</height>
+                   <width>200</width>
+                   <height>20</height>
                   </size>
                  </property>
                  <property name="maximumSize">
                   <size>
                    <width>200</width>
-                   <height>16777215</height>
+                   <height>20</height>
                   </size>
                  </property>
                  <property name="text">
@@ -1402,7 +1543,7 @@
                     <property name="maximumSize">
                      <size>
                       <width>16777215</width>
-                      <height>30</height>
+                      <height>40</height>
                      </size>
                     </property>
                     <property name="styleSheet">
@@ -1436,7 +1577,7 @@
                     <property name="maximumSize">
                      <size>
                       <width>16777215</width>
-                      <height>25</height>
+                      <height>20</height>
                      </size>
                     </property>
                     <property name="text">
@@ -1494,13 +1635,13 @@
               <property name="minimumSize">
                <size>
                 <width>100</width>
-                <height>0</height>
+                <height>20</height>
                </size>
               </property>
               <property name="maximumSize">
                <size>
                 <width>16777215</width>
-                <height>16777215</height>
+                <height>20</height>
                </size>
               </property>
               <property name="text">
@@ -1512,6 +1653,18 @@
              <layout class="QHBoxLayout" name="Box_LocalServer">
               <item>
                <widget class="QLabel" name="lblNetBufLocalLabel">
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>20</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>20</height>
+                 </size>
+                </property>
                 <property name="text">
                  <string>Local</string>
                 </property>
@@ -1525,6 +1678,18 @@
               </item>
               <item>
                <widget class="QLabel" name="lblNetBufServerLabel">
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>20</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>20</height>
+                 </size>
+                </property>
                 <property name="text">
                  <string>Server</string>
                 </property>
@@ -1542,6 +1707,18 @@
              <layout class="QHBoxLayout" name="Box_JitterBufferSizeSize">
               <item>
                <widget class="QLabel" name="lblNetBufLocal">
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>20</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>20</height>
+                 </size>
+                </property>
                 <property name="text">
                  <string>Size</string>
                 </property>
@@ -1555,6 +1732,18 @@
               </item>
               <item>
                <widget class="QLabel" name="lblNetBufServer">
+                <property name="minimumSize">
+                 <size>
+                  <width>0</width>
+                  <height>20</height>
+                 </size>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>20</height>
+                 </size>
+                </property>
                 <property name="text">
                  <string>Size</string>
                 </property>
@@ -1579,6 +1768,18 @@
                     <horstretch>0</horstretch>
                     <verstretch>0</verstretch>
                    </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>40</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>40</width>
+                    <height>16777215</height>
+                   </size>
                   </property>
                   <property name="minimum">
                    <number>1</number>
@@ -1637,6 +1838,18 @@
                     <horstretch>0</horstretch>
                     <verstretch>0</verstretch>
                    </sizepolicy>
+                  </property>
+                  <property name="minimumSize">
+                   <size>
+                    <width>40</width>
+                    <height>0</height>
+                   </size>
+                  </property>
+                  <property name="maximumSize">
+                   <size>
+                    <width>40</width>
+                    <height>16777215</height>
+                   </size>
                   </property>
                   <property name="minimum">
                    <number>1</number>

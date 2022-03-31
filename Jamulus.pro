@@ -63,6 +63,35 @@ INCLUDEPATH_OPUS = libs/opus/include \
     libs/opus/silk/fixed \
     libs/opus
 
+INCLUDEPATH_ASIO = windows/ASIOSDK2/common
+
+HEADERS_ASIO = \
+    windows/ASIOSDK2/common/asio.h \
+    windows/ASIOSDK2/common/iasiodrv.h \
+    windows/asiosys.h \
+    windows/asiodriver.h \
+    windows/sound.h
+
+SOURCES_ASIO = \
+    windows/asiodriver.cpp \
+    windows/sound.cpp
+
+
+HEADERS_JACK = \
+    linux/jackclient.h \
+    linux/sound.h
+
+SOURCES_JACK = \
+    linux/jackclient.cpp \
+    linux/sound.cpp
+
+
+HEADERS_COREAUDIO = \
+    mac/sound.h
+
+SOURCES_COREAUDIO = \ 
+    mac/sound.cpp
+
 DEFINES += APP_VERSION=\\\"$$VERSION\\\" \
     CUSTOM_MODES \
     _REENTRANT
@@ -114,8 +143,9 @@ win32 {
                 error("Error: jack.h was not found in the expected location ($${programfilesdir}). Ensure that the right JACK2 variant is installed (32bit vs. 64bit).")
             }
 
-            HEADERS += linux/sound.h
-            SOURCES += linux/sound.cpp
+            HEADERS += $$HEADERS_JACK
+            SOURCES += $$SOURCES_JACK
+
             DEFINES += WITH_JACK
             DEFINES += JACK_ON_WINDOWS
             DEFINES += _STDINT_H # supposed to solve compilation error in systemdeps.h
@@ -130,14 +160,9 @@ win32 {
             }
             # Important: Keep those ASIO includes local to this build target in
             # order to avoid poisoning other builds license-wise.
-            HEADERS += windows/sound.h
-            SOURCES += windows/sound.cpp \
-                windows/ASIOSDK2/common/asio.cpp \
-                windows/ASIOSDK2/host/asiodrivers.cpp \
-                windows/ASIOSDK2/host/pc/asiolist.cpp
-            INCLUDEPATH += windows/ASIOSDK2/common \
-                windows/ASIOSDK2/host \
-                windows/ASIOSDK2/host/pc
+            INCLUDEPATH += $$INCLUDEPATH_ASIO
+            HEADERS += $$HEADERS_ASIO
+            SOURCES += $$SOURCES_ASIO
         }
     }
 
@@ -197,16 +222,17 @@ win32 {
                  error("Error: jack.h was not found at the usual place, maybe jack is not installed")
             }
         }
-        HEADERS -= mac/sound.h
-        SOURCES -= mac/sound.cpp
-        HEADERS += linux/sound.h \
-        linux/jackclient.h
-        SOURCES += linux/sound.cpp \
-        linux/jackclient.cpp
+        HEADERS += $$HEADERS_JACK
+        SOURCES += $$SOURCES_JACK
+
         DEFINES += WITH_JACK
         DEFINES += JACK_REPLACES_COREAUDIO
         INCLUDEPATH += /usr/local/include
         LIBS += /usr/local/lib/libjack.dylib
+    } else {
+        message(Using CoreAudio.)
+        HEADERS += $$HEADERS_COREAUDIO
+        SOURCES += $$SOURCES_COREAUDIO
     }
 
 } else:ios {
@@ -286,12 +312,8 @@ win32 {
     } else {
         message(Jack Audio Interface Enabled.)
 
-        HEADERS += \
-            linux/jackclient.h \
-            linux/sound.h
-        SOURCES += \
-            linux/jackclient.cpp \
-            linux/sound.cpp
+        HEADERS += $$HEADERS_JACK
+        SOURCES += $$SOURCES_JACK
 
         contains(CONFIG, "raspijamulus") {
             message(Using Jack Audio in raspijamulus.sh mode.)
