@@ -613,18 +613,21 @@ bool CSoundBase::selectDevice ( int iDriverIndex, bool bOpenDriverSetup, bool bT
                 {
                     strErrorList.append ( tr ( "Failed to open %1" ).arg ( strDeviceNames[iDriverIndex] ) );
                     iDriverIndex++;
+                    if ( iDriverIndex >= lNumDevices )
+                    {
+                        iDriverIndex = 0;
+                    }
 
                     if ( iDriverIndex == startindex )
                     {
                         aborted = true;
                     }
-                    else if ( iDriverIndex >= lNumDevices )
+                    else
                     {
-                        iDriverIndex = 0;
+                        strErrorList.append ( "" );
+                        strErrorList.append ( tr ( "Trying %1:" ).arg ( strDeviceNames[iDriverIndex] ) );
+                        retries++;
                     }
-                    strErrorList.append ( "" );
-                    strErrorList.append ( tr ( "Trying %1:" ).arg ( strDeviceNames[iDriverIndex] ) );
-                    retries++;
                 }
                 else
                 {

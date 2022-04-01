@@ -157,7 +157,7 @@ CJackClient::CJackClient ( QString aClientName ) :
     strClientName ( aClientName ),
     strJackClientName ( APP_NAME ),
     jackClient ( NULL ),
-    openOptions ( JackNullOption ),
+    openOptions ( JackUseExactName ),
     openStatus ( JackNoSuchClient ),
     bIsActive ( false ),
     AudioInput(),
