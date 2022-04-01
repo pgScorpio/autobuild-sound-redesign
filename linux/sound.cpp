@@ -70,6 +70,11 @@ int CSound::onBufferSwitch ( jack_nframes_t nframes, void* /* arg */ )
     // make sure we are locked during execution
     QMutexLocker locker ( &mutexAudioProcessCallback );
 
+    if ( !IsStarted() )
+    {
+        return -1;
+    }
+
     // get output selections
     int iSelOutLeft  = selectedOutputChannels[0];
     int iSelOutRight = selectedOutputChannels[1];
@@ -80,7 +85,7 @@ int CSound::onBufferSwitch ( jack_nframes_t nframes, void* /* arg */ )
     getInputSelAndAddChannels ( selectedInputChannels[0], lNumInChan, lNumAddedInChan, iSelInLeft, iSelAddInLeft );
     getInputSelAndAddChannels ( selectedInputChannels[1], lNumInChan, lNumAddedInChan, iSelInRight, iSelAddInRight );
 
-    if ( IsStarted() && ( nframes == static_cast<jack_nframes_t> ( iDeviceBufferSize ) ) )
+    if ( nframes == static_cast<jack_nframes_t> ( iDeviceBufferSize ) )
     {
         // get input data pointers
         jack_default_audio_sample_t* in_left  = (jack_default_audio_sample_t*) jackClient.AudioInput[iSelInLeft].GetBuffer ( nframes );
@@ -159,7 +164,7 @@ int CSound::onBufferSwitch ( jack_nframes_t nframes, void* /* arg */ )
                 // clang-format off
 // TODO do not call malloc in real-time callback
                 // clang-format on
-                CVector<uint8_t> vMIDIPaketBytes ( in_event.size );
+                CVector<uint8_t> vMIDIPaketBytes ( (int) in_event.size );
 
                 for ( unsigned int i = 0; i < in_event.size; i++ )
                 {

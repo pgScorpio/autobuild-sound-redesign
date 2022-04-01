@@ -24,8 +24,10 @@
 
 #pragma once
 
-#include <unistd.h>
-#include <sys/ioctl.h>
+#ifndef JACK_ON_WINDOWS // these headers are not available in Windows OS
+#    include <unistd.h>
+#    include <sys/ioctl.h>
+#endif
 #include <fcntl.h>
 #include <sys/types.h>
 #include <stdlib.h>

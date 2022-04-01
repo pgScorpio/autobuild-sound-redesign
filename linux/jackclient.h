@@ -25,10 +25,10 @@
 
 #include <QString>
 #include <QVector>
+#include "util.h"
+
 #include <jack/jack.h>
 #include <jack/midiport.h>
-
-#include "util.h"
 
 //============================================================================
 // JackClient class: Jack client API implementation for Jamulus

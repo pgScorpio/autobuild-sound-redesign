@@ -71,7 +71,6 @@ HEADERS_ASIO = \
     windows/asiosys.h \
     windows/asiodriver.h \
     windows/sound.h
-
 SOURCES_ASIO = \
     windows/asiodriver.cpp \
     windows/sound.cpp
@@ -80,7 +79,6 @@ SOURCES_ASIO = \
 HEADERS_JACK = \
     linux/jackclient.h \
     linux/sound.h
-
 SOURCES_JACK = \
     linux/jackclient.cpp \
     linux/sound.cpp
@@ -88,9 +86,14 @@ SOURCES_JACK = \
 
 HEADERS_COREAUDIO = \
     mac/sound.h
-
 SOURCES_COREAUDIO = \ 
     mac/sound.cpp
+
+HEADERS_OBOE = \
+    android/sound.h
+SOURCES_OBOE = \
+    android/sound.cpp \
+    android/androiddebug.cpp
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\" \
     CUSTOM_MODES \
@@ -145,7 +148,6 @@ win32 {
 
             HEADERS += $$HEADERS_JACK
             SOURCES += $$SOURCES_JACK
-
             DEFINES += WITH_JACK
             DEFINES += JACK_ON_WINDOWS
             DEFINES += _STDINT_H # supposed to solve compilation error in systemdeps.h
@@ -160,9 +162,9 @@ win32 {
             }
             # Important: Keep those ASIO includes local to this build target in
             # order to avoid poisoning other builds license-wise.
-            INCLUDEPATH += $$INCLUDEPATH_ASIO
             HEADERS += $$HEADERS_ASIO
             SOURCES += $$SOURCES_ASIO
+            INCLUDEPATH += $$INCLUDEPATH_ASIO
         }
     }
 
@@ -224,7 +226,6 @@ win32 {
         }
         HEADERS += $$HEADERS_JACK
         SOURCES += $$SOURCES_JACK
-
         DEFINES += WITH_JACK
         DEFINES += JACK_REPLACES_COREAUDIO
         INCLUDEPATH += /usr/local/include
@@ -262,10 +263,8 @@ win32 {
     target.path = /tmp/your_executable # path on device
     INSTALLS += target
 
-    HEADERS += android/sound.h
-
-    SOURCES += android/sound.cpp \
-        android/androiddebug.cpp
+    HEADERS += $$HEADERS_OBOE
+    SOURCES += $$SOURCES_OBOE
 
     LIBS += -lOpenSLES
     ANDROID_PACKAGE_SOURCE_DIR = $$PWD/android
