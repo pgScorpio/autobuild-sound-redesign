@@ -385,7 +385,7 @@ protected:
     static QString    strMainFormName;
 
 public:
-    static void init (tMainform* theMainForm, QString theMainFormName )
+    static void init ( tMainform* theMainForm, QString theMainFormName )
     {
         pMainForm       = theMainForm;
         strMainFormName = theMainFormName;
