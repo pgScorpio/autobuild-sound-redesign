@@ -893,7 +893,8 @@ void CClientSettingsDlg::UpdateSoundDeviceChannelSelectionFrame()
         // input
         cbxLInChan->clear();
         cbxRInChan->clear();
-        for ( iSndChanIdx = 0; iSndChanIdx < pClient->GetSndCrdNumInputChannels(); iSndChanIdx++ )
+
+        for ( int iSndChanIdx = 0; iSndChanIdx < pClient->GetSndCrdNumInputChannels(); iSndChanIdx++ )
         {
             cbxLInChan->addItem ( pClient->GetSndCrdInputChannelName ( iSndChanIdx ) );
             cbxRInChan->addItem ( pClient->GetSndCrdInputChannelName ( iSndChanIdx ) );
@@ -907,7 +908,7 @@ void CClientSettingsDlg::UpdateSoundDeviceChannelSelectionFrame()
         // output
         cbxLOutChan->clear();
         cbxROutChan->clear();
-        for ( iSndChanIdx = 0; iSndChanIdx < pClient->GetSndCrdNumOutputChannels(); iSndChanIdx++ )
+        for ( int iSndChanIdx = 0; iSndChanIdx < pClient->GetSndCrdNumOutputChannels(); iSndChanIdx++ )
         {
             cbxLOutChan->addItem ( pClient->GetSndCrdOutputChannelName ( iSndChanIdx ) );
             cbxROutChan->addItem ( pClient->GetSndCrdOutputChannelName ( iSndChanIdx ) );
