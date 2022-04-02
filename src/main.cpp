@@ -58,8 +58,8 @@ extern void qt_set_sequence_auto_mnemonic ( bool bEnable );
 int    CCommandlineOptions::appArgc = 0;
 char** CCommandlineOptions::appArgv = NULL;
 
-QDialog* CMsgBoxes::pMainForm       = NULL;
-QString  CMsgBoxes::strMainFormName = APP_NAME;
+tMainform* CMsgBoxes::pMainForm       = NULL;
+QString    CMsgBoxes::strMainFormName = APP_NAME;
 
 QString UsageArguments ( QString appPath );
 
@@ -140,13 +140,6 @@ int main ( int argc, char** argv )
     // QT docu: argv()[0] is the program name, argv()[1] is the first
     // argument and argv()[argc()-1] is the last argument.
     // Start with first argument, therefore "i = 1"
-
-    // clang-format off
-// pgScorio TODO:
-// Extra Checks on parameters:
-//      If given, CMDLN_SERVER MUST be FIRST parameter.
-//      And then only check parameters valid for common, server or client !
-    // clang-format on
 
     for ( int i = 1; i < argc; i++ )
     {
@@ -533,13 +526,13 @@ int main ( int argc, char** argv )
             continue;
         }
 
-        // Unknown option ------------------------------------------------------
-        qCritical() << qUtf8Printable ( QString ( "%1: Unknown option '%2' -- use '--help' for help" ).arg ( argv[0] ).arg ( argv[i] ) );
-
-        // pgScorpio: No exit for options after the "--special" option.
+        // No exit for options after the "--special" option.
         // Used for debugging and testing new options...
         if ( !bSpecialOptions )
         {
+            // Unknown option ------------------------------------------------------
+            qCritical() << qUtf8Printable ( QString ( "%1: Unknown option '%2' -- use '--help' for help" ).arg ( argv[0] ).arg ( argv[i] ) );
+
 // clicking on the Mac application bundle, the actual application
 // is called with weird command line args -> do not exit on these
 #if !( defined( Q_OS_MACX ) )
@@ -923,6 +916,9 @@ int main ( int argc, char** argv )
                 // only start application without using the GUI
                 qInfo() << qUtf8Printable ( GetVersionAndNameStr ( false ) );
 
+                // initialise message boxes
+                CMsgBoxes::init ( NULL, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
+
                 pApp->exec();
             }
         }
@@ -973,6 +969,9 @@ int main ( int argc, char** argv )
                 // GUI object for the server
                 CServerDlg ServerDlg ( &Server, &Settings, bStartMinimized, nullptr );
 
+                // initialise message boxes
+                CMsgBoxes::init ( &ServerDlg, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
+
                 // show dialog (if not the minimized flag is set)
                 if ( !bStartMinimized )
                 {
@@ -993,6 +992,9 @@ int main ( int argc, char** argv )
                 {
                     Server.SetDirectoryType ( AT_CUSTOM );
                 }
+
+                // initialise message boxes
+                CMsgBoxes::init ( NULL, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
 
                 pApp->exec();
             }
