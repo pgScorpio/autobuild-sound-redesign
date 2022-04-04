@@ -632,35 +632,6 @@ void CServerDlg::OnClearServerListPersistenceClicked()
     }
 }
 
-void CServerDlg::OnServerListPersistenceClicked()
-{
-    // get the current value from pServer
-    QString     currentValue = pServer->GetServerListFileName();
-    QFileDialog fileDialog;
-    fileDialog.setAcceptMode ( QFileDialog::AcceptSave );
-    fileDialog.setOptions ( QFileDialog::DontUseNativeDialog | QFileDialog::HideNameFilterDetails );
-    fileDialog.selectFile ( currentValue );
-    if ( fileDialog.exec() && fileDialog.selectedFiles().size() == 1 )
-    {
-        QString newFileName = fileDialog.selectedFiles().takeFirst();
-
-        if ( newFileName != currentValue )
-        {
-            pServer->SetServerListFileName ( newFileName );
-            UpdateGUIDependencies();
-        }
-    }
-}
-
-void CServerDlg::OnClearServerListPersistenceClicked()
-{
-    if ( pServer->GetServerListFileName() != "" )
-    {
-        pServer->SetServerListFileName ( "" );
-        UpdateGUIDependencies();
-    }
-}
-
 void CServerDlg::OnSysTrayActivated ( QSystemTrayIcon::ActivationReason ActReason )
 {
 #ifdef _WIN32
