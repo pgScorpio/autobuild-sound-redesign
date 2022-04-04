@@ -858,6 +858,8 @@ void CClientSettingsDlg::UpdateSoundCardFrame()
 
 void CClientSettingsDlg::UpdateSoundDeviceChannelSelectionFrame()
 {
+    const CSoundProperties& soundProperties = CSound::GetProperties();
+
     // update combo box containing all available sound cards in the system
     QStringList slSndCrdDevNames = pClient->GetSndCrdDevNames();
     cbxSoundcard->clear();
@@ -868,62 +870,39 @@ void CClientSettingsDlg::UpdateSoundDeviceChannelSelectionFrame()
     }
 
     cbxSoundcard->setCurrentText ( pClient->GetSndCrdDev() );
+    cbxSoundcard->setEnabled ( soundProperties.HasAudioDeviceSelection() );
 
-    // update input/output channel selection
-#if defined( _WIN32 ) || defined( __APPLE__ ) || defined( __MACOSX )
+    // input
+    cbxLInChan->clear();
+    cbxRInChan->clear();
 
-    // Definition: The channel selection frame shall only be visible,
-    // if more than two input or output channels are available
-    /*
-        const int iNumInChannels  = pClient->GetSndCrdNumInputChannels();
-        const int iNumOutChannels = pClient->GetSndCrdNumOutputChannels();
-
-        if ( ( iNumInChannels < 2 ) && ( iNumOutChannels < 2 ) )
-        {
-            // as defined, make settings invisible
-            FrameSoundcardChannelSelection->setVisible ( false );
-        }
-        else
-    */
+    for ( int iSndChanIdx = 0; iSndChanIdx < pClient->GetSndCrdNumInputChannels(); iSndChanIdx++ )
     {
-        // update combo boxes
-        //        FrameSoundcardChannelSelection->setVisible ( true );
-
-        // input
-        cbxLInChan->clear();
-        cbxRInChan->clear();
-
-        for ( int iSndChanIdx = 0; iSndChanIdx < pClient->GetSndCrdNumInputChannels(); iSndChanIdx++ )
-        {
-            cbxLInChan->addItem ( pClient->GetSndCrdInputChannelName ( iSndChanIdx ) );
-            cbxRInChan->addItem ( pClient->GetSndCrdInputChannelName ( iSndChanIdx ) );
-        }
-        if ( pClient->GetSndCrdNumInputChannels() > 0 )
-        {
-            cbxLInChan->setCurrentIndex ( pClient->GetSndCrdLeftInputChannel() );
-            cbxRInChan->setCurrentIndex ( pClient->GetSndCrdRightInputChannel() );
-        }
-
-        // output
-        cbxLOutChan->clear();
-        cbxROutChan->clear();
-        for ( int iSndChanIdx = 0; iSndChanIdx < pClient->GetSndCrdNumOutputChannels(); iSndChanIdx++ )
-        {
-            cbxLOutChan->addItem ( pClient->GetSndCrdOutputChannelName ( iSndChanIdx ) );
-            cbxROutChan->addItem ( pClient->GetSndCrdOutputChannelName ( iSndChanIdx ) );
-        }
-        if ( pClient->GetSndCrdNumOutputChannels() > 0 )
-        {
-            cbxLOutChan->setCurrentIndex ( pClient->GetSndCrdLeftOutputChannel() );
-            cbxROutChan->setCurrentIndex ( pClient->GetSndCrdRightOutputChannel() );
-        }
+        cbxLInChan->addItem ( pClient->GetSndCrdInputChannelName ( iSndChanIdx ) );
+        cbxRInChan->addItem ( pClient->GetSndCrdInputChannelName ( iSndChanIdx ) );
     }
-    /*
-    #else
-        // for other OS, no sound card channel selection is supported
-        FrameSoundcardChannelSelection->setVisible ( false );
-    #endif
-    */
+    if ( pClient->GetSndCrdNumInputChannels() > 0 )
+    {
+        cbxLInChan->setCurrentIndex ( pClient->GetSndCrdLeftInputChannel() );
+        cbxRInChan->setCurrentIndex ( pClient->GetSndCrdRightInputChannel() );
+    }
+    gbInputChannelMapping->setVisible ( soundProperties.HasInputChannelSelection() );
+
+    // output
+    cbxLOutChan->clear();
+    cbxROutChan->clear();
+
+    for ( int iSndChanIdx = 0; iSndChanIdx < pClient->GetSndCrdNumOutputChannels(); iSndChanIdx++ )
+    {
+        cbxLOutChan->addItem ( pClient->GetSndCrdOutputChannelName ( iSndChanIdx ) );
+        cbxROutChan->addItem ( pClient->GetSndCrdOutputChannelName ( iSndChanIdx ) );
+    }
+    if ( pClient->GetSndCrdNumOutputChannels() > 0 )
+    {
+        cbxLOutChan->setCurrentIndex ( pClient->GetSndCrdLeftOutputChannel() );
+        cbxROutChan->setCurrentIndex ( pClient->GetSndCrdRightOutputChannel() );
+    }
+    gbOutputChannelMapping->setVisible ( soundProperties.HasOutputChannelSelection() );
 }
 
 void CClientSettingsDlg::SetEnableFeedbackDetection ( bool enable )
