@@ -62,3 +62,4 @@ autoLatestChangelog.md
 *.vcxproj.filters
 *.vcxproj.user
 Jamulus*.ps1
+debian/

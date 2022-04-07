@@ -872,6 +872,8 @@ void CClientSettingsDlg::UpdateSoundDeviceChannelSelectionFrame()
     cbxSoundcard->setCurrentText ( pClient->GetSndCrdDev() );
     cbxSoundcard->setEnabled ( soundProperties.HasAudioDeviceSelection() );
 
+    // update combo boxes
+
     // input
     cbxLInChan->clear();
     cbxRInChan->clear();

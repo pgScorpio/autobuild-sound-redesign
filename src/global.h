@@ -371,9 +371,6 @@ public:
     int iChanNum;
 };
 
-/* Prototypes for global functions ********************************************/
-extern QString UsageArguments ( QString appPath );
-
 //============================================================================
 // CMsgBoxes class:
 //  Use this static class to show basic Error, Warning and Info messageboxes
@@ -416,7 +413,7 @@ public:
 //============================================================================
 // CCommandlineOptions class:
 //  Note that passing commandline arguments to classes is no longer required,
-//  since an instance of this class can get commandline options anywhere.
+//  since via this class we can get commandline options anywhere.
 //============================================================================
 
 class CCommandlineOptions
