@@ -2,7 +2,7 @@ VERSION = 3.8.2dev
 
 # use target name which does not use a capital letter at the beginning
 contains(CONFIG, "noupcasename") {
-    message(The target name is jamulus instead of Jamulus.)
+    !build_pass:message(The target name is jamulus instead of Jamulus.)
     TARGET = jamulus
 }
 
@@ -11,13 +11,13 @@ contains(VERSION, .*dev.*) {
     exists(".git/config") {
         GIT_DESCRIPTION=$$system(git describe --match=xxxxxxxxxxxxxxxxxxxx --always --abbrev --dirty) # the match should never match
         VERSION = "$$VERSION"-$$GIT_DESCRIPTION
-        message("building version \"$$VERSION\" (intermediate in git repository)")
+        !build_pass:message("building version \"$$VERSION\" (intermediate in git repository)")
     } else {
         VERSION = "$$VERSION"-nogit
-        message("building version \"$$VERSION\" (intermediate without git repository)")
+        !build_pass:message("building version \"$$VERSION\" (intermediate without git repository)")
     }
 } else {
-    message("building version \"$$VERSION\" (release)")
+    !build_pass:message("building version \"$$VERSION\" (release)")
 }
 
 CONFIG += qt \
@@ -31,11 +31,11 @@ QT += network \
 contains(CONFIG, "nosound") {
     CONFIG -= "nosound"
     CONFIG += "serveronly"
-    warning("\"nosound\" is deprecated: please use \"serveronly\" for a server-only build.")
+    !build_pass:warning("\"nosound\" is deprecated: please use \"serveronly\" for a server-only build.")
 }
 
 contains(CONFIG, "headless") {
-    message(Headless mode activated.)
+    !build_pass:message(Headless mode activated.)
     QT -= gui
 } else {
     QT += widgets
@@ -118,7 +118,7 @@ auto_builddir {
     #####################################
 
     # prefix BUILD for BUILD_DIR
-    equals(BUILD, "") {
+    isEmpty(BUILD) {
         error(Unknown build target!)
 
         equals(TEMPLATE, "vcapp") {
@@ -136,7 +136,7 @@ auto_builddir {
         }
     }
 
-    message(Building $$BUILD in $$absolute_path($$BUILD_DIR))
+    !build_pass:message(Building $$BUILD in $$absolute_path($$BUILD_DIR))
 }
 
 debug_and_release {
@@ -278,22 +278,22 @@ win32 {
     }
 
     contains(CONFIG, "serveronly") {
-        message(Restricting build to server-only due to CONFIG+=serveronly.)
+        !build_pass:message(Restricting build to server-only due to CONFIG+=serveronly.)
         DEFINES += SERVER_ONLY
     } else {
         contains(CONFIG, "jackonwindows") {
-            message(Using JACK.)
+            !build_pass:message(Using JACK.)
             contains(QT_ARCH, "i386") {
                 exists("C:/Program Files (x86)") {
-                    message("Cross compilation build")
+                    !build_pass:message("Cross compilation build")
                     programfilesdir = "C:/Program Files (x86)"
                 } else {
-                    message("Native i386 build")
+                    !build_pass:message("Native i386 build")
                     programfilesdir = "C:/Program Files"
                 }
                 libjackname = "libjack.lib"
             } else {
-                message("Native x86_64 build")
+                !build_pass:message("Native x86_64 build")
                 programfilesdir = "C:/Program Files"
                 libjackname = "libjack64.lib"
             }
@@ -309,8 +309,8 @@ win32 {
             INCLUDEPATH += "$${programfilesdir}/JACK2/include"
             LIBS += "$${programfilesdir}/JACK2/lib/$${libjackname}"
         } else {
-            message(Using ASIO.)
-            message(Please review the ASIO SDK licence.)
+            !build_pass:message(Using ASIO.)
+            !build_pass:message(Please review the ASIO SDK licence.)
 
             !exists(windows/ASIOSDK2) {
                 error("Error: ASIOSDK2 must be placed in Jamulus windows folder.")
@@ -332,7 +332,7 @@ win32 {
 
 } else:macx {
     contains(CONFIG, "server_bundle") {
-        message(The generated application bundle will run a server instance.)
+        !build_pass:message(The generated application bundle will run a server instance.)
 
         DEFINES += SERVER_BUNDLE
         TARGET = $${TARGET}Server
@@ -378,7 +378,7 @@ win32 {
         -framework Foundation
 
     contains(CONFIG, "jackonmac") {
-        message(Using JACK.)
+        !build_pass:message(Using JACK.)
         !exists(/usr/include/jack/jack.h) {
             !exists(/usr/local/include/jack/jack.h) {
                  error("Error: jack.h was not found at the usual place, maybe jack is not installed")
@@ -391,7 +391,7 @@ win32 {
         INCLUDEPATH += /usr/local/include
         LIBS += /usr/local/lib/libjack.dylib
     } else {
-        message(Using CoreAudio.)
+        !build_pass:message(Using CoreAudio.)
         HEADERS += mac/sound.h
         SOURCES += mac/sound.cpp
     }
@@ -412,7 +412,7 @@ win32 {
     ANDROID_ABIS = armeabi-v7a arm64-v8a x86 x86_64
     ANDROID_VERSION_NAME = $$VERSION
     ANDROID_VERSION_CODE = $$system(git log --oneline | wc -l)
-    message("Setting ANDROID_VERSION_NAME=$${ANDROID_VERSION_NAME} ANDROID_VERSION_CODE=$${ANDROID_VERSION_CODE}")
+    !build_pass:message("Setting ANDROID_VERSION_NAME=$${ANDROID_VERSION_NAME} ANDROID_VERSION_CODE=$${ANDROID_VERSION_CODE}")
 
     # liboboe requires C++17 for std::timed_mutex
     CONFIG += c++17
@@ -479,16 +479,16 @@ win32 {
 
     # only include jack support if CONFIG serveronly is not set
     contains(CONFIG, "serveronly") {
-        message(Restricting build to server-only due to CONFIG+=serveronly.)
+        !build_pass:message(Restricting build to server-only due to CONFIG+=serveronly.)
         DEFINES += SERVER_ONLY
     } else {
-        message(Jack Audio Interface Enabled.)
+        !build_pass:message(Jack Audio Interface Enabled.)
 
         HEADERS += linux/sound.h
         SOURCES += linux/sound.cpp
 
         contains(CONFIG, "raspijamulus") {
-            message(Using Jack Audio in raspijamulus.sh mode.)
+            !build_pass:message(Using Jack Audio in raspijamulus.sh mode.)
             LIBS += -ljack
         } else {
             CONFIG += link_pkgconfig
@@ -1262,12 +1262,12 @@ contains(CONFIG, "headless") {
 
 # use external OPUS library if requested
 contains(CONFIG, "opus_shared_lib") {
-    message(OPUS codec is used from a shared library.)
+    !build_pass:message(OPUS codec is used from a shared library.)
 
     unix {
         !exists(/usr/include/opus/opus_custom.h) {
             !exists(/usr/local/include/opus/opus_custom.h) {
-                 message(Header opus_custom.h was not found at the usual place. Maybe the opus dev packet is missing.)
+                 !build_pass:message(Header opus_custom.h was not found at the usual place. Maybe the opus dev packet is missing.)
             }
         }
 
@@ -1318,7 +1318,7 @@ contains(CONFIG, "opus_shared_lib") {
 
 # disable version check if requested (#370)
 contains(CONFIG, "disable_version_check") {
-    message(The version check is disabled.)
+    !build_pass:message(The version check is disabled.)
     DEFINES += DISABLE_VERSION_CHECK
 }
 
