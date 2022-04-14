@@ -22,7 +22,7 @@ contains(VERSION, .*dev.*) {
 
 CONFIG += qt \
     thread \
-    lrelease
+    lrelease   # Why don't we use embed_translations too ?
 
 QT += network \
     xml \
@@ -41,118 +41,162 @@ contains(CONFIG, "headless") {
     QT += widgets
 }
 
-#####################################
-# determine the build name:
-#####################################
+#########################################
+# Automatic build (sub)folder assignment:
+#########################################
 
-win32 {
-    BUILD = win32
+equals(OUT_PWD, $$_PRO_FILE_PWD_) {
+    # default enable Automatic build (sub)folder assignment if the generated makefile 
+    # is in the same folder as the Jamulus.pro file (normal qmake run)
+    # unless specifically requested not to
 
-    contains(CONFIG, "serveronly") {
-          BUILD = $${BUILD}_server
-    } else:contains(CONFIG, "jackonwindows") {
-        BUILD = $${BUILD}_jack
-    } else {
-        BUILD = $${BUILD}_asio
-    }
+    !no_auto_builddir:CONFIG *= auto_builddir
+    !no_auto_buildsubdirs:CONFIG *= auto_buildsubdirs
+}
 
-    contains(QT_ARCH, "i386") {
-        exists("C:/Program Files (x86)") {
-            BUILD = $${BUILD}_x86
+auto_builddir {
+    #####################################
+    # determine the build name:
+    #####################################
+
+    win32 {
+        BUILD = windows
+
+        contains(CONFIG, "serveronly") {
+              BUILD = $${BUILD}_server
+        } else:contains(CONFIG, "jackonwindows") {
+            BUILD = $${BUILD}_jack
         } else {
-            BUILD = $${BUILD}_i386
+            BUILD = $${BUILD}_asio
         }
-    } else {
-        BUILD = $${BUILD}_x86_64
-    }
-} else:macx {
-    BUILD = macx
 
-    contains(CONFIG, "server_bundle") {
-        BUILD = $${BUILD}_server
-    }
+        contains(QT_ARCH, "i386") {
+            exists("C:/Program Files (x86)") {
+                BUILD = $${BUILD}_x86
+            } else {
+                BUILD = $${BUILD}_i386
+            }
+        } else {
+            BUILD = $${BUILD}_x86_64
+        }
+    } else:macx {
+        BUILD = mac
 
-    contains(CONFIG, "jackonmac") {
-        BUILD = $${BUILD}_jack
-    } else {
-        BUILD = $${BUILD}_coreaudio
-    }
+        # Why are we using 'serveronly' for linux and 'server_bundle' for mac ?? 
+        # could be just 'server' for both.
+        contains(CONFIG, "server_bundle") {
+            BUILD = $${BUILD}_server
+        }
 
-} else:ios {
-    BUILD = ios
-} else:android {
-    BUILD = android
-} else:unix {
-    BUILD = unix
+        # Why are we using 'jackonwindows' and 'jackonmac' ??
+        # could be just 'jack' for both.
+        contains(CONFIG, "jackonmac") {
+            BUILD = $${BUILD}_jack
+        } else {
+            BUILD = $${BUILD}_coreaudio
+        }
+    } else:ios {
+        BUILD = ios
+    } else:android {
+        BUILD = android
+    } else:unix {
+        BUILD = linux
 
-    contains(CONFIG, "serveronly") {
-        BUILD = $${BUILD}_server
-    } else {
-        BUILD = $${BUILD}_jack
+        contains(CONFIG, "serveronly") {
+            BUILD = $${BUILD}_server
+        } else {
+            BUILD = $${BUILD}_jack
+        }
     }
 
     contains(CONFIG, "headless") {
         BUILD = $${BUILD}_headless
     }
-}
 
-message(Building $$BUILD)
+    #####################################
+    # determine the build folder:
+    #####################################
 
-#####################################
-# determine build folders:
-#####################################
+    # prefix BUILD for BUILD_DIR
+    equals(BUILD, "") {
+        error(Unknown build target!)
 
-# prefix BUILD for use as subfolder in BUILD_DIR
-!equals(BUILD, "") {
-    equals(TEMPLATE, "vcapp") {
-        # prefix visual studio builds
-        BUILD = /vs_$$BUILD
+        equals(TEMPLATE, "vcapp") {
+            # prefix visual studio builds
+            BUILD_DIR = build/vs
+        } else {
+            BUILD_DIR = build
+        }
     } else {
-        BUILD = /$$BUILD
+        equals(TEMPLATE, "vcapp") {
+            # prefix visual studio builds
+            BUILD_DIR = build/vs_$$BUILD
+        } else {
+            BUILD_DIR = build/$$BUILD
+        }
     }
+
+    message(Building $$BUILD in $$absolute_path($$BUILD_DIR))
 }
 
-# apply debug/release build subfolder
-CONFIG(debug, debug|release) {
-    BUILD_DIR = build$${BUILD}/debug
-    message(Building Debug in $$BUILD_DIR)
+debug_and_release {
+    # debug/release build subfolders
+    CONFIG(debug, debug|release) {
+        DR_SUBDIR = debug/
+    } else {
+        DR_SUBDIR = release/
+    }
 } else {
-    BUILD_DIR = build$${BUILD}/release
-    message(Building Release in $$BUILD_DIR)
+    unset(DR_SUBDIR)
 }
 
-# PRECOMPILED_DIR: An undocumented variable that must be set equal to BUILD_DIR
-# to prevent creation of unused build folders for precompiled headers
-PRECOMPILED_DIR = $$BUILD_DIR
+auto_buildsubdirs {
+    # BUILD_DIR_BASE: base for BUID_DIR subfolders to prevent accessing root if BUILD_DIR is not set.
+    isEmpty(BUILD_DIR) {
+        BUILD_DIR_BASE=
+    } else {
+        BUILD_DIR_BASE= $$BUILD_DIR/
+    }
 
-# QT_ARCH: Another undocumented variable that is set during make.
-#          This one is needed for the multi target android build
-#          use '$$QT_ARCH' (in single quotes!) to use the achitecture name in the make file.
+    # PRECOMPILED_DIR: An undocumented variable that must be set equal to BUILD_DIR
+    # to prevent creation of unused build folders for precompiled headers we don't have
+    PRECOMPILED_DIR = $$BUILD_DIR
 
-android {
-    # We cannot change the './android-build' folder which is used by make install
+    android {
+        # android is an exeption because it is a multi-target built
+        # note: We cannot change the './android-build' folder which is used by make install
 
-    DESTDIR = $$BUILD_DIR/lib                 # libJamulus_<ARCH>.so files are put here
-    UI_DIR =  $$BUILD_DIR/ui                  # ui_*.h files are put here
-    MOC_DIR = $$BUILD_DIR/moc/'$$QT_ARCH'     # moc_*.cpp files must be in ABI subdirs !
-    RCC_DIR = $$BUILD_DIR/rcc/'$$QT_ARCH'     # qrc_*.cpp files must be in ABI subdirs !
-    OBJECTS_DIR = $$BUILD_DIR/obj/'$$QT_ARCH' # OBJ files must be in ABI subdirs !
-    LRELEASE_DIR = $$BUILD_DIR/translation    # This folder will automatically have ABI subdirs generated by  !
-    QM_PATH = $$LRELEASE_DIR/'$$QT_ARCH'      # So for android builds we have to pass expanding of (the undocumented) $$QT_ARCH to the makefile creation by single quoting it
+        # QT_ARCH: Another undocumented variable that is set during make.
+        #          This one is needed for the multi-target android build
+        #          use '$$QT_ARCH' (in single quotes!) to use the achitecture name in the created make file.
 
-    # moved from the other android section:
-    ANDROID_PACKAGE_SOURCE_DIR = $$PWD/android/package # ALL files and folders in the package folder will be copied to the android-build folder !
-                                                       # That's why it must be a subfolder of ./android, otherwise all other files (like .cpp amd .h files) will be included in the package too.
-    DISTFILES += android/package/AndroidManifest.xml   # Not needed ?, already in package, so copied to android-build
+
+        DESTDIR = $${BUILD_DIR_BASE}$${DR_SUBDIR}lib                 # libJamulus_<ARCH>.so files are put here
+        UI_DIR =  $${BUILD_DIR_BASE}$${DR_SUBDIR}ui                  # ui_*.h files are put here
+        MOC_DIR = $${BUILD_DIR_BASE}$${DR_SUBDIR}moc/'$$QT_ARCH'     # moc_*.cpp files must be in ABI subdirs !
+        RCC_DIR = $${BUILD_DIR_BASE}$${DR_SUBDIR}rcc/'$$QT_ARCH'     # qrc_*.cpp files must be in ABI subdirs !
+        OBJECTS_DIR = $${BUILD_DIR_BASE}$${DR_SUBDIR}obj/'$$QT_ARCH' # OBJ files must be in ABI subdirs !
+        LRELEASE_DIR = $${BUILD_DIR_BASE}$${DR_SUBDIR}translation    # This folder will automatically have ABI subdirs generated by lrelease !
+        QM_DIR = $$LRELEASE_DIR/'$$QT_ARCH'/                         # So for android builds we have to pass expanding of (the undocumented) $$QT_ARCH to the makefile creation by single quoting it
+
+        # moved from the other android section:
+        ANDROID_PACKAGE_SOURCE_DIR = $$PWD/android/package # ALL files and folders in the package folder will be copied to the android-build folder !
+                                                           # That's why it must be a subfolder of ./android, otherwise all other files (like .cpp and .h files) will be included in the package too.
+#       DISTFILES += android/package/AndroidManifest.xml   # ? DISTFILES is only for UnixMake specs. for Android it is included in the package folder
+
+    } else {
+
+        DESTDIR = $$BUILD_DIR
+        UI_DIR =  $${BUILD_DIR_BASE}$${DR_SUBDIR}ui
+        MOC_DIR = $${BUILD_DIR_BASE}$${DR_SUBDIR}moc
+        RCC_DIR = $${BUILD_DIR_BASE}$${DR_SUBDIR}rcc
+        OBJECTS_DIR = $${BUILD_DIR_BASE}$${DR_SUBDIR}obj
+        LRELEASE_DIR = $${BUILD_DIR_BASE}translation       # will have debug/release subdir !
+        QM_DIR = $${LRELEASE_DIR}/$${DR_SUBDIR}
+
+    }
 } else {
-
-    DESTDIR = $$BUILD_DIR
-    UI_DIR =  $$BUILD_DIR/ui
-    MOC_DIR = $$BUILD_DIR/moc
-    RCC_DIR = $$BUILD_DIR/rcc
-    OBJECTS_DIR = $$BUILD_DIR/obj
-    LRELEASE_DIR = $$BUILD_DIR/translation
-    QM_PATH = $$LRELEASE_DIR
+    QM_DIR = $$OUT_PWD/$$DR_SUBDIR
 }
 
 #####################################
@@ -169,6 +213,30 @@ TRANSLATIONS = \
     src/res/translation/translation_it_IT.ts \
     src/res/translation/translation_sv_SE.ts \
     src/res/translation/translation_zh_CN.ts
+
+!isEmpty(QM_DIR) {
+    QM_FILES = \
+        $${QM_DIR}translation_de_DE.qm \
+        $${QM_DIR}translation_fr_FR.qm \
+        $${QM_DIR}translation_pt_PT.qm \
+        $${QM_DIR}translation_pt_BR.qm \
+        $${QM_DIR}translation_es_ES.qm \
+        $${QM_DIR}translation_nl_NL.qm \
+        $${QM_DIR}translation_pl_PL.qm \
+        $${QM_DIR}translation_it_IT.qm \
+        $${QM_DIR}translation_sv_SE.qm \
+        $${QM_DIR}translation_sk_SK.qm \
+        $${QM_DIR}translation_zh_CN.qm
+
+    DISTFILES += $$QM_FILES
+
+    debug_and_release {
+        # pass QMAKE_CLEAN to the .Debug/.Release makefiles !
+        build_pass:QMAKE_CLEAN += $${QM_DIR}*.qm
+    } else {
+        !build_pass:QMAKE_CLEAN += $${QM_DIR}*.qm
+    }
+}
 
 INCLUDEPATH += src
 
@@ -1172,18 +1240,7 @@ DISTFILES += \
     src/res/flags/yt.png \
     src/res/flags/za.png \
     src/res/flags/zm.png \
-    src/res/flags/zw.png \
-    $$QM_PATH/translation_de_DE.qm \
-    $$QM_PATH/translation_fr_FR.qm \
-    $$QM_PATH/translation_pt_PT.qm \
-    $$QM_PATH/translation_pt_BR.qm \
-    $$QM_PATH/translation_es_ES.qm \
-    $$QM_PATH/translation_nl_NL.qm \
-    $$QM_PATH/translation_pl_PL.qm \
-    $$QM_PATH/translation_it_IT.qm \
-    $$QM_PATH/translation_sv_SE.qm \
-    $$QM_PATH/translation_sk_SK.qm \
-    $$QM_PATH/translation_zh_CN.qm
+    src/res/flags/zw.png
 
 DISTFILES_OPUS += \
     libs/opus/AUTHORS \

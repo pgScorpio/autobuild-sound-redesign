@@ -23,7 +23,7 @@ Set-Location -Path "$PSScriptRoot\..\"
 
 # Global constants
 $RootPath = "$PWD"
-$BuildPath = "$RootPath\build"
+$BuildPath = "$RootPath\build\deploy_windows"
 $DeployPath = "$RootPath\deploy"
 $WindowsPath ="$RootPath\windows"
 $AppName = "Jamulus"
