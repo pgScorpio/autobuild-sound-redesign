@@ -65,6 +65,9 @@ protected:
     AudioBuffer     buffer;
     AudioBufferList bufferList;
     void            checkStatus ( int status );
+
+    static inline CSound& instance() { return *static_cast<CSound*> ( pSound ); }
+
     static OSStatus recordingCallback ( void*                       inRefCon,
                                         AudioUnitRenderActionFlags* ioActionFlags,
                                         const AudioTimeStamp*       inTimeStamp,
@@ -72,7 +75,7 @@ protected:
                                         UInt32                      inNumberFrames,
                                         AudioBufferList*            ioData );
 
-    void processBufferList ( AudioBufferList* inInputData, CSound* pSound );
+    void processBufferList();
 
     bool init(); // init now done by start()
     //    virtual void Start();                                      // Should use start() (called by CSoundBase)
@@ -89,15 +92,6 @@ protected:
     // No Defaults! All virtuals should be abstract, so we don't forget to
     // implemenent the neccesary virtuals in CSound.
     //========================================================================
-    // This Section MUST also be included in any CSound class definition !
-
-protected: // CSoundBase Mandatory pointer to instance (must be set to 'this' in the CSound constructor)
-    static CSound* pSound;
-
-public: // CSoundBase Mandatory functions. (but static functions can't be virtual)
-    static inline CSoundBase*             pInstance() { return pSound; }
-    static inline const CSoundProperties& GetProperties() { return pSound->getSoundProperties(); }
-
 protected:
     //============================================================================
     // Virtual interface to CSoundBase:

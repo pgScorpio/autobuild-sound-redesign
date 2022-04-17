@@ -215,7 +215,12 @@ class CSoundBase : public QThread
 protected:
     CSoundProperties soundProperties; // CSound Information for the user interface
 
-    const CSoundProperties& getSoundProperties() const { return soundProperties; }
+protected:
+    static CSoundBase* pSound; // This pointer must be set from the CSound constructor !
+
+public:
+    static inline CSoundBase*             Sound() { return pSound; }
+    static inline const CSoundProperties& GetSoundProperties() { return pSound->soundProperties; }
 
 public:
     // utility functions
@@ -503,19 +508,10 @@ protected:
     //========================================================================
     // pgScorpio: For clarity always list all virtual functions in separate
     //             sections at the end !
-    //             In this case no Defaults! All virtuals should be abstract,
+    //             Preferably all virtuals should be abstract,
     //             so we don't forget to implemenent the neccesary virtuals
     //             in CSound
     //========================================================================
-    /* This Section MUST also be included in any CSound class definition !
-
-protected: // CSoundBase Mandatory pointer to instance (must be set to 'this' in the CSound constructor)
-    static CSound* pSound;
-
-public: // CSoundBase Mandatory functions. (but static functions can't be virtual)
-    static inline CSoundBase* pInstance() { return pSound; }
-    static inline const CSoundProperties& GetProperties() { return pSound->getSoundProperties(); }
-    */
 protected:
     //============================================================================
     // Virtual interface to CSoundBase:

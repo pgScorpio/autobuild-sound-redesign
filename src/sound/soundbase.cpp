@@ -108,13 +108,13 @@ void CSoundProperties::setDefaultTexts()
     {
         strAudioDeviceWhatsThis      = ( "<b>" + CSoundBase::tr ( "Audio Device" ) + ":</b> " +
                                     CSoundBase::tr ( "Your audio device (sound card) can be "
-                                                          "selected or using %1. If the selected driver is not valid an error "
-                                                          "message will be shown. " )
+                                                     "selected or using %1. If the selected driver is not valid an error "
+                                                     "message will be shown. " )
                                         .arg ( APP_NAME ) +
                                     "<br>" +
                                     CSoundBase::tr ( "If the driver is selected during an active connection, the connection "
-                                                          "is stopped, the driver is changed and the connection is started again "
-                                                          "automatically." ) );
+                                                     "is stopped, the driver is changed and the connection is started again "
+                                                     "automatically." ) );
         strAudioDeviceAccessibleName = CSoundBase::tr ( "Audio device selector combo box." );
     }
     else
@@ -149,6 +149,8 @@ CSoundProperties::CSoundProperties() :
 //============================================================================
 // CSoundBase:
 //============================================================================
+
+CSoundBase* CSoundBase::pSound = NULL; // This pointer must be set from the CSound constructor !
 
 CSoundBase::CSoundBase ( const QString& systemDriverTechniqueName,
                          void ( *theProcessCallback ) ( CVector<int16_t>& psData, void* pArg ),

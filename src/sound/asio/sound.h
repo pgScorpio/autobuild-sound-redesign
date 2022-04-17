@@ -92,25 +92,27 @@ protected:
 
 protected:
     // callbacks
+    static inline CSound& instance() { return *static_cast<CSound*> ( pSound ); }
 
     static ASIOCallbacks asioCallbacks;
 
-    static void _onBufferSwitch ( long index, ASIOBool processNow ) { pSound->onBufferSwitch ( index, processNow ); }
+    static void _onBufferSwitch ( long index, ASIOBool processNow ) { instance().onBufferSwitch ( index, processNow ); }
 
     static ASIOTime* _onBufferSwitchTimeInfo ( ASIOTime* timeInfo, long index, ASIOBool processNow )
     {
-        return pSound->onBufferSwitchTimeInfo ( timeInfo, index, processNow );
+        return instance().onBufferSwitchTimeInfo ( timeInfo, index, processNow );
     }
 
-    static void _onSampleRateChanged ( ASIOSampleRate sampleRate ) { pSound->onSampleRateChanged ( sampleRate ); }
+    static void _onSampleRateChanged ( ASIOSampleRate sampleRate ) { instance().onSampleRateChanged ( sampleRate ); }
 
     static long _onAsioMessages ( long selector, long value, void* message, double* opt )
     {
-        return pSound->onAsioMessages ( selector, value, message, opt );
+        return instance().onAsioMessages ( selector, value, message, opt );
     }
 
 protected:
     // CSound Internal
+
     void closeAllAsioDrivers();
     bool prepareAsio ( bool bStartAsio ); // Called before starting
 
@@ -119,15 +121,9 @@ protected:
     //============================================================================
     // Virtual interface to CSoundBase:
     //============================================================================
-protected: // CSoundBase Mandatory pointer to instance (must be set to 'this' in the CSound constructor)
-    static CSound* pSound;
-
-public: // CSoundBase Mandatory functions. (but static functions can't be virtual)
-    static inline CSoundBase*             pInstance() { return pSound; }
-    static inline const CSoundProperties& GetProperties() { return pSound->getSoundProperties(); }
-
 protected:
     // CSoundBase internal
+
     virtual long         createDeviceList ( bool bRescan = false ); // Fills strDeviceList. Returns number of devices found
     virtual bool         checkDeviceChange ( CSoundBase::tDeviceChangeCheck mode, int iDriverIndex ); // Open device sequence handling....
     virtual unsigned int getDeviceBufferSize ( unsigned int iDesiredBufferSize );

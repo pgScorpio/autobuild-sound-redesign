@@ -89,6 +89,8 @@ private:
 
 protected:
     // oboe::AudioStreamCallback:
+    static inline CSound& instance() { return *static_cast<CSound*> ( pSound ); }
+
     oboe::DataCallbackResult onAudioInput ( oboe::AudioStream* oboeStream, void* audioData, int32_t numFrames );
     oboe::DataCallbackResult onAudioOutput ( oboe::AudioStream* oboeStream, void* audioData, int32_t numFrames );
 
@@ -104,13 +106,6 @@ protected:
     //============================================================================
     // Virtual interface to CSoundBase:
     //============================================================================
-protected: // CSoundBase Mandatory pointer to instance (must be set to 'this' in the CSound constructor)
-    static CSound* pSound;
-
-public: // CSoundBase Mandatory functions. (but static functions can't be virtual)
-    static inline CSoundBase*             pInstance() { return pSound; }
-    static inline const CSoundProperties& GetProperties() { return pSound->getSoundProperties(); }
-
 protected:
     // CSoundBase virtuals:
     virtual long         createDeviceList ( bool bRescan = false ); // Fills strDeviceList. Returns number of devices found

@@ -204,13 +204,14 @@ protected:
 
 protected:
     // callbacks
+    static inline CSound& instance() { return *static_cast<CSound*> ( pSound ); }
 
     static OSStatus _onDeviceNotification ( AudioDeviceID                     deviceID,
                                             UInt32                            unknown,
                                             const AudioObjectPropertyAddress* inAddresses,
                                             void* /* inRefCon */ )
     {
-        return pSound->onDeviceNotification ( deviceID, unknown, inAddresses );
+        return instance().onDeviceNotification ( deviceID, unknown, inAddresses );
     }
 
     static OSStatus _onBufferSwitch ( AudioDeviceID          inDevice,
@@ -221,11 +222,11 @@ protected:
                                       const AudioTimeStamp*  pAudioTimeStamp3,
                                       void* /* inRefCon */ )
     {
-        return pSound->onBufferSwitch ( inDevice, pAudioTimeStamp1, inInputData, pAudioTimeStamp2, outOutputData, pAudioTimeStamp3 );
+        return instance().onBufferSwitch ( inDevice, pAudioTimeStamp1, inInputData, pAudioTimeStamp2, outOutputData, pAudioTimeStamp3 );
     }
 
     //  typedef void  (*MIDIReadProc)(const MIDIPacketList* pktlist, void* __nullable readProcRefCon, void* __nullable srcConnRefCon); !!??
-    static void _onMIDI ( const MIDIPacketList* pktlist, void* /* readProcRefCon */, void* /* srcConnRefCon */ ) { pSound->onMIDI ( pktlist ); }
+    static void _onMIDI ( const MIDIPacketList* pktlist, void* /* readProcRefCon */, void* /* srcConnRefCon */ ) { instance().onMIDI ( pktlist ); }
 
     void registerDeviceCallBacks();
     void unregisterDeviceCallBacks();
@@ -250,13 +251,6 @@ protected:
     //============================================================================
     // Virtual interface to CSoundBase:
     //============================================================================
-protected: // CSoundBase Mandatory pointer to instance (must be set to 'this' in CSound constructor)
-    static CSound* pSound;
-
-public: // CSoundBase Mandatory functions. (but static functions can't be virtual)
-    static inline CSoundBase*             pInstance() { return pSound; }
-    static inline const CSoundProperties& GetProperties() { return pSound->getSoundProperties(); }
-
 protected:
     // CSoundBase internal
     virtual void onChannelSelectionChanged()

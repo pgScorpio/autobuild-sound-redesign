@@ -45,7 +45,6 @@ inline bool SampleTypeSupported ( const ASIOSampleType SamType )
 // ASIO callback statics
 //============================================================================
 
-CSound*       CSound::pSound = NULL;
 ASIOCallbacks CSound::asioCallbacks; // Pointers to the asio driver callbacks    (ASIO driver -> Application)
 
 //============================================================================

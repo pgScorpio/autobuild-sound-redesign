@@ -27,8 +27,6 @@
 #define kOutputBus 0
 #define kInputBus  1
 
-CSound* CSound::pSound = NULL;
-
 /* Implementation *************************************************************/
 CSound::CSound ( void ( *fpProcessCallback ) ( CVector<short>& psData, void* arg ), void* pProcessCallBackArg ) :
     CSoundBase ( "CoreAudio iOS", fpProcessCallback, pProcessCallBackArg ),
@@ -141,48 +139,53 @@ OSStatus CSound::recordingCallback ( void*                       inRefCon,
     //    CSound* pSound = static_cast<CSound*> ( inRefCon );
 
     // setting up temp buffer
-    pSound->buffer.mDataByteSize   = pSound->iDeviceBufferSize * sizeof ( Float32 ) * pSound->buffer.mNumberChannels;
-    pSound->bufferList.mBuffers[0] = pSound->buffer;
+    instance().buffer.mDataByteSize   = instance().iDeviceBufferSize * sizeof ( Float32 ) * instance().buffer.mNumberChannels;
+    instance().bufferList.mBuffers[0] = instance().buffer;
 
     // Obtain recorded samples
 
     // Calling Unit Render to store input data to bufferList
-    AudioUnitRender ( pSound->audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, &pSound->bufferList );
+    AudioUnitRender ( instance().audioUnit, ioActionFlags, inTimeStamp, 1, inNumberFrames, &instance().bufferList );
 
     // Now, we have the samples we just read sitting in buffers in bufferList
     // Process the new data
-    pSound->processBufferList ( &pSound->bufferList, pSound ); // THIS IS WHERE vecsStereo is filled with data from bufferList
+    instance().processBufferList(); // THIS IS WHERE vecsStereo is filled with data from bufferList
 
     Float32* pData = (Float32*) ( ioData->mBuffers[0].mData );
 
     // copy output data
-    for ( unsigned int i = 0; i < pSound->iDeviceBufferSize; i++ )
+    for ( unsigned int i = 0; i < instance().iDeviceBufferSize; i++ )
     {
-        pData[2 * i]     = (Float32) pSound->audioBuffer[2 * i] / _MAXSHORT;     // left
-        pData[2 * i + 1] = (Float32) pSound->audioBuffer[2 * i + 1] / _MAXSHORT; // right
+        pData[2 * i]     = (Float32) instance().audioBuffer[2 * i] / _MAXSHORT;     // left
+        pData[2 * i + 1] = (Float32) instance().audioBuffer[2 * i + 1] / _MAXSHORT; // right
     }
 
     return noErr;
 }
 
-void CSound::processBufferList ( AudioBufferList* inInputData, CSound* pSound ) // got stereo input data
+void CSound::processBufferList() // got stereo input data
 {
-    QMutexLocker locker ( &pSound->mutexAudioProcessCallback );
-    Float32*     pData = static_cast<Float32*> ( inInputData->mBuffers[0].mData );
+    QMutexLocker locker ( &mutexAudioProcessCallback );
+    Float32*     pData = static_cast<Float32*> ( bufferList.mBuffers[0].mData );
 
     // copy input data
-    for ( unsigned int i = 0; i < pSound->iDeviceBufferSize; i++ )
+    for ( unsigned int i = 0; i < iDeviceBufferSize; i++ )
     {
         // copy left and right channels separately
-        pSound->audioBuffer[2 * i]     = (short) ( pData[2 * i] * _MAXSHORT );     // left
-        pSound->audioBuffer[2 * i + 1] = (short) ( pData[2 * i + 1] * _MAXSHORT ); // right
+        audioBuffer[2 * i]     = (short) ( pData[2 * i] * _MAXSHORT );     // left
+        audioBuffer[2 * i + 1] = (short) ( pData[2 * i + 1] * _MAXSHORT ); // right
     }
-    pSound->processCallback ( pSound->audioBuffer );
+    processCallback ( audioBuffer );
 }
 
-bool CSound::init() // pgScorpio: Some of these function results could be stored and checked in checkCapabilities()
+bool CSound::init()
 {
     bool ok = true;
+
+    // TODO: BEGIN
+    /* Some of these function results could be stored and checked in checkCapabilities()
+     */
+    // TODO: END
 
     try
     {

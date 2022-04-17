@@ -73,6 +73,8 @@ public:
     }
 
 protected:
+    static inline CSound& instance() { return *static_cast<CSound*> ( pSound ); }
+
     // CSound callbacks:
     int onBufferSwitch ( jack_nframes_t nframes, void* arg );
 
@@ -82,22 +84,15 @@ protected:
 
 protected:
     // static callbacks:
-    static int _BufferSwitch ( jack_nframes_t nframes, void* arg ) { return pSound->onBufferSwitch ( nframes, arg ); }
+    static int _BufferSwitch ( jack_nframes_t nframes, void* arg ) { return instance().onBufferSwitch ( nframes, arg ); }
 
-    static int _BufferSizeCallback ( jack_nframes_t, void* ) { return pSound->onBufferSizeCallback(); }
+    static int _BufferSizeCallback ( jack_nframes_t, void* ) { return instance().onBufferSizeCallback(); }
 
-    static void _ShutdownCallback ( void* ) { pSound->onShutdownCallback(); }
+    static void _ShutdownCallback ( void* ) { instance().onShutdownCallback(); }
 
     //============================================================================
     // Virtual interface to CSoundBase:
     //============================================================================
-protected: // CSoundBase Mandatory pointer to instance (must be set to 'this' in the CSound constructor)
-    static CSound* pSound;
-
-public: // CSoundBase Mandatory functions. (but static functions can't be virtual)
-    static inline CSoundBase*             pInstance() { return pSound; }
-    static inline const CSoundProperties& GetProperties() { return pSound->getSoundProperties(); }
-
 protected:
     virtual void onChannelSelectionChanged(){}; // Needed on macOS
 

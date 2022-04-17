@@ -32,8 +32,6 @@
 // CSound:
 //============================================================================
 
-CSound* CSound::pSound = NULL;
-
 CSound::CSound ( void ( *theProcessCallback ) ( CVector<short>& psData, void* arg ), void* theProcessCallbackArg ) :
     CSoundBase ( "Jack", theProcessCallback, theProcessCallbackArg ),
     jackClient ( strClientName ), // ClientName from CSoundBase !
@@ -60,6 +58,40 @@ CSound::CSound ( void ( *theProcessCallback ) ( CVector<short>& psData, void* ar
 
     pSound = this;
 }
+
+#ifdef OLD_SOUND_COMPATIBILITY
+// Backwards compatibility constructor
+CSound::CSound ( void ( *fpProcessCallback ) ( CVector<int16_t>& psData, void* pCallbackArg ),
+                 void* theProcessCallbackArg,
+                 QString /* strMIDISetup */,
+                 bool /* bNoAutoJackConnect */,
+                 QString /* strNClientName */ ) :
+    CSoundBase ( "ASIO", fpProcessCallback, theProcessCallbackArg ),
+    jackClient ( strClientName ), // ClientName from CSoundBase !
+    bJackWasShutDown ( false ),
+    bAutoConnect ( true ),
+    iJackNumInputs ( 2 )
+{
+    CCommandlineOptions cCommandlineOptions;
+    double              dValue;
+
+    setObjectName ( "CSoundThread" );
+
+    if ( cCommandlineOptions.GetFlagArgument ( CMDLN_NOJACKCONNECT ) )
+    {
+        bAutoConnect = false;
+    }
+
+    if ( cCommandlineOptions.GetNumericArgument ( CMDLN_JACKINPUTS, 2, 16, dValue ) )
+    {
+        iJackNumInputs = static_cast<int> ( dValue );
+    }
+
+    soundProperties.bHasSetupDialog = false;
+
+    pSound = this;
+}
+#endif
 
 //===============================
 // JACK callbacks:

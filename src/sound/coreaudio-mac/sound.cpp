@@ -407,8 +407,6 @@ bool CSound::cDeviceInfo::IsValid()
 // CSound class:
 //============================================================================
 
-CSound* CSound::pSound = NULL;
-
 CSound::cChannelInfo CSound::noChannelInfo;
 
 CSound::CSound ( void ( *theProcessCallback ) ( CVector<short>& psData, void* arg ), void* theProcessCallbackArg ) :

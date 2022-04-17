@@ -29,8 +29,6 @@
 
 /* Implementation *************************************************************/
 
-CSound* CSound::pSound = NULL;
-
 CSound::CSound ( void ( *theProcessCallback ) ( CVector<short>& psData, void* arg ), void* theProcessCallbackArg ) :
     CSoundBase ( "Oboe", theProcessCallback, theProcessCallbackArg )
 {
