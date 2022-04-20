@@ -66,6 +66,15 @@ protected: // Jack:
 public:
     CSound ( void ( *theProcessCallback ) ( CVector<short>& psData, void* arg ), void* theProcessCallbackArg );
 
+#ifdef OLD_SOUND_COMPATIBILITY
+    // Backwards compatibility constructor
+    CSound ( void ( *fpProcessCallback ) ( CVector<int16_t>& psData, void* arg ),
+             void*          theProcessCallbackArg,
+             const QString& strMIDISetup,
+             const bool,
+             const QString& );
+#endif
+
     virtual ~CSound()
     {
         Stop();

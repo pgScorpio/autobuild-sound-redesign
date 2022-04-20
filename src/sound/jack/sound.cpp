@@ -26,7 +26,7 @@
 
 #include "sound.h"
 #include "jackclient.h"
-#include "global.h"
+#include "cmdline.h"
 
 //============================================================================
 // CSound:
@@ -39,17 +39,17 @@ CSound::CSound ( void ( *theProcessCallback ) ( CVector<short>& psData, void* ar
     bAutoConnect ( true ),
     iJackNumInputs ( 2 )
 {
-    CCommandlineOptions cCommandlineOptions;
-    double              dValue;
+    CCommandline cmdLine;
+    double       dValue;
 
     setObjectName ( "CSoundThread" );
 
-    if ( cCommandlineOptions.GetFlagArgument ( CMDLN_NOJACKCONNECT ) )
+    if ( cmdLine.GetFlagArgument ( CMDLN_NOJACKCONNECT ) )
     {
         bAutoConnect = false;
     }
 
-    if ( cCommandlineOptions.GetNumericArgument ( CMDLN_JACKINPUTS, 2, 16, dValue ) )
+    if ( cmdLine.GetNumericArgument ( CMDLN_JACKINPUTS, 2, 16, dValue ) )
     {
         iJackNumInputs = static_cast<int> ( dValue );
     }
@@ -61,28 +61,28 @@ CSound::CSound ( void ( *theProcessCallback ) ( CVector<short>& psData, void* ar
 
 #ifdef OLD_SOUND_COMPATIBILITY
 // Backwards compatibility constructor
-CSound::CSound ( void ( *fpProcessCallback ) ( CVector<int16_t>& psData, void* pCallbackArg ),
+CSound::CSound ( void ( *fpProcessCallback ) ( CVector<int16_t>& psData, void* arg ),
                  void* theProcessCallbackArg,
-                 QString /* strMIDISetup */,
-                 bool /* bNoAutoJackConnect */,
-                 QString /* strNClientName */ ) :
+                 const QString&,
+                 const bool,
+                 const QString& ) :
     CSoundBase ( "ASIO", fpProcessCallback, theProcessCallbackArg ),
     jackClient ( strClientName ), // ClientName from CSoundBase !
     bJackWasShutDown ( false ),
     bAutoConnect ( true ),
     iJackNumInputs ( 2 )
 {
-    CCommandlineOptions cCommandlineOptions;
-    double              dValue;
+    CCommandline cmdLine;
+    double       dValue;
 
     setObjectName ( "CSoundThread" );
 
-    if ( cCommandlineOptions.GetFlagArgument ( CMDLN_NOJACKCONNECT ) )
+    if ( cmdLine.GetFlagArgument ( CMDLN_NOJACKCONNECT ) )
     {
         bAutoConnect = false;
     }
 
-    if ( cCommandlineOptions.GetNumericArgument ( CMDLN_JACKINPUTS, 2, 16, dValue ) )
+    if ( cmdLine.GetNumericArgument ( CMDLN_JACKINPUTS, 2, 16, dValue ) )
     {
         iJackNumInputs = static_cast<int> ( dValue );
     }
@@ -215,9 +215,9 @@ int CSound::onBufferSizeCallback()
 {
     QMutexLocker locker ( &mutexAudioProcessCallback );
 
-    if ( isRunning() )
+    if ( IsRunning() )
     {
-        emit reinitRequest ( RS_ONLY_RESTART_AND_INIT );
+        emit ReinitRequest ( RS_ONLY_RESTART_AND_INIT );
     }
 
     return 0; // zero on success, non-zero on error
@@ -230,7 +230,7 @@ void CSound::onShutdownCallback()
     bJackWasShutDown = true;
 
     // Trying to restart should generate the error....
-    emit reinitRequest ( RS_ONLY_RESTART );
+    emit ReinitRequest ( RS_ONLY_RESTART );
 }
 
 //============================================================================
