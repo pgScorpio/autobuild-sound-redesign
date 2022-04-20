@@ -26,9 +26,9 @@
 #include <QDir>
 #include <iostream>
 #include "global.h"
+#include "messages.h"
 #ifndef HEADLESS
 #    include <QApplication>
-#    include <QMessageBox>
 #    include "serverdlg.h"
 #    ifndef SERVER_ONLY
 #        include "clientdlg.h"
@@ -52,31 +52,30 @@ extern void qt_set_sequence_auto_mnemonic ( bool bEnable );
 #ifndef SERVER_ONLY
 #    include "clientrpc.h"
 #endif
-
-// Forward declarations ********************************************************
-
-QString UsageArguments ( char** argv );
+#include "cmdline.h"
 
 // Implementation **************************************************************
 
-int    CCommandline::argc = 0;
-char** CCommandline::argv = NULL;
+QString UsageArguments ( char* argv );
 
-tMainform* CMsgBoxes::pMainForm       = NULL;
-QString    CMsgBoxes::strMainFormName = APP_NAME;
+void OnFatalError ( QString errMsg )
+{
+    qCritical() << qUtf8Printable ( errMsg );
+    exit ( 1 );
+}
 
 int main ( int argc, char** argv )
 {
-    CCommandline::argc = argc;
-    CCommandline::argv = argv;
-
-    CCommandline cmdLine; // We don't really need an instance here, but using one improves the readability of the code.
 
 #if defined( Q_OS_MACX )
     // Mnemonic keys are default disabled in Qt for MacOS. The following function enables them.
     // Qt will not show these with underline characters in the GUI on MacOS. (#1873)
     qt_set_sequence_auto_mnemonic ( true );
 #endif
+    CCommandline::argc = argc;
+    CCommandline::argv = argv;
+
+    CCommandline cmdLine ( OnFatalError );
 
     QString        strArgument;
     double         rDbleArgument;
@@ -149,7 +148,7 @@ int main ( int argc, char** argv )
         // Help (usage) flag ---------------------------------------------------
         if ( ( !strcmp ( argv[i], "--help" ) ) || ( !strcmp ( argv[i], "-h" ) ) || ( !strcmp ( argv[i], "-?" ) ) )
         {
-            const QString strHelp = UsageArguments ( argv );
+            const QString strHelp = UsageArguments ( argv[0] );
             std::cout << qUtf8Printable ( strHelp );
             exit ( 0 );
         }
@@ -538,6 +537,7 @@ int main ( int argc, char** argv )
             continue;
         }
 
+        // Unknown option ------------------------------------------------------
         // No exit for options after the "--special" option.
         // Used for debugging and testing new options...
         if ( !bSpecialOptions )
@@ -582,7 +582,8 @@ int main ( int argc, char** argv )
         if ( ServerOnlyOptions.size() != 0 )
         {
             qCritical() << qUtf8Printable ( QString ( "%1: Server only option(s) '%2' used.  Did you omit '--server'?" )
-                                                .arg ( CCommandline::GetProgramPath(), ServerOnlyOptions.join ( ", " ) ) );
+                                                .arg ( argv[0] )
+                                                .arg ( ServerOnlyOptions.join ( ", " ) ) );
             exit ( 1 );
         }
 
@@ -887,7 +888,7 @@ int main ( int argc, char** argv )
                                        nullptr );
 
                 // initialise message boxes
-                CMsgBoxes::init ( &ClientDlg, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
+                CMessages::init ( &ClientDlg, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
 
                 // show dialog
                 ClientDlg.show();
@@ -900,7 +901,7 @@ int main ( int argc, char** argv )
                 qInfo() << qUtf8Printable ( GetVersionAndNameStr ( false ) );
 
                 // initialise message boxes
-                CMsgBoxes::init ( NULL, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
+                CMessages::init ( NULL, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
 
                 pApp->exec();
             }
@@ -953,7 +954,7 @@ int main ( int argc, char** argv )
                 CServerDlg ServerDlg ( &Server, &Settings, bStartMinimized, nullptr );
 
                 // initialise message boxes
-                CMsgBoxes::init ( &ServerDlg, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
+                CMessages::init ( &ServerDlg, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
 
                 // show dialog (if not the minimized flag is set)
                 if ( !bStartMinimized )
@@ -977,7 +978,7 @@ int main ( int argc, char** argv )
                 }
 
                 // initialise message boxes
-                CMsgBoxes::init ( NULL, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
+                CMessages::init ( NULL, strClientName.isEmpty() ? QString ( APP_NAME ) : QString ( APP_NAME ) + " " + strClientName );
 
                 pApp->exec();
             }
@@ -987,17 +988,10 @@ int main ( int argc, char** argv )
     catch ( const CGenErr& generr )
     {
         // show generic error
-#ifndef HEADLESS
-        if ( bUseGUI )
-        {
-            CMsgBoxes::ShowError ( generr.GetErrorText() );
-        }
-        else
+        CMessages::ShowError ( generr.GetErrorText() );
+#ifdef HEADLESS
+        exit ( 1 );
 #endif
-        {
-            qCritical() << qUtf8Printable ( QString ( "%1: %2" ).arg ( APP_NAME ).arg ( generr.GetErrorText() ) );
-            exit ( 1 );
-        }
     }
 
 #if defined( Q_OS_MACX )
@@ -1008,39 +1002,9 @@ int main ( int argc, char** argv )
 }
 
 /******************************************************************************\
-* Message Boxes                                                                *
-\******************************************************************************/
-void CMsgBoxes::ShowError ( QString strError )
-{
-#ifndef HEADLESS
-    QMessageBox::critical ( pMainForm, strMainFormName + ": " + QObject::tr ( "Error" ), strError, QObject::tr ( "Ok" ), nullptr );
-#else
-    qCritical() << "Error: " << strError.toLocal8Bit().data();
-#endif
-}
-
-void CMsgBoxes::ShowWarning ( QString strWarning )
-{
-#ifndef HEADLESS
-    QMessageBox::warning ( pMainForm, strMainFormName + ": " + QObject::tr ( "Warning" ), strWarning, QObject::tr ( "Ok" ), nullptr );
-#else
-    qWarning() << "Warning: " << strWarning.toLocal8Bit().data();
-#endif
-}
-
-void CMsgBoxes::ShowInfo ( QString strInfo )
-{
-#ifndef HEADLESS
-    QMessageBox::information ( pMainForm, strMainFormName + ": " + QObject::tr ( "Information" ), strInfo, QObject::tr ( "Ok" ), nullptr );
-#else
-    qInfo() << "Info: " << strInfo.toLocal8Bit().data();
-#endif
-}
-
-/******************************************************************************\
 * Command Line Argument Parsing                                                *
 \******************************************************************************/
-QString UsageArguments ( char** argv )
+QString UsageArguments ( char* argv )
 {
     // clang-format off
     return QString (
@@ -1106,70 +1070,6 @@ QString UsageArguments ( char** argv )
            "\n"
            "For more information and localized help see:\n"
            "https://jamulus.io/wiki/Command-Line-Options\n"
-    ).arg( argv[0] );
+    ).arg( argv );
     // clang-format on
-}
-
-bool CCommandline::GetFlagArgument ( int& i, const QString& strShortOpt, const QString& strLongOpt )
-{
-    if ( ( !strShortOpt.compare ( argv[i] ) ) || ( !strLongOpt.compare ( argv[i] ) ) )
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-bool CCommandline::GetStringArgument ( int& i, const QString& strShortOpt, const QString& strLongOpt, QString& strArg )
-{
-    if ( ( !strShortOpt.compare ( argv[i] ) ) || ( !strLongOpt.compare ( argv[i] ) ) )
-    {
-        if ( ++i >= argc )
-        {
-            qCritical() << qUtf8Printable ( QString ( "%1: '%2' needs a string argument." ).arg ( argv[0] ).arg ( argv[i - 1] ) );
-            exit ( 1 );
-        }
-
-        strArg = argv[i];
-
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-bool CCommandline::GetNumericArgument ( int&           i,
-                                        const QString& strShortOpt,
-                                        const QString& strLongOpt,
-                                        double         rRangeStart,
-                                        double         rRangeStop,
-                                        double&        rValue )
-{
-    if ( ( !strShortOpt.compare ( argv[i] ) ) || ( !strLongOpt.compare ( argv[i] ) ) )
-    {
-        QString errmsg = "%1: '%2' needs a numeric argument from '%3' to '%4'.";
-        if ( ++i >= argc )
-        {
-            qCritical() << qUtf8Printable ( errmsg.arg ( argv[0] ).arg ( argv[i - 1] ).arg ( rRangeStart ).arg ( rRangeStop ) );
-            exit ( 1 );
-        }
-
-        char* p;
-        rValue = strtod ( argv[i], &p );
-        if ( *p || ( rValue < rRangeStart ) || ( rValue > rRangeStop ) )
-        {
-            qCritical() << qUtf8Printable ( errmsg.arg ( argv[0] ).arg ( argv[i - 1] ).arg ( rRangeStart ).arg ( rRangeStop ) );
-            exit ( 1 );
-        }
-
-        return true;
-    }
-    else
-    {
-        return false;
-    }
 }

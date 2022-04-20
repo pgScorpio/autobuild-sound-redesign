@@ -26,6 +26,7 @@
 \******************************************************************************/
 
 #include "sound.h"
+#include "messages.h" // for htmlNewLine / htmlBold
 
 //============================================================================
 // Helpers for checkNewDeviceCapabilities

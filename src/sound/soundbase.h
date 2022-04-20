@@ -86,7 +86,7 @@
 
 #pragma once
 
-#include <QThread>
+#include <QObject>
 #include <QString>
 #include <QMutex>
 #include <QTimer>
@@ -208,7 +208,7 @@ public:
 // CSoundBase class:
 //=======================================================================================
 
-class CSoundBase : public QThread
+class CSoundBase : public QObject
 {
     Q_OBJECT
 
@@ -384,7 +384,7 @@ protected:
     // device selection
     // selectDevice calls a checkDeviceChange() sequence (checkOpen, checkCapabilities, Activate|Abort)
     // Any Errors should be reported in strErorList
-    // So if false is returned one should call GetErrorList( QStringList& errorList );
+    // if false is returned CSoundBase::SetDevice functions will show the errors;
     bool selectDevice ( int iDriverIndex, bool bOpenDriverSetup, bool bTryAnyDriver = false );
 
 public:
@@ -401,14 +401,14 @@ public:
     inline bool IsStarted() const { return bStarted; }
     inline bool IsActive() const { return bStarted && bActive; }
 
-    int GetNumDevices() const { return strDeviceNames.count(); }
+    inline int GetNumDevices() const { return strDeviceNames.count(); }
 
     QStringList GetDeviceNames();
     QString     GetDeviceName ( const int index );
     QString     GetCurrentDeviceName();
 
-    int GetCurrentDeviceIndex() const { return iCurrentDevice; }
-    int GetIndexOfDevice ( const QString& strDeviceName );
+    inline int GetCurrentDeviceIndex() const { return iCurrentDevice; }
+    int        GetIndexOfDevice ( const QString& strDeviceName );
 
     int        GetNumInputChannels();
     inline int GetNumOutputChannels() const { return lNumOutChan; }
@@ -425,8 +425,8 @@ public:
     void       SetLeftOutputChannel ( const int iNewChan );
     inline int GetLeftOutputChannel() const { return selectedOutputChannels[0]; }
 
-    void SetRightOutputChannel ( const int iNewChan );
-    int  GetRightOutputChannel() const { return selectedOutputChannels[1]; }
+    void       SetRightOutputChannel ( const int iNewChan );
+    inline int GetRightOutputChannel() const { return selectedOutputChannels[1]; }
 
     int        SetLeftInputGain ( int iGain );
     inline int GetLeftInputGain() const { return inputChannelsGain[0]; };

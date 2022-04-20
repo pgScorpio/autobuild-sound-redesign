@@ -347,7 +347,7 @@ oboe::DataCallbackResult CSound::onAudioReady ( oboe::AudioStream* oboeStream, v
     return oboe::DataCallbackResult::Continue;
 }
 
-// TODO better handling of stream closing errors (use CMsgBoxes::ShowError or strErrorList ??)
+// TODO better handling of stream closing errors (use CMessages::ShowError or strErrorList ??)
 void CSound::onErrorAfterClose ( oboe::AudioStream* oboeStream, oboe::Result result )
 {
     qDebug() << "CSound::onErrorAfterClose";
@@ -356,7 +356,7 @@ void CSound::onErrorAfterClose ( oboe::AudioStream* oboeStream, oboe::Result res
     Q_UNUSED ( result );
 }
 
-// TODO better handling of stream closing errors (use CMsgBoxes::ShowError or strErrorList  ??)
+// TODO better handling of stream closing errors (use CMessages::ShowError or strErrorList ??)
 void CSound::onErrorBeforeClose ( oboe::AudioStream* oboeStream, oboe::Result result )
 {
     qDebug() << "CSound::onErrorBeforeClose";

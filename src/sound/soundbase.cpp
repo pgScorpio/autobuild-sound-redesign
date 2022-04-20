@@ -23,6 +23,8 @@
 \******************************************************************************/
 
 #include "soundbase.h"
+#include "messages.h"
+#include "cmdline.h"
 
 // This is used as a lookup table for parsing option letters, mapping
 // a single character to an EMidiCtlType
@@ -175,8 +177,6 @@ CSoundBase::CSoundBase ( const QString& systemDriverTechniqueName,
 {
     CCommandline cCommandline;
 
-    setObjectName ( "CSoundThread" );
-
     cCommandline.GetStringArgument ( CMDLN_CLIENTNAME, strClientName );
 
     QString strMIDISetup;
@@ -199,7 +199,7 @@ void CSoundBase::onTimerCheckActive()
     if ( !bActive )
     {
         emit SoundActiveTimeout();
-        CMsgBoxes::ShowWarning ( htmlBold ( tr ( "Your audio device is not working correctly." ) ) + htmlNewLine() +
+        CMessages::ShowWarning ( htmlBold ( tr ( "Your audio device is not working correctly." ) ) + htmlNewLine() +
                                  tr ( "Please check your device settings or try another device." ) );
     }
 }
@@ -562,7 +562,7 @@ bool CSoundBase::OpenDeviceSetup()
     {
         // With ASIO there always is a setup button, but not all ASIO drivers support a setup dialog!
 
-        CMsgBoxes::ShowInfo ( htmlBold ( tr ( "This audio device does not support setup from jamulus." ) ) + htmlNewLine() +
+        CMessages::ShowInfo ( htmlBold ( tr ( "This audio device does not support setup from jamulus." ) ) + htmlNewLine() +
                               tr ( "Check the device manual to see how you can check and change it's settings." ) );
         return false;
     }
@@ -745,7 +745,7 @@ bool CSoundBase::selectDevice ( int iDriverIndex, bool bOpenDriverSetup, bool bT
             }
             // If there is something in the errorlist, so these are warnings...
             // Show warnings now!
-            CMsgBoxes::ShowWarning ( getErrorString() );
+            CMessages::ShowWarning ( getErrorString() );
             strErrorList.clear();
 
             if ( checkDeviceChange ( tDeviceChangeCheck::Activate, iDriverIndex ) )
@@ -783,7 +783,7 @@ bool CSoundBase::SetDevice ( const QString& strDevName, bool bOpenSetupOnError )
         return true;
     }
 
-    CMsgBoxes::ShowError ( getErrorString() );
+    CMessages::ShowError ( getErrorString() );
     return false;
 }
 
@@ -1078,7 +1078,7 @@ bool CSoundBase::Start()
     QString strError = getErrorString();
     if ( strError.size() )
     {
-        CMsgBoxes::ShowError ( strError );
+        CMessages::ShowError ( strError );
     }
 
     return false;
@@ -1099,7 +1099,7 @@ bool CSoundBase::Stop()
     QString strError = getErrorString();
     if ( strError.size() )
     {
-        CMsgBoxes::ShowError ( strError );
+        CMessages::ShowError ( strError );
     }
 
     return false;
