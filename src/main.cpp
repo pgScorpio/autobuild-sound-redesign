@@ -861,19 +861,9 @@ int main ( int argc, char** argv )
         if ( bIsClient )
         {
             // Client:
-            // actual client object
-            CClient Client ( iPortNumber,
-                             iQosNumber,
-                             strConnOnStartupAddress,
-                             strMIDISetup,
-                             bNoAutoJackConnect,
-                             strClientName,
-                             bEnableIPv6,
-                             bMuteMeInPersonalMix );
-
+            //
             // load settings from init-file (command line options override)
-            CClientSettings Settings ( &Client, strIniFileName );
-            Settings.Load ( CommandLineOptions );
+            CClientSettings Settings ( strIniFileName );
 
             // load translation
             if ( bUseGUI && bUseTranslation )
@@ -881,6 +871,17 @@ int main ( int argc, char** argv )
                 CLocale::LoadTranslation ( Settings.strLanguage, pApp );
                 CInstPictures::UpdateTableOnLanguageChange();
             }
+
+            // actual client object
+            CClient Client ( Settings,
+                             iPortNumber,
+                             iQosNumber,
+                             strConnOnStartupAddress,
+                             strMIDISetup,
+                             bNoAutoJackConnect,
+                             strClientName,
+                             bEnableIPv6,
+                             bMuteMeInPersonalMix );
 
             if ( pRpcServer )
             {
@@ -891,8 +892,8 @@ int main ( int argc, char** argv )
             if ( bUseGUI )
             {
                 // GUI object
-                CClientDlg ClientDlg ( &Client,
-                                       &Settings,
+                CClientDlg ClientDlg ( Client,
+                                       Settings,
                                        strConnOnStartupAddress,
                                        strMIDISetup,
                                        bShowComplRegConnList,
@@ -903,6 +904,8 @@ int main ( int argc, char** argv )
 
                 // show dialog
                 ClientDlg.show();
+
+                Client.ApplySettings();
                 pApp->exec();
             }
             else
@@ -911,6 +914,7 @@ int main ( int argc, char** argv )
                 // only start application without using the GUI
                 qInfo() << qUtf8Printable ( GetVersionAndNameStr ( false ) );
 
+                Client.ApplySettings();
                 pApp->exec();
             }
         }
@@ -918,8 +922,19 @@ int main ( int argc, char** argv )
 #endif
         {
             // Server:
+
+            // load settings from init-file (command line options override)
+            CServerSettings Settings ( strIniFileName );
+
+            // load translation
+            if ( bUseGUI && bUseTranslation )
+            {
+                CLocale::LoadTranslation ( Settings.strLanguage, pApp );
+            }
+
             // actual server object
-            CServer Server ( iNumServerChannels,
+            CServer Server ( Settings,
+                             iNumServerChannels,
                              strLoggingFileName,
                              strServerBindIP,
                              iPortNumber,
@@ -948,16 +963,6 @@ int main ( int argc, char** argv )
 #ifndef HEADLESS
             if ( bUseGUI )
             {
-                // load settings from init-file (command line options override)
-                CServerSettings Settings ( &Server, strIniFileName );
-                Settings.Load ( CommandLineOptions );
-
-                // load translation
-                if ( bUseGUI && bUseTranslation )
-                {
-                    CLocale::LoadTranslation ( Settings.strLanguage, pApp );
-                }
-
                 // GUI object for the server
                 CServerDlg ServerDlg ( &Server, &Settings, bStartMinimized, nullptr );
 
@@ -967,6 +972,7 @@ int main ( int argc, char** argv )
                     ServerDlg.show();
                 }
 
+                Server.ApplySettings();
                 pApp->exec();
             }
             else
@@ -975,12 +981,18 @@ int main ( int argc, char** argv )
                 // only start application without using the GUI
                 qInfo() << qUtf8Printable ( GetVersionAndNameStr ( false ) );
 
+                Server.ApplySettings();
+
+                //### TODO: BEGIN ###//
+                // Applying commandline values should be done from Server.ApplySettings()
+
                 // CServerListManager defaults to AT_NONE, so need to switch if
                 // strDirectoryServer is wanted
                 if ( !strDirectoryServer.isEmpty() )
                 {
                     Server.SetDirectoryType ( AT_CUSTOM );
                 }
+                //### TODO: END ###//
 
                 pApp->exec();
             }

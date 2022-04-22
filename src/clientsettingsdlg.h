@@ -54,7 +54,7 @@ class CClientSettingsDlg : public CBaseDlg, private Ui_CClientSettingsDlgBase
     Q_OBJECT
 
 public:
-    CClientSettingsDlg ( CClient* pNCliP, CClientSettings* pNSetP, QWidget* parent = nullptr );
+    CClientSettingsDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* parent = nullptr );
 
     void UpdateUploadRate();
     void UpdateDisplay();
@@ -71,8 +71,8 @@ protected:
 
     virtual void showEvent ( QShowEvent* );
 
-    CClient*         pClient;
-    CClientSettings* pSettings;
+    CClient&         Client;
+    CClientSettings& Settings;
     QTimer           TimerStatus;
     QButtonGroup     SndCrdBufferDelayButtonGroup;
 
@@ -84,7 +84,7 @@ public slots:
     void OnEnableOPUS64StateChanged ( int value );
     void OnFeedbackDetectionChanged ( int value );
     void OnCustomDirectoriesEditingFinished();
-    void OnNewClientLevelEditingFinished() { pSettings->iNewClientFaderLevel = edtNewClientLevel->text().toInt(); }
+    void OnNewClientLevelEditingFinished() { Settings.iNewClientFaderLevel = edtNewClientLevel->text().toInt(); }
     void OnInputBoostChanged();
     void OnSndCrdBufferDelayButtonGroupClicked ( QAbstractButton* button );
     void OnSoundcardActivated ( int iSndDevIdx );
@@ -96,7 +96,7 @@ public slots:
     void OnAudioQualityActivated ( int iQualityIdx );
     void OnGUIDesignActivated ( int iDesignIdx );
     void OnMeterStyleActivated ( int iMeterStyleIdx );
-    void OnLanguageChanged ( QString strLanguage ) { pSettings->strLanguage = strLanguage; }
+    void OnLanguageChanged ( QString strLanguage ) { Settings.strLanguage = strLanguage; }
     void OnAliasTextChanged ( const QString& strNewName );
     void OnInstrumentActivated ( int iCntryListItem );
     void OnCountryActivated ( int iCntryListItem );
@@ -115,6 +115,13 @@ signals:
     void GUIDesignChanged();
     void MeterStyleChanged();
     void AudioChannelsChanged();
+    void AudioQualityChanged();
+    void ChannelInfoChanged();
+    void EnableOPUS64Changed();
+    void ClientSockBufNumFramesChanged();
+    void ServerSockBufNumFramesChanged();
+    void AutoSockBufSizeChanged();
+
     void CustomDirectoriesChanged();
     void NumMixerPanelRowsChanged ( int value );
 };

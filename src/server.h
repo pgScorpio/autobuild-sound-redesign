@@ -45,6 +45,7 @@
 #include "serverlogging.h"
 #include "serverlist.h"
 #include "recorder/jamcontroller.h"
+#include "settings.h"
 
 #include "threadpool.h"
 
@@ -152,7 +153,8 @@ class CServer : public QObject, public CServerSlots<MAX_NUM_CHANNELS>
     Q_OBJECT
 
 public:
-    CServer ( const int          iNewMaxNumChan,
+    CServer ( CServerSettings&   cSettings,
+              const int          iNewMaxNumChan,
               const QString&     strLoggingFileName,
               const QString&     strServerBindIP,
               const quint16      iPortNumber,
@@ -175,6 +177,8 @@ public:
 
     virtual ~CServer();
 
+    void ApplySettings();
+
     void Start();
     void Stop();
     bool IsRunning() { return HighPrecisionTimer.isActive(); }
@@ -193,6 +197,8 @@ public:
     // IPv6 Enabled
     bool IsIPv6Enabled() { return bEnableIPv6; }
 
+    CServerSettings& Settings;
+
     // GUI settings ------------------------------------------------------------
     int GetClientNumAudioChannels ( const int iChanNum ) { return vecChannels[iChanNum].GetNumAudioChannels(); }
 
@@ -210,30 +216,43 @@ public:
 
     bool    GetRecorderInitialised() { return JamController.GetRecorderInitialised(); }
     void    SetEnableRecording ( bool bNewEnableRecording );
-    bool    GetDisableRecording() { return bDisableRecording; }
+    bool    GetDisableRecording() { return !Settings.bEnableRecording; }
     QString GetRecorderErrMsg() { return JamController.GetRecorderErrMsg(); }
     bool    GetRecordingEnabled() { return JamController.GetRecordingEnabled(); }
     void    RequestNewRecording() { JamController.RequestNewRecording(); }
     void    SetRecordingDir ( QString newRecordingDir )
     {
-        JamController.SetRecordingDir ( newRecordingDir, iServerFrameSizeSamples, bDisableRecording );
+        JamController.SetRecordingDir ( newRecordingDir, iServerFrameSizeSamples, !Settings.bEnableRecording );
     }
     QString GetRecordingDir() { return JamController.GetRecordingDir(); }
 
     void    SetWelcomeMessage ( const QString& strNWelcMess );
-    QString GetWelcomeMessage() { return strWelcomeMessage; }
+    QString GetWelcomeMessage() { return Settings.strWelcomeMessage; }
 
-    void    SetDirectoryAddress ( const QString& sNDirectoryAddress ) { ServerListManager.SetDirectoryAddress ( sNDirectoryAddress ); }
+    void SetDirectoryAddress ( const QString& sNDirectoryAddress )
+    {
+        ServerListManager.SetDirectoryAddress ( sNDirectoryAddress );
+        Settings.strDirectoryAddress = sNDirectoryAddress;
+    }
     QString GetDirectoryAddress() { return ServerListManager.GetDirectoryAddress(); }
 
     QString GetServerListFileName() { return ServerListManager.GetServerListFileName(); }
-    bool    SetServerListFileName ( QString strFilename ) { return ServerListManager.SetServerListFileName ( strFilename ); }
+    bool    SetServerListFileName ( QString strFilename )
+    {
+        if ( ServerListManager.SetServerListFileName ( strFilename ) )
+        {
+            Settings.strServerListFileName = strFilename;
+            return true;
+        }
 
-    void SetAutoRunMinimized ( const bool NAuRuMin ) { bAutoRunMinimized = NAuRuMin; }
-    bool GetAutoRunMinimized() { return bAutoRunMinimized; }
+        return false;
+    }
 
-    void SetEnableDelayPanning ( bool bDelayPanningOn ) { bDelayPan = bDelayPanningOn; }
-    bool IsDelayPanningEnabled() { return bDelayPan; }
+    void SetAutoRunMinimized ( const bool NAuRuMin ) { Settings.bAutoRunMinimized = NAuRuMin; }
+    bool GetAutoRunMinimized() { return Settings.bAutoRunMinimized; }
+
+    void SetEnableDelayPanning ( bool bDelayPanningOn ) { Settings.bDelayPan = bDelayPanningOn; }
+    bool IsDelayPanningEnabled() { return Settings.bDelayPan; }
 
 protected:
     // access functions for actual channels
@@ -354,19 +373,11 @@ protected:
 
     // jam recorder
     recorder::CJamController JamController;
-    bool                     bDisableRecording;
-
-    // GUI settings
-    bool bAutoRunMinimized;
-
-    // for delay panning
-    bool bDelayPan;
 
     // enable IPv6
     bool bEnableIPv6;
 
     // messaging
-    QString      strWelcomeMessage;
     ELicenceType eLicenceType;
     bool         bDisconnectAllClientsOnQuit;
 

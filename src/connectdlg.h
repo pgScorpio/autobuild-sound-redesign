@@ -49,7 +49,7 @@ class CConnectDlg : public CBaseDlg, private Ui_CConnectDlgBase
     Q_OBJECT
 
 public:
-    CConnectDlg ( CClientSettings* pNSetP, const bool bNewShowCompleteRegList, const bool bNEnableIPv6, QWidget* parent = nullptr );
+    CConnectDlg ( CClientSettings& cSettings, const bool bNewShowCompleteRegList, const bool bNEnableIPv6, QWidget* parent = nullptr );
 
     void SetShowAllMusicians ( const bool bState ) { ShowAllMusicians ( bState ); }
     bool GetShowAllMusicians() { return bShowAllMusicians; }
@@ -77,7 +77,7 @@ protected:
     void             EmitCLServerListPingMes ( const CHostAddress& haServerAddress );
     void             UpdateDirectoryServerComboBox();
 
-    CClientSettings* pSettings;
+    CClientSettings& Settings;
 
     QTimer       TimerPing;
     QTimer       TimerReRequestServList;

@@ -186,7 +186,16 @@ public:
 
     virtual ~CAudioMixerBoard();
 
-    void    SetSettingsPointer ( CClientSettings* pNSet ) { pSettings = pNSet; }
+    void SetSettings ( CClientSettings* pNSet )
+    {
+        pSettings = pNSet;
+
+        SetNumMixerPanelRows ( pSettings->iNumMixerPanelRows );
+        SetFaderSorting ( pSettings->eChannelSortType );
+        SetMeterStyle ( pSettings->eMeterStyle );
+        SetGUIDesign ( pSettings->eGUIDesign );
+    }
+
     void    HideAll();
     void    ApplyNewConClientList ( CVector<CChannelInfo>& vecChanInfo );
     void    SetServerName ( const QString& strNewServerName );

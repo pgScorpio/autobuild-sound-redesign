@@ -25,9 +25,9 @@
 #include "connectdlg.h"
 
 /* Implementation *************************************************************/
-CConnectDlg::CConnectDlg ( CClientSettings* pNSetP, const bool bNewShowCompleteRegList, const bool bNEnableIPv6, QWidget* parent ) :
+CConnectDlg::CConnectDlg ( CClientSettings& cSettings, const bool bNewShowCompleteRegList, const bool bNEnableIPv6, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Dialog ),
-    pSettings ( pNSetP ),
+    Settings ( cSettings ),
     strSelectedAddress ( "" ),
     strSelectedServerName ( "" ),
     bShowCompleteRegList ( bNewShowCompleteRegList ),
@@ -196,9 +196,9 @@ void CConnectDlg::showEvent ( QShowEvent* )
 
     for ( int iLEIdx = 0; iLEIdx < MAX_NUM_SERVER_ADDR_ITEMS; iLEIdx++ )
     {
-        if ( !pSettings->vstrIPAddress[iLEIdx].isEmpty() )
+        if ( !Settings.vstrIPAddress[iLEIdx].isEmpty() )
         {
-            cbxServerAddr->addItem ( pSettings->vstrIPAddress[iLEIdx] );
+            cbxServerAddr->addItem ( Settings.vstrIPAddress[iLEIdx] );
         }
     }
 
@@ -224,16 +224,16 @@ void CConnectDlg::RequestServerList()
 
     // update list combo box (disable events to avoid a signal)
     cbxDirectoryServer->blockSignals ( true );
-    if ( pSettings->eDirectoryType == AT_CUSTOM )
+    if ( Settings.eDirectoryType == AT_CUSTOM )
     {
         // iCustomDirectoryIndex is non-zero only if eDirectoryType == AT_CUSTOM
         // find the combobox item that corresponds to vstrDirectoryAddress[iCustomDirectoryIndex]
         // (the current selected custom directory)
-        cbxDirectoryServer->setCurrentIndex ( cbxDirectoryServer->findData ( QVariant ( pSettings->iCustomDirectoryIndex ) ) );
+        cbxDirectoryServer->setCurrentIndex ( cbxDirectoryServer->findData ( QVariant ( Settings.iCustomDirectoryIndex ) ) );
     }
     else
     {
-        cbxDirectoryServer->setCurrentIndex ( static_cast<int> ( pSettings->eDirectoryType ) );
+        cbxDirectoryServer->setCurrentIndex ( static_cast<int> ( Settings.eDirectoryType ) );
     }
     cbxDirectoryServer->blockSignals ( false );
 
@@ -244,7 +244,7 @@ void CConnectDlg::RequestServerList()
 
     // Allow IPv4 only for communicating with Directories
     if ( NetworkUtil().ParseNetworkAddress (
-             NetworkUtil::GetDirectoryAddress ( pSettings->eDirectoryType, pSettings->vstrDirectoryAddress[pSettings->iCustomDirectoryIndex] ),
+             NetworkUtil::GetDirectoryAddress ( Settings.eDirectoryType, Settings.vstrDirectoryAddress[Settings.iCustomDirectoryIndex] ),
              haDirectoryAddress,
              false ) )
     {
@@ -273,14 +273,14 @@ void CConnectDlg::OnDirectoryServerChanged ( int iTypeIdx )
     if ( iTypeIdx >= AT_CUSTOM )
     {
         // the value for the index into the vector vstrDirectoryAddress is in the user data of the combobox item
-        pSettings->iCustomDirectoryIndex = cbxDirectoryServer->itemData ( iTypeIdx ).toInt();
-        iTypeIdx                         = AT_CUSTOM;
+        Settings.iCustomDirectoryIndex = cbxDirectoryServer->itemData ( iTypeIdx ).toInt();
+        iTypeIdx                       = AT_CUSTOM;
     }
     else
     {
-        pSettings->iCustomDirectoryIndex = 0;
+        Settings.iCustomDirectoryIndex = 0;
     }
-    pSettings->eDirectoryType = static_cast<EDirectoryType> ( iTypeIdx );
+    Settings.eDirectoryType = static_cast<EDirectoryType> ( iTypeIdx );
     RequestServerList();
 }
 
@@ -558,7 +558,7 @@ void CConnectDlg::OnCustomDirectoriesChanged()
     UpdateDirectoryServerComboBox();
     // after updating the combobox, we must re-select the previous directory selection
 
-    if ( pSettings->eDirectoryType == AT_CUSTOM )
+    if ( Settings.eDirectoryType == AT_CUSTOM )
     {
         // check if the currently select custom directory still exists in the now potentially re-ordered vector,
         // if so, then change to its new index.  (addresses Issue #1899)
@@ -566,17 +566,17 @@ void CConnectDlg::OnCustomDirectoriesChanged()
         if ( iNewIndex == INVALID_INDEX )
         {
             // previously selected custom directory has been deleted.  change to default directory
-            pSettings->eDirectoryType        = static_cast<EDirectoryType> ( AT_DEFAULT );
-            pSettings->iCustomDirectoryIndex = 0;
+            Settings.eDirectoryType        = static_cast<EDirectoryType> ( AT_DEFAULT );
+            Settings.iCustomDirectoryIndex = 0;
             RequestServerList();
         }
         else
         {
             // find previously selected custom directory in the now potentially re-ordered vector
-            pSettings->eDirectoryType        = static_cast<EDirectoryType> ( AT_CUSTOM );
-            pSettings->iCustomDirectoryIndex = cbxDirectoryServer->itemData ( iNewIndex ).toInt();
+            Settings.eDirectoryType        = static_cast<EDirectoryType> ( AT_CUSTOM );
+            Settings.iCustomDirectoryIndex = cbxDirectoryServer->itemData ( iNewIndex ).toInt();
             cbxDirectoryServer->blockSignals ( true );
-            cbxDirectoryServer->setCurrentIndex ( cbxDirectoryServer->findData ( QVariant ( pSettings->iCustomDirectoryIndex ) ) );
+            cbxDirectoryServer->setCurrentIndex ( cbxDirectoryServer->findData ( QVariant ( Settings.iCustomDirectoryIndex ) ) );
             cbxDirectoryServer->blockSignals ( false );
         }
     }
@@ -584,7 +584,7 @@ void CConnectDlg::OnCustomDirectoriesChanged()
     {
         // selected directory was not a custom directory
         cbxDirectoryServer->blockSignals ( true );
-        cbxDirectoryServer->setCurrentIndex ( static_cast<int> ( pSettings->eDirectoryType ) );
+        cbxDirectoryServer->setCurrentIndex ( static_cast<int> ( Settings.eDirectoryType ) );
         cbxDirectoryServer->blockSignals ( false );
     }
 }
@@ -964,10 +964,10 @@ void CConnectDlg::UpdateDirectoryServerComboBox()
     // contents to the combobox in reverse order
     for ( int i = MAX_NUM_SERVER_ADDR_ITEMS - 1; i >= 0; i-- )
     {
-        if ( pSettings->vstrDirectoryAddress[i] != "" )
+        if ( Settings.vstrDirectoryAddress[i] != "" )
         {
             // add vector index (i) to the combobox as user data
-            cbxDirectoryServer->addItem ( pSettings->vstrDirectoryAddress[i], i );
+            cbxDirectoryServer->addItem ( Settings.vstrDirectoryAddress[i], i );
         }
     }
 }

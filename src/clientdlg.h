@@ -74,8 +74,8 @@ class CClientDlg : public CBaseDlg, private Ui_CClientDlgBase
     Q_OBJECT
 
 public:
-    CClientDlg ( CClient*         pNCliP,
-                 CClientSettings* pNSetP,
+    CClientDlg ( CClient&         cClient,
+                 CClientSettings& cSettings,
                  const QString&   strConnOnStartupAddress,
                  const QString&   strMIDISetup,
                  const bool       bNewShowComplRegConnList,
@@ -99,8 +99,8 @@ protected:
     void ManageDragNDrop ( QDropEvent* Event, const bool bCheckAccept );
     void SetPingTime ( const int iPingTime, const int iOverallDelayMs, const CMultiColorLED::ELightColor eOverallDelayLEDColor );
 
-    CClient*         pClient;
-    CClientSettings* pSettings;
+    CClient&         Client;
+    CClientSettings& Settings;
 
     bool           bConnected;
     bool           bConnectDlgWasShown;
@@ -116,6 +116,7 @@ protected:
     QTimer         TimerCheckAudioDeviceOk;
     QTimer         TimerDetectFeedback;
 
+    virtual void showEvent ( QShowEvent* );
     virtual void closeEvent ( QCloseEvent* Event );
     virtual void dragEnterEvent ( QDragEnterEvent* Event ) { ManageDragNDrop ( Event, true ); }
     virtual void dropEvent ( QDropEvent* Event ) { ManageDragNDrop ( Event, false ); }
@@ -163,8 +164,8 @@ public slots:
     void OnOpenAnalyzerConsole() { ShowAnalyzerConsole(); }
     void OnOwnFaderFirst()
     {
-        pSettings->bOwnFaderFirst = !pSettings->bOwnFaderFirst;
-        MainMixerBoard->SetFaderSorting ( pSettings->eChannelSortType );
+        Settings.bOwnFaderFirst = !Settings.bOwnFaderFirst;
+        MainMixerBoard->SetFaderSorting ( Settings.eChannelSortType );
     }
     void OnNoSortChannels() { MainMixerBoard->SetFaderSorting ( ST_NO_SORT ); }
     void OnSortChannelsByName() { MainMixerBoard->SetFaderSorting ( ST_BY_NAME ); }
@@ -180,11 +181,18 @@ public slots:
     void OnChatStateChanged ( int value );
     void OnLocalMuteStateChanged ( int value );
 
-    void OnAudioReverbValueChanged ( int value ) { pClient->SetReverbLevel ( value ); }
+    void OnAudioReverbValueChanged ( int value ) { Settings.iReverbLevel = value; }
 
-    void OnReverbSelLClicked() { pClient->SetReverbOnLeftChan ( true ); }
-
-    void OnReverbSelRClicked() { pClient->SetReverbOnLeftChan ( false ); }
+    void OnReverbSelLClicked()
+    {
+        Settings.bReverbOnLeftChan = true;
+        emit ReverbChannelChanged();
+    }
+    void OnReverbSelRClicked()
+    {
+        Settings.bReverbOnLeftChan = false;
+        emit ReverbChannelChanged();
+    }
 
     void OnFeedbackDetectionChanged ( int state ) { ClientSettingsDlg.SetEnableFeedbackDetection ( state == Qt::Checked ); }
 
@@ -193,19 +201,19 @@ public slots:
     void OnLicenceRequired ( ELicenceType eLicenceType );
     void OnSoundDeviceChanged ( QString strError );
 
-    void OnChangeChanGain ( int iId, float fGain, bool bIsMyOwnFader ) { pClient->SetRemoteChanGain ( iId, fGain, bIsMyOwnFader ); }
+    void OnChangeChanGain ( int iId, float fGain, bool bIsMyOwnFader ) { Client.SetRemoteChanGain ( iId, fGain, bIsMyOwnFader ); }
 
-    void OnChangeChanPan ( int iId, float fPan ) { pClient->SetRemoteChanPan ( iId, fPan ); }
+    void OnChangeChanPan ( int iId, float fPan ) { Client.SetRemoteChanPan ( iId, fPan ); }
 
-    void OnNewLocalInputText ( QString strChatText ) { pClient->CreateChatTextMes ( strChatText ); }
+    void OnNewLocalInputText ( QString strChatText ) { Client.CreateChatTextMes ( strChatText ); }
 
-    void OnReqServerListQuery ( CHostAddress InetAddr ) { pClient->CreateCLReqServerListMes ( InetAddr ); }
+    void OnReqServerListQuery ( CHostAddress InetAddr ) { Client.CreateCLReqServerListMes ( InetAddr ); }
 
-    void OnCreateCLServerListPingMes ( CHostAddress InetAddr ) { pClient->CreateCLServerListPingMes ( InetAddr ); }
+    void OnCreateCLServerListPingMes ( CHostAddress InetAddr ) { Client.CreateCLServerListPingMes ( InetAddr ); }
 
-    void OnCreateCLServerListReqVerAndOSMes ( CHostAddress InetAddr ) { pClient->CreateCLServerListReqVerAndOSMes ( InetAddr ); }
+    void OnCreateCLServerListReqVerAndOSMes ( CHostAddress InetAddr ) { Client.CreateCLServerListReqVerAndOSMes ( InetAddr ); }
 
-    void OnCreateCLServerListReqConnClientsListMes ( CHostAddress InetAddr ) { pClient->CreateCLServerListReqConnClientsListMes ( InetAddr ); }
+    void OnCreateCLServerListReqConnClientsListMes ( CHostAddress InetAddr ) { Client.CreateCLServerListReqConnClientsListMes ( InetAddr ); }
 
     void OnCLServerListReceived ( CHostAddress InetAddr, CVector<CServerInfo> vecServerInfo )
     {
@@ -236,7 +244,7 @@ public slots:
     void OnGUIDesignChanged();
     void OnMeterStyleChanged();
     void OnRecorderStateReceived ( ERecorderState eRecorderState );
-    void SetMixerBoardDeco ( const ERecorderState newRecorderState, const EGUIDesign eNewDesign );
+    void SetMixerBoardDeco ( const ERecorderState newRecorderState );
     void OnAudioChannelsChanged() { UpdateRevSelection(); }
     void OnNumClientsChanged ( int iNewNumClients );
 
@@ -244,4 +252,6 @@ public slots:
 
 signals:
     void SendTabChange ( int iTabIdx );
+    void ReverbChannelChanged();
+    void ChannelInfoChanged();
 };

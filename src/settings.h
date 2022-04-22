@@ -28,15 +28,17 @@
 #include <QFile>
 #include <QSettings>
 #include <QDir>
-#ifndef HEADLESS
-#    include <QMessageBox>
-#endif
 #include "global.h"
-#ifndef SERVER_ONLY
-#    include "client.h"
-#endif
-#include "server.h"
 #include "util.h"
+
+/* Definitions ****************************************************************/
+// audio in fader range
+#define AUD_FADER_IN_MIN    0
+#define AUD_FADER_IN_MAX    100
+#define AUD_FADER_IN_MIDDLE ( AUD_FADER_IN_MAX / 2 )
+
+// audio reverberation range
+#define AUD_REVERB_MAX 100
 
 /* Classes ********************************************************************/
 class CSettings : public QObject
@@ -48,20 +50,18 @@ public:
         vecWindowPosMain(), // empty array
         strLanguage ( "" ),
         strFileName ( "" )
-    {
-        QObject::connect ( QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, &CSettings::OnAboutToQuit );
-    }
-
-    void Load ( const QList<QString> CommandLineOptions );
-    void Save();
+    {}
 
     // common settings
     QByteArray vecWindowPosMain;
     QString    strLanguage;
 
 protected:
-    virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument )                                                  = 0;
-    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument, const QList<QString>& CommandLineOptions ) = 0;
+    void Load();
+    void Save();
+
+    virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument )        = 0;
+    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) = 0;
 
     void ReadFromFile ( const QString& strCurFileName, QDomDocument& XMLDocument );
 
@@ -103,16 +103,13 @@ protected:
     void PutIniSetting ( QDomDocument& xmlFile, const QString& sSection, const QString& sKey, const QString& sValue = "" );
 
     QString strFileName;
-
-public slots:
-    void OnAboutToQuit() { Save(); }
 };
 
 #ifndef SERVER_ONLY
 class CClientSettings : public CSettings
 {
 public:
-    CClientSettings ( CClient* pNCliP, const QString& sNFiName ) :
+    CClientSettings ( const QString& sNFiName ) :
         CSettings(),
         vecStoredFaderTags ( MAX_NUM_STORED_FADER_SETTINGS, "" ),
         vecStoredFaderLevels ( MAX_NUM_STORED_FADER_SETTINGS, AUD_MIX_FADER_MAX ),
@@ -137,13 +134,69 @@ public:
         bWindowWasShownChat ( false ),
         bWindowWasShownConnect ( false ),
         bOwnFaderFirst ( false ),
-        pClient ( pNCliP )
+        ChannelInfo(),
+        eAudioQuality ( AQ_NORMAL ),
+        eAudioChannelConfig ( CC_MONO ),
+        eGUIDesign ( GD_ORIGINAL ),
+        eMeterStyle ( MT_LED_STRIPE ),
+        bEnableOPUS64 ( false ),
+        iAudioInFader ( AUD_FADER_IN_MIDDLE ),
+        bReverbOnLeftChan ( false ),
+        iReverbLevel ( 0 ),
+        iServerSockBufNumFrames ( DEF_NET_BUF_SIZE_NUM_BL ),
+        bFraSiFactPrefSupported ( false ),
+        bFraSiFactDefSupported ( false ),
+        bFraSiFactSafeSupported ( false ),
+        bMuteOutStream ( false ),
+        bConnectState ( false )
     {
         SetFileName ( sNFiName, DEFAULT_INI_FILE_NAME );
+        Load();
+        // SelectSoundCard ( strCurrentAudioDevice );
     }
 
-    void LoadFaderSettings ( const QString& strCurFileName );
-    void SaveFaderSettings ( const QString& strCurFileName );
+    ~CClientSettings()
+    {
+        // StoreSoundCard( CurrentSoundCard );
+        Save();
+    }
+
+    //### TODO: BEGIN ###//
+    // new values need to be initialised in constructor and read by CClient
+
+    CChannelCoreInfo ChannelInfo;
+
+    //### TODO: BEGIN ###//
+    // After the sound-redesign we should store all Soundcard settings per device (and per device type!),
+    // i.e. in a CVector< CSoundCardSettings > SoundCard[],
+    // and set a current Device: CSoundCardSettings CurrentSoundCard = SoundCard[n]
+    // CurrentSoundCard.strName will be stored in the inifile as 'CurrentSoundCard'
+    // and there should be a function Settings.SelectSoundCard ( strName )
+    // there should also be a function Settings.StoreSoundCard( CSoundCardSettings& sndCardSettings)
+    // Which will store sndCardSettings in the matching SoundCard[x], or add a new device to
+    // SoundCard[] when no SoundCard[x] with sndCardSettings.strName already exists.
+    //
+    QString strCurrentAudioDevice;
+    int     iSndCrdLeftInputChannel;
+    int     iSndCrdRightInputChannel;
+    int     iSndCrdLeftOutputChannel;
+    int     iSndCrdRightOutputChannel;
+    int     iSndCrdPrefFrameSizeFactor;
+    // int  iSndCrdLeftInputBoost;
+    // int  iSndCrdRightInputBoost;
+    //### TODO: END ###//
+
+    int           iAudioInFader;
+    int           iReverbLevel;
+    bool          bReverbOnLeftChan;
+    bool          bAutoSockBufSize;
+    int           iClientSockBufNumFrames;
+    int           iServerSockBufNumFrames;
+    bool          bEnableOPUS64;
+    EGUIDesign    eGUIDesign;
+    EMeterStyle   eMeterStyle;
+    EAudChanConf  eAudioChannelConfig;
+    EAudioQuality eAudioQuality;
 
     // general settings
     CVector<QString> vecStoredFaderTags;
@@ -173,29 +226,63 @@ public:
     bool       bWindowWasShownConnect;
     bool       bOwnFaderFirst;
 
+public:
+    // Unsaved settings, needed by CClientSettingsDlg
+    //### TODO: BEGIN ###//
+    // these could be set by CSound on device selection !
+    // no more need for separate calls to CSound from CClient.Init() then.
+    bool bFraSiFactPrefSupported;
+    bool bFraSiFactDefSupported;
+    bool bFraSiFactSafeSupported;
+    //### TODO: END ###//
+
+    bool bMuteOutStream;
+    bool bConnectState;
+
+public:
+    void LoadFaderSettings ( const QString& strCurFileName );
+    void SaveFaderSettings ( const QString& strCurFileName );
+
+    // void SelectSoundCard ( QString strName );
+    // void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
+
 protected:
     // No CommandLineOptions used when reading Client inifile
     virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument ) override;
-    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument, const QList<QString>& ) override;
+    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) override;
 
     void ReadFaderSettingsFromXML ( const QDomDocument& IniXMLDocument );
     void WriteFaderSettingsToXML ( QDomDocument& IniXMLDocument );
-
-    CClient* pClient;
 };
 #endif
 
 class CServerSettings : public CSettings
 {
 public:
-    CServerSettings ( CServer* pNSerP, const QString& sNFiName ) : CSettings(), pServer ( pNSerP )
+    CServerSettings ( const QString& sNFiName ) : CSettings()
     {
         SetFileName ( sNFiName, DEFAULT_INI_FILE_NAME_SERVER );
+        Load();
     }
+
+    ~CServerSettings() { Save(); }
+
+    //### TODO: BEGIN ###//
+    // CHECK! these new values need to be initialised in constructor and read by CClient
+    QString          strServerName;
+    QString          strServerCity;
+    QLocale::Country eServerCountry;
+    bool             bEnableRecording;
+    QString          strWelcomeMessage;
+    QString          strRecordingDir;
+    QString          strDirectoryAddress;
+    EDirectoryType   eDirectoryType;
+    QString          strServerListFileName;
+    bool             bAutoRunMinimized;
+    bool             bDelayPan;
+    //### TODO: END ###//
 
 protected:
     virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument ) override;
-    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument, const QList<QString>& CommandLineOptions ) override;
-
-    CServer* pServer;
+    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) override;
 };
