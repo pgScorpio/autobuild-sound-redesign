@@ -39,10 +39,10 @@ How to handle overriding commandline parameters?
 
 Future improvements:
 
-main should only read the --server commandline parameter
-all others should be read by CCLientSettings/CServerSettings.
+main should only read the --server and --nogui commandline parameters
+all others should be read by a CCommandlineOptions class.
 
-Better solution for notifiers: 
+Better solution for notifiers:
     Get/Set functions in Settings class and the Set functions should emit the "Changed" notifier from Settings.
     In this way we don't need separate notifiers from Dialogs and RPC.
 
@@ -51,4 +51,3 @@ This would also strongly reduce the number of needed CSoundbase functions and wo
 Also CClientSettings should no longer need calls to Client for Sound values, since they would be in Settings too.
 And when we change stored Settings to store all Sound settings (like channel selection and input boost) per device
 CSound can also change all settigs at once when selecting another device.
-

@@ -705,12 +705,6 @@ public:
         return false;
     }
 
-    /*
-    protected:
-        void SelectSoundCard ( QString strName );
-        void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
-    */
-
 protected: // Unsaved settings:
     QString strClientName;
 
@@ -730,6 +724,9 @@ public:
     void SaveFaderSettings ( const QString& strCurFileName );
 
     void RequestDriverSetup() { emit OpenDriverSetup(); }
+
+    // void SelectSoundCard ( QString strName );
+    // void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
 
 protected:
     // Status values
@@ -890,6 +887,7 @@ public:
             return QString ( APP_NAME ) + " - " + GetServerName();
         }
     }
+
 
 protected:
     virtual void ReadCommandLineOptions() override;

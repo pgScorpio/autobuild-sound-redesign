@@ -465,6 +465,7 @@ int main ( int argc, char** argv )
                 {
                     Server.SetDirectoryType ( AT_CUSTOM );
                 }
+                //### TODO: END ###//
 
                 // initialise message boxes
                 CMessages::init ( NULL, GetAppName() );

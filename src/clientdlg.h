@@ -235,4 +235,6 @@ public slots:
 
 signals:
     void SendTabChange ( int iTabIdx );
+    void ReverbChannelChanged();
+    void ChannelInfoChanged();
 };
