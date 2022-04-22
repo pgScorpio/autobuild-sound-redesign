@@ -199,8 +199,18 @@ void CSoundBase::onTimerCheckActive()
     if ( !bActive )
     {
         emit SoundActiveTimeout();
-        CMessages::ShowWarning ( htmlBold ( tr ( "Your audio device is not working correctly." ) ) + htmlNewLine() +
-                                 tr ( "Please check your device settings or try another device." ) );
+#ifndef OLD_SOUND_COMPATIBILITY
+        if ( lNumDevices > 1 )
+        {
+            CMessages::ShowWarning ( htmlBold ( tr ( "Your audio device is not working correctly." ) ) + htmlNewLine() +
+                                     tr ( "Please check your device settings or try another device." ) );
+        }
+        else
+        {
+            CMessages::ShowWarning ( htmlBold ( tr ( "Your audio device is not working correctly." ) ) + htmlNewLine() +
+                                     tr ( "Please check your device settings." ) );
+        }
+#endif
     }
 }
 

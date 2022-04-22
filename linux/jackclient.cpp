@@ -33,16 +33,18 @@ bool CJackClientPort::Connect ( const char* connPort )
 {
     Disconnect();
     int res;
+
+    const char* jackPortName = jack_port_name ( jackPort );
     // First portname must be the output, second portname must be the input
     if ( bIsInput )
     {
         // I am input, so connPort must be output
-        res = jack_connect ( jackClient, connPort, jack_port_name ( jackPort ) /*jack_port_name ( jackPort )*/ );
+        res = jack_connect ( jackClient, connPort, jackPortName );
     }
     else
     {
         // I am output, so connPort must be input
-        res = jack_connect ( jackClient, jack_port_name ( jackPort ), connPort );
+        res = jack_connect ( jackClient, jackPortName, connPort );
     }
 
     bool ok = ( res == 0 ) || ( res == EEXIST );
@@ -266,18 +268,19 @@ bool CJackClient::AddAudioPort ( const QString& portName, bool bInput )
         const char*    jackName = jack_port_name ( newPort );
         CJackAudioPort newAudioPort ( CJackAudioPort ( jackClient, newPort, portName, bInput ) );
 
-        if ( bInput )
+        if ( jackName )
         {
-            if ( jackName )
+            if ( bInput )
+            {
                 AudioInput.append ( newAudioPort );
-        }
-        else
-        {
-            if ( jackName )
+            }
+            else
+            {
                 AudioOutput.append ( newAudioPort );
-        }
+            }
 
-        return true;
+            return true;
+        }
     }
 
     return false;
@@ -340,6 +343,16 @@ bool CJackClient::AutoConnect()
                 ok = false;
             }
             i++;
+        }
+
+        // there is only one input while we have more ?
+        if ( ok && ( i == 1 ) && ( AudioInput.size() > 1 ) )
+        {
+            // Connect second input to the same port
+            if ( AudioInput[1].Connect ( ports[0] ) )
+            {
+                numInConnected++;
+            }
         }
 
         jack_free ( ports );

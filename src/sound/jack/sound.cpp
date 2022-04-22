@@ -42,8 +42,6 @@ CSound::CSound ( void ( *theProcessCallback ) ( CVector<short>& psData, void* ar
     CCommandline cmdLine;
     double       dValue;
 
-    setObjectName ( "CSoundThread" );
-
     if ( cmdLine.GetFlagArgument ( CMDLN_NOJACKCONNECT ) )
     {
         bAutoConnect = false;
@@ -66,7 +64,7 @@ CSound::CSound ( void ( *fpProcessCallback ) ( CVector<int16_t>& psData, void* a
                  const QString&,
                  const bool,
                  const QString& ) :
-    CSoundBase ( "ASIO", fpProcessCallback, theProcessCallbackArg ),
+    CSoundBase ( "Jack", fpProcessCallback, theProcessCallbackArg ),
     jackClient ( strClientName ), // ClientName from CSoundBase !
     bJackWasShutDown ( false ),
     bAutoConnect ( true ),
@@ -74,8 +72,6 @@ CSound::CSound ( void ( *fpProcessCallback ) ( CVector<int16_t>& psData, void* a
 {
     CCommandline cmdLine;
     double       dValue;
-
-    setObjectName ( "CSoundThread" );
 
     if ( cmdLine.GetFlagArgument ( CMDLN_NOJACKCONNECT ) )
     {
@@ -379,6 +375,7 @@ bool CSound::checkCapabilities()
         if ( bAutoConnect ) // We don't seem to get any connections when not connected via autoconnect !
         {
             bool connOk = true;
+
             if ( numInputConnections < DRV_MIN_IN_CHANNELS )
             {
                 strErrorList.append ( tr ( "You have less than %1 inputs connected." ).arg ( DRV_MIN_IN_CHANNELS ) );
@@ -461,7 +458,6 @@ bool CSound::checkDeviceChange ( CSoundBase::tDeviceChangeCheck mode, int iDrive
     switch ( mode )
     {
     case CSoundBase::tDeviceChangeCheck::CheckOpen:
-    {
         // Now reset jack by closing and re-opening jack
         if ( bJackWasShutDown )
         {
@@ -471,7 +467,6 @@ bool CSound::checkDeviceChange ( CSoundBase::tDeviceChangeCheck mode, int iDrive
         {
             return false;
         }
-    }
         return true;
 
     case CSoundBase::tDeviceChangeCheck::CheckCapabilities:
