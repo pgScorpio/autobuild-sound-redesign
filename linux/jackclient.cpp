@@ -412,7 +412,7 @@ unsigned int CJackClient::GetAudioOutputConnections()
 
 bool CJackClient::Activate()
 {
-    if ( !bIsActive )
+    if ( !bIsActive && jackClient )
     {
         bIsActive = jackClient ? ( jack_activate ( jackClient ) == 0 ) : false;
     }
@@ -422,15 +422,12 @@ bool CJackClient::Activate()
 
 bool CJackClient::Deactivate() // Also disconnects ports !
 {
-    if ( !jackClient )
+    if ( jackClient )
     {
-        bIsActive = false;
+        jack_deactivate ( jackClient );
     }
 
-    if ( bIsActive && ( jack_deactivate ( jackClient ) == 0 ) )
-    {
-        bIsActive = false;
-    }
+    bIsActive = false;
 
     return !bIsActive;
 }

@@ -100,6 +100,13 @@ int CSound::onBufferSwitch ( jack_nframes_t nframes, void* /* arg */ )
 
     if ( !IsStarted() )
     {
+        if ( jackClient.GetJackClient() )
+        {
+            jackClient.setActive ( true );
+            return 0;
+        }
+
+        jackClient.setActive ( false );
         return -1;
     }
 
@@ -225,8 +232,11 @@ void CSound::onShutdownCallback()
 
     bJackWasShutDown = true;
 
-    // Trying to restart should generate the error....
-    emit ReinitRequest ( RS_ONLY_RESTART );
+    if ( IsRunning() )
+    {
+        // Trying to restart should generate the error....
+        emit ReinitRequest ( RS_ONLY_RESTART );
+    }
 }
 
 //============================================================================
@@ -295,6 +305,16 @@ bool CSound::startJack()
 
     if ( jackClient.IsOpen() )
     {
+        // prepare buffers
+        jackClient.SetBufferSize ( iProtocolBufferSize );
+        iDeviceBufferSize = jackClient.GetBufferSize();
+        audioBuffer.Init ( iDeviceBufferSize * 2 );
+
+        // set callbacks
+        jackClient.SetProcessCallBack ( _BufferSwitch, this );
+        jackClient.SetBuffersizeCallBack ( _BufferSizeCallback, this );
+        jackClient.SetShutDownCallBack ( _ShutdownCallback, this );
+
         // create ports
         if ( iJackNumInputs == 2 )
         {
@@ -317,16 +337,6 @@ bool CSound::startJack()
         {
             jackClient.AddMidiPort ( "input midi", biINPUT );
         }
-
-        // set callbacks
-        jackClient.SetShutDownCallBack ( _ShutdownCallback, this );
-        jackClient.SetProcessCallBack ( _BufferSwitch, this );
-        jackClient.SetBuffersizeCallBack ( _BufferSizeCallback, this );
-
-        // prepare buffers
-        jackClient.SetBufferSize ( iProtocolBufferSize );
-        iDeviceBufferSize = jackClient.GetBufferSize();
-        audioBuffer.Init ( iDeviceBufferSize * 2 );
 
         // activate jack
         if ( jackClient.Activate() )

@@ -216,4 +216,6 @@ public:
     bool Deactivate(); // Also disconnects all ports !
 
     inline bool IsActive() const { return bIsActive; }
+
+    inline void setActive ( bool active ) { bIsActive = active; }
 };
