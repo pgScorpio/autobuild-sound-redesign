@@ -103,11 +103,12 @@ int CSound::onBufferSwitch ( jack_nframes_t nframes, void* /* arg */ )
         if ( jackClient.GetJackClient() )
         {
             jackClient.setActive ( true );
-            return 0;
         }
-
-        jackClient.setActive ( false );
-        return -1;
+        else
+        {
+            jackClient.setActive ( false );
+            return -1;
+        }
     }
 
     // get output selections
@@ -120,7 +121,7 @@ int CSound::onBufferSwitch ( jack_nframes_t nframes, void* /* arg */ )
     getInputSelAndAddChannels ( selectedInputChannels[0], lNumInChan, lNumAddedInChan, iSelInLeft, iSelAddInLeft );
     getInputSelAndAddChannels ( selectedInputChannels[1], lNumInChan, lNumAddedInChan, iSelInRight, iSelAddInRight );
 
-    if ( nframes == static_cast<jack_nframes_t> ( iDeviceBufferSize ) )
+    if ( IsStarted() && ( nframes == static_cast<jack_nframes_t> ( iDeviceBufferSize ) ) )
     {
         // get input data pointers
         jack_default_audio_sample_t* in_left  = (jack_default_audio_sample_t*) jackClient.AudioInput[iSelInLeft].GetBuffer ( nframes );
@@ -196,10 +197,10 @@ int CSound::onBufferSwitch ( jack_nframes_t nframes, void* /* arg */ )
                 jack_midi_event_get ( &in_event, in_midi, j );
 
                 // copy packet and send it to the MIDI parser
-                // clang-format off
-// TODO do not call malloc in real-time callback
-                // clang-format on
+                //### TODO:BEGIN ###//
+                // do not call malloc in real-time callback
                 CVector<uint8_t> vMIDIPaketBytes ( (int) in_event.size );
+                //### TODO:END ###//
 
                 for ( unsigned int i = 0; i < in_event.size; i++ )
                 {
@@ -338,6 +339,8 @@ bool CSound::startJack()
             jackClient.AddMidiPort ( "input midi", biINPUT );
         }
 
+        setBaseValues();
+
         // activate jack
         if ( jackClient.Activate() )
         {
@@ -420,7 +423,7 @@ bool CSound::setBaseValues()
     // Set the input channel names:
     for ( lNumInChan = 0; lNumInChan < jackClient.AudioInput.size(); lNumInChan++ )
     {
-        strInputChannelNames.append ( jackClient.AudioInput[lNumInChan].portName ); // pgScoprpio TODO use fixed names ??
+        strInputChannelNames.append ( jackClient.AudioInput[lNumInChan].portName );
     }
 
     // Set any added input channel names:
@@ -429,12 +432,14 @@ bool CSound::setBaseValues()
     // Set the output channel names:
     for ( lNumOutChan = 0; lNumOutChan < jackClient.AudioOutput.size(); lNumOutChan++ )
     {
-        strOutputChannelNames.append ( jackClient.AudioOutput[lNumOutChan].portName ); // pgScoprpio TODO use fixed names ??
+        strOutputChannelNames.append ( jackClient.AudioOutput[lNumOutChan].portName );
     }
 
     // Select input and output channels:
+    //### TODO: BEGIN ###//
+    // reload channel mapping from inifile !
     resetChannelMapping();
-    // pgScorpio TODO: reload channel mapping from inifile
+    //### TODO: END ###//
 
     // Set the In/Out Latency:
     fInOutLatencyMs = 0.0;
@@ -456,7 +461,6 @@ bool CSound::setBaseValues()
     return ( jackClient.IsOpen() && ( lNumInChan >= DRV_MIN_IN_CHANNELS ) && ( lNumOutChan >= DRV_MIN_OUT_CHANNELS ) );
 }
 
-// TODO: ChannelMapping from inifile!
 bool CSound::checkDeviceChange ( CSoundBase::tDeviceChangeCheck mode, int iDriverIndex ) // Open device sequence handling....
 {
     // We have just one device !
