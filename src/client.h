@@ -118,40 +118,40 @@ public:
     void Stop();
     bool IsRunning() { return Sound.IsRunning(); }
     bool IsCallbackEntered() const { return Sound.IsCallbackEntered(); }
-    bool SetServerAddr ( QString strNAddr );
 
     double GetLevelForMeterdBLeft() { return SignalLevelMeter.GetLevelForMeterdBLeftOrMono(); }
     double GetLevelForMeterdBRight() { return SignalLevelMeter.GetLevelForMeterdBRight(); }
 
-    bool GetAndResetbJitterBufferOKFlag();
-
     bool IsConnected() { return Channel.IsConnected(); }
 
-    int GetUploadRateKbps() { return Channel.GetUploadRateKbps(); }
+public:
+    // settings
+    CClientSettings& Settings;
+
+    bool SetServerAddr ( QString strNAddr );
+    void SetRemoteChanGain ( const int iId, const float fGain, const bool bIsMyOwnFader );
+    void SetRemoteChanPan ( const int iId, const float fPan ) { Channel.SetRemoteChanPan ( iId, fPan ); }
+
+public:
+    bool GetAndResetbJitterBufferOKFlag();
+    int  GetUploadRateKbps() { return Channel.GetUploadRateKbps(); }
+    int  GetClientSockBufNumFrames()
+    {
+        Settings.SetClientSockBufNumFrames ( Channel.GetSockBufNumFrames() );
+        return Settings.GetClientSockBufNumFrames();
+    }
 
     // sound card device selection
     QStringList GetSndCrdDevNames() { return Sound.GetDevNames(); }
 
-    QString SetSndCrdDev ( const QString strNewDev );
-    void    OpenSndCrdDriverSetup() { Sound.OpenDriverSetup(); }
-
     // sound card channel selection
     int     GetSndCrdNumInputChannels() { return Sound.GetNumInputChannels(); }
     QString GetSndCrdInputChannelName ( const int iDiD ) { return Sound.GetInputChannelName ( iDiD ); }
-    void    SetSndCrdLeftInputChannel ( const int iNewChan );
-    void    SetSndCrdRightInputChannel ( const int iNewChan );
-    int     GetSndCrdLeftInputChannel() { return Sound.GetLeftInputChannel(); }
-    int     GetSndCrdRightInputChannel() { return Sound.GetRightInputChannel(); }
 
     int     GetSndCrdNumOutputChannels() { return Sound.GetNumOutputChannels(); }
     QString GetSndCrdOutputChannelName ( const int iDiD ) { return Sound.GetOutputChannelName ( iDiD ); }
-    void    SetSndCrdLeftOutputChannel ( const int iNewChan );
-    void    SetSndCrdRightOutputChannel ( const int iNewChan );
-    int     GetSndCrdLeftOutputChannel() { return Sound.GetLeftOutputChannel(); }
-    int     GetSndCrdRightOutputChannel() { return Sound.GetRightOutputChannel(); }
 
-    void SetSndCrdPrefFrameSizeFactor ( const int iNewFactor );
-    int  GetSndCrdPrefFrameSizeFactor() { return iSndCrdPrefFrameSizeFactor; }
+    int GetSndCrdPrefFrameSizeFactor() { return iSndCrdPrefFrameSizeFactor; }
 
     int GetSndCrdActualMonoBlSize()
     {
@@ -183,12 +183,16 @@ public:
         }
     }
 
-    void SetRemoteChanGain ( const int iId, const float fGain, const bool bIsMyOwnFader );
+    void GetBufErrorRates ( CVector<double>& vecErrRates, double& dLimit, double& dMaxUpLimit )
+    {
+        Channel.GetBufErrorRates ( vecErrRates, dLimit, dMaxUpLimit );
+    }
+
+protected:
     void OnTimerRemoteChanGain();
     void StartDelayTimer();
 
-    void SetRemoteChanPan ( const int iId, const float fPan ) { Channel.SetRemoteChanPan ( iId, fPan ); }
-
+public:
     void CreateChatTextMes ( const QString& strChatText ) { Channel.CreateChatTextMes ( strChatText ); }
 
     void CreateCLPingMes() { ConnLessProtocol.CreateCLPingMes ( Channel.GetAddress(), PreparePingMessage() ); }
@@ -206,25 +210,17 @@ public:
 
     int EstimatedOverallDelay ( const int iPingTimeMs );
 
-    void GetBufErrorRates ( CVector<double>& vecErrRates, double& dLimit, double& dMaxUpLimit )
-    {
-        Channel.GetBufErrorRates ( vecErrRates, dLimit, dMaxUpLimit );
-    }
-
-    // settings
-    CClientSettings& Settings;
-
-    QString strClientName;
-
 public:
     //### TODO: BEGIN ###//
     // These functions are still needed for classes with no direct access to Settings
     // See if there is a better solution
-    EGUIDesign GetGUIDesign() const { return Settings.eGUIDesign; }
+    EGUIDesign GetGUIDesign() const { return Settings.GetGUIDesign(); }
 
-    int GetSockBufNumFrames() { return Settings.iClientSockBufNumFrames = Channel.GetSockBufNumFrames(); }
-
-    void SetEnableOPUS64 ( const bool eNEnableOPUS64 );
+    int GetSockBufNumFrames()
+    {
+        Settings.SetClientSockBufNumFrames ( Channel.GetSockBufNumFrames() );
+        return Settings.GetClientSockBufNumFrames();
+    }
     //### TODO: END ###//
 
 protected:
@@ -337,28 +333,40 @@ protected slots:
     void OnClientIDReceived ( int iChanID );
     void OnAboutToQuit();
 
+    void OnAudioDeviceChanged();
+    void OnInputChannelChanged();
+    void OnOutputChannelChanged();
+    void OnPrefFrameSizeFactorChanged();
+
 public slots:
     void OnReInitRequest();
     void OnReverbChannelChanged();
     void OnChannelInfoChanged();
 
-    void OnClientSockBufNumFramesChanged() { Channel.SetSockBufNumFrames ( Settings.iClientSockBufNumFrames ); }
+    void OnClientSockBufNumFramesChanged() { Channel.SetSockBufNumFrames ( Settings.GetClientSockBufNumFrames() ); }
 
     void OnServerSockBufNumFramesChanged()
     {
         // if auto setting is disabled, inform the server about the new size
-        if ( !Settings.bAutoSockBufSize )
+        if ( !Settings.GetAutoSockBufSize() )
         {
-            Channel.CreateJitBufMes ( Settings.iServerSockBufNumFrames );
+            Channel.CreateJitBufMes ( Settings.GetServerSockBufNumFrames() );
         }
     };
 
     void OnAutoSockBufSizeChanged()
     {
         // first, set new value in the channel object
-        Channel.SetDoAutoSockBufSize ( Settings.bAutoSockBufSize );
+        Channel.SetDoAutoSockBufSize ( Settings.GetAutoSockBufSize() );
         // inform the server about the change
         CreateServerJitterBufferMessage();
+    }
+
+    void OnDriverSetup()
+    {
+#if defined( _WIN32 ) && !defined( WITH_JACK )
+        Sound.OpenDriverSetup();
+#endif
     }
 
 signals:

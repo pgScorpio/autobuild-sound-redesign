@@ -70,6 +70,11 @@ int main ( int argc, char** argv )
     QList<QString> ServerOnlyOptions;
     QList<QString> ClientOnlyOptions;
 
+    //### TODO: BEGIN ###//
+    // only the --server commandline parameter should be read in main.
+    // all other parameters should be handled in CClientSettings/CServerSettings
+    //### TODO: END ###//
+
     // initialize all flags and string which might be changed by command line
     // arguments
 #if ( defined( SERVER_BUNDLE ) && defined( Q_OS_MACX ) ) || defined( SERVER_ONLY )

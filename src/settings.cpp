@@ -316,7 +316,7 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
     // audio fader
     if ( GetNumericIniSet ( IniXMLDocument, "client", "audfad", AUD_FADER_IN_MIN, AUD_FADER_IN_MAX, iValue ) )
     {
-        iAudioInFader = iValue;
+        iAudioInputBalance = iValue;
     }
 
     // reverberation level
@@ -640,7 +640,7 @@ void CClientSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )
     SetNumericIniSet ( IniXMLDocument, "client", "skill", static_cast<int> ( ChannelInfo.eSkillLevel ) );
 
     // audio fader
-    SetNumericIniSet ( IniXMLDocument, "client", "audfad", iAudioInFader );
+    SetNumericIniSet ( IniXMLDocument, "client", "audfad", iAudioInputBalance );
 
     // reverberation level
     SetNumericIniSet ( IniXMLDocument, "client", "revlev", iReverbLevel );

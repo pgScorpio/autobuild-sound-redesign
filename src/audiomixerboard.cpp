@@ -1124,7 +1124,7 @@ void CAudioMixerBoard::ChangeFaderOrder ( const EChSortType eChSortType )
     std::stable_sort ( PairList.begin(), PairList.end() );
 
     // move my fader to first position
-    if ( pSettings->bOwnFaderFirst )
+    if ( pSettings->GetOwnFaderFirst() )
     {
         for ( int i = 0; i < MAX_NUM_CHANNELS; i++ )
         {

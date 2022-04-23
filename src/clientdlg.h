@@ -162,11 +162,7 @@ public slots:
     void OnOpenAdvancedSettings();
     void OnOpenChatDialog() { ShowChatWindow(); }
     void OnOpenAnalyzerConsole() { ShowAnalyzerConsole(); }
-    void OnOwnFaderFirst()
-    {
-        Settings.bOwnFaderFirst = !Settings.bOwnFaderFirst;
-        MainMixerBoard->SetFaderSorting ( Settings.eChannelSortType );
-    }
+    void OnOwnFaderFirstToggle() { Settings.SetOwnFaderFirst ( !Settings.GetOwnFaderFirst() ); }
     void OnNoSortChannels() { MainMixerBoard->SetFaderSorting ( ST_NO_SORT ); }
     void OnSortChannelsByName() { MainMixerBoard->SetFaderSorting ( ST_BY_NAME ); }
     void OnSortChannelsByInstrument() { MainMixerBoard->SetFaderSorting ( ST_BY_INSTRUMENT ); }
@@ -175,24 +171,16 @@ public slots:
     void OnClearAllStoredSoloMuteSettings();
     void OnSetAllFadersToNewClientLevel() { MainMixerBoard->SetAllFaderLevelsToNewClientLevel(); }
     void OnAutoAdjustAllFaderLevels() { MainMixerBoard->AutoAdjustAllFaderLevels(); }
-    void OnNumMixerPanelRowsChanged ( int value ) { MainMixerBoard->SetNumMixerPanelRows ( value ); }
+    void OnNumMixerPanelRowsChanged() { MainMixerBoard->SetNumMixerPanelRows ( Settings.GetNumMixerPanelRows() ); }
 
     void OnSettingsStateChanged ( int value );
     void OnChatStateChanged ( int value );
     void OnLocalMuteStateChanged ( int value );
 
-    void OnAudioReverbValueChanged ( int value ) { Settings.iReverbLevel = value; }
+    void OnAudioReverbValueChanged ( int value ) { Settings.SetReverbLevel ( value ); }
 
-    void OnReverbSelLClicked()
-    {
-        Settings.bReverbOnLeftChan = true;
-        emit ReverbChannelChanged();
-    }
-    void OnReverbSelRClicked()
-    {
-        Settings.bReverbOnLeftChan = false;
-        emit ReverbChannelChanged();
-    }
+    void OnReverbSelLClicked() { Settings.SetReverbOnLeftChannel ( true ); }
+    void OnReverbSelRClicked() { Settings.SetReverbOnLeftChannel ( false ); }
 
     void OnFeedbackDetectionChanged ( int state ) { ClientSettingsDlg.SetEnableFeedbackDetection ( state == Qt::Checked ); }
 
@@ -239,19 +227,19 @@ public slots:
         MainMixerBoard->SetChannelLevels ( vecLevelList );
     }
 
+    void OnOwnFaderFirstChanged() { MainMixerBoard->SetFaderSorting ( Settings.eChannelSortType ); }
+
     void OnConnectDlgAccepted();
     void OnDisconnected() { Disconnect(); }
     void OnGUIDesignChanged();
     void OnMeterStyleChanged();
     void OnRecorderStateReceived ( ERecorderState eRecorderState );
     void SetMixerBoardDeco ( const ERecorderState newRecorderState );
-    void OnAudioChannelsChanged() { UpdateRevSelection(); }
+    void OnAudioChannelConfigChanged() { UpdateRevSelection(); }
     void OnNumClientsChanged ( int iNewNumClients );
 
     void accept() { close(); } // introduced by pljones
 
 signals:
     void SendTabChange ( int iTabIdx );
-    void ReverbChannelChanged();
-    void ChannelInfoChanged();
 };

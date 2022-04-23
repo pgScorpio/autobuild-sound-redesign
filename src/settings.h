@@ -108,6 +108,8 @@ protected:
 #ifndef SERVER_ONLY
 class CClientSettings : public CSettings
 {
+    Q_OBJECT
+
 public:
     CClientSettings ( const QString& sNFiName ) :
         CSettings(),
@@ -140,7 +142,7 @@ public:
         eGUIDesign ( GD_ORIGINAL ),
         eMeterStyle ( MT_LED_STRIPE ),
         bEnableOPUS64 ( false ),
-        iAudioInFader ( AUD_FADER_IN_MIDDLE ),
+        iAudioInputBalance ( AUD_FADER_IN_MIDDLE ),
         bReverbOnLeftChan ( false ),
         iReverbLevel ( 0 ),
         iServerSockBufNumFrames ( DEF_NET_BUF_SIZE_NUM_BL ),
@@ -161,11 +163,43 @@ public:
         Save();
     }
 
-    //### TODO: BEGIN ###//
-    // new values need to be initialised in constructor and read by CClient
+public:                        // Values without notifiers: (these don't need direct action on change, they are used 'on the fly')
+    int iCustomDirectoryIndex; // index of selected custom directory server
 
-    CChannelCoreInfo ChannelInfo;
+    int  iNewClientFaderLevel;
+    bool bConnectDlgShowAllMusicians;
 
+    CVector<QString> vecStoredFaderTags;
+    CVector<int>     vecStoredFaderLevels;
+    CVector<int>     vecStoredPanValues;
+    CVector<int>     vecStoredFaderIsSolo;
+    CVector<int>     vecStoredFaderIsMute;
+    CVector<int>     vecStoredFaderGroupID;
+    CVector<QString> vstrIPAddress;
+
+    EChSortType    eChannelSortType;
+    EDirectoryType eDirectoryType;
+
+    bool bEnableFeedbackDetection;
+
+    // window position/state settings
+    QByteArray vecWindowPosSettings;
+    QByteArray vecWindowPosChat;
+    QByteArray vecWindowPosConnect;
+    bool       bWindowWasShownSettings;
+    bool       bWindowWasShownChat;
+    bool       bWindowWasShownConnect;
+    int        iSettingsTab;
+
+public:
+    // CustomDirectories
+    // Special case:
+    //     there are many ways vstrDirectoryAddress can be changed,
+    //     so, after changing this one, one should always call OnCustomDirectoriesChanged() !!
+    CVector<QString> vstrDirectoryAddress;
+    void             OnCustomDirectoriesChanged() { emit CustomDirectoriesChanged(); }
+
+protected: // values with notifiers: use Get/Set functions !
     //### TODO: BEGIN ###//
     // After the sound-redesign we should store all Soundcard settings per device (and per device type!),
     // i.e. in a CVector< CSoundCardSettings > SoundCard[],
@@ -182,52 +216,449 @@ public:
     int     iSndCrdLeftOutputChannel;
     int     iSndCrdRightOutputChannel;
     int     iSndCrdPrefFrameSizeFactor;
+    int     iInputBoost;
     // int  iSndCrdLeftInputBoost;
     // int  iSndCrdRightInputBoost;
     //### TODO: END ###//
 
-    int           iAudioInFader;
-    int           iReverbLevel;
-    bool          bReverbOnLeftChan;
-    bool          bAutoSockBufSize;
-    int           iClientSockBufNumFrames;
-    int           iServerSockBufNumFrames;
-    bool          bEnableOPUS64;
-    EGUIDesign    eGUIDesign;
-    EMeterStyle   eMeterStyle;
+    EGUIDesign  eGUIDesign;
+    EMeterStyle eMeterStyle;
+
     EAudChanConf  eAudioChannelConfig;
     EAudioQuality eAudioQuality;
 
-    // general settings
-    CVector<QString> vecStoredFaderTags;
-    CVector<int>     vecStoredFaderLevels;
-    CVector<int>     vecStoredPanValues;
-    CVector<int>     vecStoredFaderIsSolo;
-    CVector<int>     vecStoredFaderIsMute;
-    CVector<int>     vecStoredFaderGroupID;
-    CVector<QString> vstrIPAddress;
-    int              iNewClientFaderLevel;
-    int              iInputBoost;
-    int              iSettingsTab;
-    bool             bConnectDlgShowAllMusicians;
-    EChSortType      eChannelSortType;
-    int              iNumMixerPanelRows;
-    CVector<QString> vstrDirectoryAddress;
-    EDirectoryType   eDirectoryType;
-    int              iCustomDirectoryIndex; // index of selected custom directory server
-    bool             bEnableFeedbackDetection;
+    CChannelCoreInfo ChannelInfo;
 
-    // window position/state settings
-    QByteArray vecWindowPosSettings;
-    QByteArray vecWindowPosChat;
-    QByteArray vecWindowPosConnect;
-    bool       bWindowWasShownSettings;
-    bool       bWindowWasShownChat;
-    bool       bWindowWasShownConnect;
-    bool       bOwnFaderFirst;
+    int  iClientSockBufNumFrames;
+    int  iServerSockBufNumFrames;
+    bool bAutoSockBufSize;
+
+    bool bEnableOPUS64;
+
+    int iNumMixerPanelRows;
+
+    int  iAudioInputBalance;
+    int  iReverbLevel;
+    bool bReverbOnLeftChan;
+
+    bool bOwnFaderFirst;
+
+signals:
+    void CustomDirectoriesChanged();
+
+    void InputBoostChanged();
+
+    void AudioDeviceChanged();
+    void InputChannelChanged();
+    void OutputChannelChanged();
+    void PrefFrameSizeFactorChanged();
+
+    void GUIDesignChanged();
+    void MeterStyleChanged();
+
+    void AudioChannelConfigChanged();
+    void AudioQualityChanged();
+
+    void ChannelInfoChanged();
+
+    void EnableOPUS64Changed();
+
+    void ClientSockBufNumFramesChanged();
+    void ServerSockBufNumFramesChanged();
+    void AutoSockBufSizeChanged();
+
+    void NumMixerPanelRowsChanged();
+
+    void AudioInputBalanceChanged();
+
+    void ReverbLevelChanged();
+    void ReverbChannelChanged();
+
+    void OwnFaderFirstChanged();
+
+    // protected:
+    //  void SelectSoundCard ( QString strName );
+    //  void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
+
+    void OpenDriverSetup(); // Just needed for signalling, no related value
 
 public:
-    // Unsaved settings, needed by CClientSettingsDlg
+    inline QString GetAudioDevice() { return strCurrentAudioDevice; }
+    bool           SetAudioDevice ( QString deviceName, bool bReinit = false )
+    {
+        if ( bReinit || ( strCurrentAudioDevice != deviceName ) )
+        {
+            //### TODO: BEGIN ###//
+            // get other audio device settings for this device too!
+            strCurrentAudioDevice = deviceName;
+            //### TODO: END ###//
+            emit AudioDeviceChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline int GetInputBoost( /* bool bRight */ ) { return iInputBoost; }
+
+    bool SetInputBoost ( /* bool bRight */ int boost )
+    {
+        if ( iInputBoost != boost )
+        {
+            iInputBoost = boost;
+            emit InputBoostChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    int GetInputChannel ( bool bRight )
+    {
+        if ( bRight )
+        {
+            return iSndCrdRightInputChannel;
+        }
+        else
+        {
+            return iSndCrdLeftInputChannel;
+        }
+    }
+
+    bool SetInputChannel ( bool bRight, int chNum )
+    {
+        if ( bRight )
+        {
+            if ( iSndCrdRightInputChannel != chNum )
+            {
+                iSndCrdRightInputChannel = chNum;
+                emit InputChannelChanged();
+
+                return true;
+            }
+        }
+        else
+        {
+            if ( iSndCrdLeftInputChannel != chNum )
+            {
+                iSndCrdLeftInputChannel = chNum;
+                emit InputChannelChanged();
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    int GetOutputChannel ( bool bRight )
+    {
+        if ( bRight )
+        {
+            return iSndCrdRightOutputChannel;
+        }
+        else
+        {
+            return iSndCrdLeftOutputChannel;
+        }
+    }
+
+    bool SetOutputChannel ( bool bRight, int chNum )
+    {
+        if ( bRight )
+        {
+            if ( iSndCrdRightOutputChannel != chNum )
+            {
+                iSndCrdRightOutputChannel = chNum;
+                emit OutputChannelChanged();
+
+                return true;
+            }
+        }
+        else
+        {
+            if ( iSndCrdLeftOutputChannel != chNum )
+            {
+                iSndCrdLeftOutputChannel = chNum;
+                emit OutputChannelChanged();
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    inline int GetSndCrdPrefFrameSizeFactor() { return iSndCrdPrefFrameSizeFactor; }
+    bool       SetSndCrdPrefFrameSizeFactor ( int iSize )
+    {
+        if ( iSndCrdPrefFrameSizeFactor != iSize )
+        {
+            iSndCrdPrefFrameSizeFactor = iSize;
+            emit PrefFrameSizeFactorChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline EGUIDesign GetGUIDesign() { return eGUIDesign; }
+    bool              SetGUIDesign ( EGUIDesign design )
+    {
+        if ( eGUIDesign != design )
+        {
+            eGUIDesign = design;
+            emit GUIDesignChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline EMeterStyle GetMeterStyle() { return eMeterStyle; }
+    bool               SetMeterStyle ( EMeterStyle style )
+    {
+        if ( eMeterStyle != style )
+        {
+            eMeterStyle = style;
+            emit MeterStyleChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline EAudChanConf GetAudioChannelConfig() { return eAudioChannelConfig; }
+    bool                SetAudioChannelConfig ( EAudChanConf config )
+    {
+        if ( eAudioChannelConfig != config )
+        {
+            eAudioChannelConfig = config;
+            emit AudioChannelConfigChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline EAudioQuality GetAudioQuality() { return eAudioQuality; }
+    bool                 SetAudioQuality ( EAudioQuality quality )
+    {
+        if ( eAudioQuality != quality )
+        {
+            eAudioQuality = quality;
+            emit AudioQualityChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline CChannelCoreInfo& GetChannelInfo() { return ChannelInfo; };
+    bool                     SetChannelInfo ( const CChannelCoreInfo& info )
+    {
+        ChannelInfo = info;
+        emit ChannelInfoChanged();
+
+        return true;
+    }
+    bool SetChannelInfoName ( const QString& name )
+    {
+        if ( ChannelInfo.strName != name )
+        {
+            ChannelInfo.strName = name;
+            emit ChannelInfoChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+    bool SetChannelInfoCountry ( const QLocale::Country country )
+    {
+        if ( ChannelInfo.eCountry != country )
+        {
+            ChannelInfo.eCountry = country;
+            emit ChannelInfoChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+    bool SetChannelInfoCity ( const QString& city )
+    {
+        if ( ChannelInfo.strCity != city )
+        {
+            ChannelInfo.strCity = city;
+            emit ChannelInfoChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+    bool SetChannelInfoInstrument ( const int instrument )
+    {
+        if ( ChannelInfo.iInstrument != instrument )
+        {
+            ChannelInfo.iInstrument = instrument;
+            emit ChannelInfoChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+    bool SetChannelInfoSkillLevel ( ESkillLevel skillLevel )
+    {
+        if ( ChannelInfo.eSkillLevel != skillLevel )
+        {
+            ChannelInfo.eSkillLevel = skillLevel;
+            emit ChannelInfoChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline int GetClientSockBufNumFrames() { return iClientSockBufNumFrames; }
+    bool       SetClientSockBufNumFrames ( int numFrames )
+    {
+        if ( iClientSockBufNumFrames != numFrames )
+        {
+            iClientSockBufNumFrames = numFrames;
+            emit ClientSockBufNumFramesChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline int GetServerSockBufNumFrames() { return iServerSockBufNumFrames; }
+    bool       SetServerSockBufNumFrames ( int numFrames )
+    {
+        if ( iServerSockBufNumFrames != numFrames )
+        {
+            iServerSockBufNumFrames = numFrames;
+            emit ServerSockBufNumFramesChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline bool GetAutoSockBufSize() { return bAutoSockBufSize; }
+    bool        SetAutoSockBufSize ( bool bAuto )
+    {
+        if ( bAutoSockBufSize != bAuto )
+        {
+            bAutoSockBufSize = bAuto;
+            emit AutoSockBufSizeChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline bool GetEnableOPUS64() { return bEnableOPUS64; }
+    bool        SetEnableOPUS64 ( bool bEnable )
+    {
+        if ( bEnableOPUS64 != bEnable )
+        {
+            bEnableOPUS64 = bEnable;
+            emit EnableOPUS64Changed();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline int GetNumMixerPanelRows() { return iNumMixerPanelRows; }
+    bool       SetNumMixerPanelRows ( int rows )
+    {
+        if ( iNumMixerPanelRows != rows )
+        {
+            iNumMixerPanelRows = rows;
+            emit NumMixerPanelRowsChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline int GetAudioInputBalance() { return iAudioInputBalance; }
+    bool       SetAudioInputBalance ( int iValue )
+    {
+        if ( iAudioInputBalance != iValue )
+        {
+            iAudioInputBalance = iValue;
+            emit AudioInputBalanceChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline int GetReverbLevel() { return iReverbLevel; }
+    bool       SetReverbLevel ( int iLevel )
+    {
+        if ( iReverbLevel != iLevel )
+        {
+            iReverbLevel = iLevel;
+            emit ReverbLevelChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline bool GetReverbOnLeftChannel() { return bReverbOnLeftChan; }
+    bool        SetReverbOnLeftChannel ( bool bOnLeftChannel )
+    {
+        if ( bReverbOnLeftChan != bOnLeftChannel )
+        {
+            bReverbOnLeftChan = bOnLeftChannel;
+            emit ReverbChannelChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    inline bool GetOwnFaderFirst() { return bOwnFaderFirst; }
+    bool        SetOwnFaderFirst ( bool bOwnFirst )
+    {
+        if ( bOwnFaderFirst != bOwnFirst )
+        {
+            bOwnFaderFirst = bOwnFirst;
+            emit OwnFaderFirstChanged();
+
+            return true;
+        }
+
+        return false;
+    }
+
+public: // Unsaved settings, needed by CClientSettingsDlg
+    QString strClientName;
+
     //### TODO: BEGIN ###//
     // these could be set by CSound on device selection !
     // no more need for separate calls to CSound from CClient.Init() then.
@@ -243,8 +674,7 @@ public:
     void LoadFaderSettings ( const QString& strCurFileName );
     void SaveFaderSettings ( const QString& strCurFileName );
 
-    // void SelectSoundCard ( QString strName );
-    // void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
+    void RequestDriverSetup() { emit OpenDriverSetup(); }
 
 protected:
     // No CommandLineOptions used when reading Client inifile

@@ -35,7 +35,6 @@ CClient::CClient ( CClientSettings& cSettings,
                    const bool       bNEnableIPv6,
                    const bool       bNMuteMeInPersonalMix ) :
     Settings ( cSettings ),
-    strClientName ( strNClientName ),
     Channel ( false ), /* we need a client channel -> "false" */
     CurOpusEncoder ( nullptr ),
     CurOpusDecoder ( nullptr ),
@@ -59,6 +58,8 @@ CClient::CClient ( CClientSettings& cSettings,
     bMuteMeInPersonalMix ( bNMuteMeInPersonalMix ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
+    Settings.strClientName = strNClientName;
+
     int iOpusError;
 
     OpusMode = opus_custom_mode_create ( SYSTEM_SAMPLE_RATE_HZ, DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES, &iOpusError );
@@ -98,63 +99,51 @@ CClient::CClient ( CClientSettings& cSettings,
     // Connections -------------------------------------------------------------
     // connections for the protocol mechanism
     QObject::connect ( &Channel, &CChannel::MessReadyForSending, this, &CClient::OnSendProtMessage );
-
     QObject::connect ( &Channel, &CChannel::DetectedCLMessage, this, &CClient::OnDetectedCLMessage );
-
     QObject::connect ( &Channel, &CChannel::ReqJittBufSize, this, &CClient::OnReqJittBufSize );
-
     QObject::connect ( &Channel, &CChannel::JittBufSizeChanged, this, &CClient::OnServerJittBufSizeChanged );
-
     QObject::connect ( &Channel, &CChannel::ReqChanInfo, this, &CClient::OnChannelInfoChanged );
-
     QObject::connect ( &Channel, &CChannel::ConClientListMesReceived, this, &CClient::ConClientListMesReceived );
-
     QObject::connect ( &Channel, &CChannel::Disconnected, this, &CClient::Disconnected );
-
     QObject::connect ( &Channel, &CChannel::NewConnection, this, &CClient::OnNewConnection );
-
     QObject::connect ( &Channel, &CChannel::ChatTextReceived, this, &CClient::ChatTextReceived );
-
     QObject::connect ( &Channel, &CChannel::ClientIDReceived, this, &CClient::OnClientIDReceived );
-
     QObject::connect ( &Channel, &CChannel::MuteStateHasChangedReceived, this, &CClient::MuteStateHasChangedReceived );
-
     QObject::connect ( &Channel, &CChannel::LicenceRequired, this, &CClient::LicenceRequired );
-
     QObject::connect ( &Channel, &CChannel::VersionAndOSReceived, this, &CClient::VersionAndOSReceived );
-
     QObject::connect ( &Channel, &CChannel::RecorderStateReceived, this, &CClient::RecorderStateReceived );
 
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLMessReadyForSending, this, &CClient::OnSendCLProtMessage );
-
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLServerListReceived, this, &CClient::CLServerListReceived );
-
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLRedServerListReceived, this, &CClient::CLRedServerListReceived );
-
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLConnClientsListMesReceived, this, &CClient::CLConnClientsListMesReceived );
-
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLPingReceived, this, &CClient::OnCLPingReceived );
-
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLPingWithNumClientsReceived, this, &CClient::OnCLPingWithNumClientsReceived );
-
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLDisconnection, this, &CClient::OnCLDisconnection );
-
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLVersionAndOSReceived, this, &CClient::CLVersionAndOSReceived );
-
     QObject::connect ( &ConnLessProtocol, &CProtocol::CLChannelLevelListReceived, this, &CClient::CLChannelLevelListReceived );
 
     // other
     QObject::connect ( &Sound, &CSound::ReinitRequest, this, &CClient::OnSndCrdReinitRequest );
-
     QObject::connect ( &Sound, &CSound::ControllerInFaderLevel, this, &CClient::OnControllerInFaderLevel );
-
     QObject::connect ( &Sound, &CSound::ControllerInPanValue, this, &CClient::OnControllerInPanValue );
-
     QObject::connect ( &Sound, &CSound::ControllerInFaderIsSolo, this, &CClient::OnControllerInFaderIsSolo );
-
     QObject::connect ( &Sound, &CSound::ControllerInFaderIsMute, this, &CClient::OnControllerInFaderIsMute );
-
     QObject::connect ( &Sound, &CSound::ControllerInMuteMyself, this, &CClient::OnControllerInMuteMyself );
+
+    QObject::connect ( &Settings, &CClientSettings::AudioDeviceChanged, this, &CClient::OnAudioDeviceChanged );
+    QObject::connect ( &Settings, &CClientSettings::InputChannelChanged, this, &CClient::OnInputChannelChanged );
+    QObject::connect ( &Settings, &CClientSettings::OutputChannelChanged, this, &CClient::OnOutputChannelChanged );
+    QObject::connect ( &Settings, &CClientSettings::PrefFrameSizeFactorChanged, this, &CClient::OnPrefFrameSizeFactorChanged );
+    QObject::connect ( &Settings, &CClientSettings::OpenDriverSetup, this, &CClient::OnDriverSetup );
+    QObject::connect ( &Settings, &CClientSettings::AudioChannelConfigChanged, this, &CClient::OnReInitRequest );
+    QObject::connect ( &Settings, &CClientSettings::AudioQualityChanged, this, &CClient::OnReInitRequest );
+    QObject::connect ( &Settings, &CClientSettings::EnableOPUS64Changed, this, &CClient::OnReInitRequest );
+    QObject::connect ( &Settings, &CClientSettings::ClientSockBufNumFramesChanged, this, &CClient::OnClientSockBufNumFramesChanged );
+    QObject::connect ( &Settings, &CClientSettings::ServerSockBufNumFramesChanged, this, &CClient::OnServerSockBufNumFramesChanged );
+    QObject::connect ( &Settings, &CClientSettings::AutoSockBufSizeChanged, this, &CClient::OnAutoSockBufSizeChanged );
+    QObject::connect ( &Settings, &CClientSettings::ChannelInfoChanged, this, &CClient::OnChannelInfoChanged );
+    QObject::connect ( &Settings, &CClientSettings::ReverbChannelChanged, this, &CClient::OnReverbChannelChanged );
 
     QObject::connect ( &Socket, &CHighPrioSocket::InvalidPacketReceived, this, &CClient::OnInvalidPacketReceived );
 
@@ -207,8 +196,8 @@ CClient::~CClient()
 
 void CClient::ApplySettings()
 {
-    Channel.SetDoAutoSockBufSize ( Settings.bAutoSockBufSize );
-    Channel.SetSockBufNumFrames ( Settings.iClientSockBufNumFrames );
+    Channel.SetDoAutoSockBufSize ( Settings.GetAutoSockBufSize() );
+    Channel.SetSockBufNumFrames ( Settings.GetClientSockBufNumFrames() );
 
     AudioReverb.Clear();
 
@@ -217,15 +206,16 @@ void CClient::ApplySettings()
     // Settings should store all Sound settings per device and
     // Set a CurrendSoundCard with settings of the selected sound card.
     // and we should call a new CSound function Sound.ApplySettings() here
-    Sound.SetDev ( Settings.strCurrentAudioDevice );
-    Sound.SetLeftInputChannel ( Settings.iSndCrdLeftInputChannel );
-    Sound.SetRightInputChannel ( Settings.iSndCrdRightInputChannel );
-    Sound.SetLeftOutputChannel ( Settings.iSndCrdLeftOutputChannel );
-    Sound.SetRightOutputChannel ( Settings.iSndCrdRightOutputChannel );
+    QString strError = Sound.SetDev ( Settings.GetAudioDevice() );
+    Sound.SetLeftInputChannel ( Settings.GetInputChannel ( 0 ) );
+    Sound.SetRightInputChannel ( Settings.GetInputChannel ( 1 ) );
+    Sound.SetLeftOutputChannel ( Settings.GetOutputChannel ( 0 ) );
+    Sound.SetRightOutputChannel ( Settings.GetOutputChannel ( 1 ) );
     // Sound.ApplySettings();
     //### TODO: END ###//
 
     Init();
+    emit SoundDeviceChanged ( strError );
 }
 
 void CClient::OnAboutToQuit()
@@ -271,12 +261,12 @@ void CClient::OnServerJittBufSizeChanged ( int iNewJitBufSize )
 {
     // we received a jitter buffer size changed message from the server,
     // only apply this value if auto jitter buffer size is enabled
-    if ( Settings.bAutoSockBufSize )
+    if ( Settings.GetAutoSockBufSize() )
     {
         // Note: Do not use the "SetServerSockBufNumFrames" function for setting
         // the new server jitter buffer size since then a message would be sent
         // to the server which is incorrect.
-        Settings.iServerSockBufNumFrames = iNewJitBufSize;
+        Settings.SetServerSockBufNumFrames ( iNewJitBufSize );
     }
 }
 
@@ -284,7 +274,7 @@ void CClient::OnNewConnection()
 {
     // a new connection was successfully initiated, send infos and request
     // connected clients list
-    Channel.SetRemoteInfo ( Settings.ChannelInfo );
+    Channel.SetRemoteInfo ( Settings.GetChannelInfo() );
 
     // We have to send a connected clients list request since it can happen
     // that we just had connected to the server and then disconnected but
@@ -306,7 +296,7 @@ void CClient::CreateServerJitterBufferMessage()
     // per definition in the client: if auto jitter buffer is enabled, both,
     // the client and server shall use an auto jitter buffer
 
-    if ( Settings.bAutoSockBufSize )
+    if ( Settings.GetAutoSockBufSize() )
     {
         // in case auto jitter buffer size is enabled, we have to transmit a
         // special value
@@ -314,7 +304,7 @@ void CClient::CreateServerJitterBufferMessage()
     }
     else
     {
-        Channel.CreateJitBufMes ( Settings.iServerSockBufNumFrames );
+        Channel.CreateJitBufMes ( Settings.GetServerSockBufNumFrames() );
     }
 }
 
@@ -506,8 +496,119 @@ void CClient::OnReInitRequest()
     }
 }
 
-void CClient::SetSndCrdPrefFrameSizeFactor ( const int iNewFactor )
+void CClient::OnReverbChannelChanged() { AudioReverb.Clear(); }
+
+void CClient::OnChannelInfoChanged()
 {
+    // Update the channel
+    Channel.SetRemoteInfo ( Settings.GetChannelInfo() );
+}
+
+void CClient::OnAudioDeviceChanged()
+{
+    const QString strNewDev = Settings.GetAudioDevice();
+
+    // if client was running then first
+    // stop it and restart again after new initialization
+    const bool bWasRunning = Sound.IsRunning();
+    if ( bWasRunning )
+    {
+        Sound.Stop();
+    }
+
+    //### TODO: BEGIN ###//
+    // After the sound-redesign implementation
+    // we should store all Sound related settings per Device and
+    // we should read all current device settings for the new device
+    // ( i.e. Settings.SelectAudioDevice ( strNewDev ) )
+    // and call a new CSound function Sound.ApplySettings()
+    // that should change device, channel selection and all other device related Sound settings all in one go
+
+    const QString strError = Sound.SetDev ( strNewDev );
+    Settings.SetAudioDevice ( Sound.GetDev() );
+
+    // init again because the sound card actual buffer size might
+    // be changed on new device
+    Init();
+
+    if ( bWasRunning )
+    {
+        // restart client
+        Sound.Start();
+    }
+
+    emit SoundDeviceChanged ( strError );
+    //### TODO: END ###//
+}
+
+void CClient::OnInputChannelChanged()
+{
+    // if client was running then first
+    // stop it and restart again after new initialization
+    const bool bWasRunning = Sound.IsRunning();
+    if ( bWasRunning )
+    {
+        Sound.Stop();
+    }
+
+    Sound.SetLeftInputChannel ( Settings.GetInputChannel ( 0 ) );
+    Sound.SetRightInputChannel ( Settings.GetInputChannel ( 1 ) );
+
+    if ( Sound.GetLeftInputChannel() != Settings.GetInputChannel ( 0 ) )
+    {
+        Settings.SetInputChannel ( 0, Sound.GetLeftInputChannel() );
+    }
+
+    if ( Sound.GetRightInputChannel() != Settings.GetInputChannel ( 1 ) )
+    {
+        Settings.SetInputChannel ( 1, Sound.GetRightInputChannel() );
+    }
+
+    Init();
+
+    if ( bWasRunning )
+    {
+        // restart client
+        Sound.Start();
+    }
+}
+
+void CClient::OnOutputChannelChanged()
+{
+    // if client was running then first
+    // stop it and restart again after new initialization
+    const bool bWasRunning = Sound.IsRunning();
+    if ( bWasRunning )
+    {
+        Sound.Stop();
+    }
+
+    Sound.SetLeftOutputChannel ( Settings.GetOutputChannel ( 0 ) );
+    Sound.SetRightOutputChannel ( Settings.GetOutputChannel ( 1 ) );
+
+    if ( Sound.GetLeftOutputChannel() != Settings.GetOutputChannel ( 0 ) )
+    {
+        Settings.SetOutputChannel ( 0, Sound.GetLeftOutputChannel() );
+    }
+
+    if ( Sound.GetRightOutputChannel() != Settings.GetOutputChannel ( 1 ) )
+    {
+        Settings.SetOutputChannel ( 1, Sound.GetRightOutputChannel() );
+    }
+
+    Init();
+
+    if ( bWasRunning )
+    {
+        // restart client
+        Sound.Start();
+    }
+}
+
+void CClient::OnPrefFrameSizeFactorChanged()
+{
+    const int iNewFactor = Settings.GetSndCrdPrefFrameSizeFactor();
+
     // first check new input parameter
     if ( ( iNewFactor == FRAME_SIZE_FACTOR_PREFERRED ) || ( iNewFactor == FRAME_SIZE_FACTOR_DEFAULT ) || ( iNewFactor == FRAME_SIZE_FACTOR_SAFE ) )
     {
@@ -531,138 +632,9 @@ void CClient::SetSndCrdPrefFrameSizeFactor ( const int iNewFactor )
             Sound.Start();
         }
     }
-}
-
-void CClient::OnReverbChannelChanged() { AudioReverb.Clear(); }
-
-void CClient::OnChannelInfoChanged()
-{
-    // Update the channel
-    Channel.SetRemoteInfo ( Settings.ChannelInfo );
-}
-
-QString CClient::SetSndCrdDev ( const QString strNewDev )
-{
-    // if client was running then first
-    // stop it and restart again after new initialization
-    const bool bWasRunning = Sound.IsRunning();
-    if ( bWasRunning )
+    else
     {
-        Sound.Stop();
-    }
-
-    //### TODO: BEGIN ###//
-    // After the sound-redesign implementation
-    // we should store all Sound related settings per Device and
-    // we should read all current device settings for the new device
-    // ( i.e. Settings.SelectAudioDevice ( strNewDev ) )
-    // and call a new CSound function Sound.ApplySettings()
-    // that should change device, channel selection and all other device related Sound settings all in one go
-
-    const QString strError         = Sound.SetDev ( strNewDev );
-    Settings.strCurrentAudioDevice = Sound.GetDev();
-
-    // init again because the sound card actual buffer size might
-    // be changed on new device
-    Init();
-
-    if ( bWasRunning )
-    {
-        // restart client
-        Sound.Start();
-    }
-
-    // in case of an error inform the GUI about it
-    if ( !strError.isEmpty() )
-    {
-        emit SoundDeviceChanged ( strError );
-    }
-    //### TODO: END ###//
-
-    return strError;
-}
-
-void CClient::SetSndCrdLeftInputChannel ( const int iNewChan )
-{
-    // if client was running then first
-    // stop it and restart again after new initialization
-    const bool bWasRunning = Sound.IsRunning();
-    if ( bWasRunning )
-    {
-        Sound.Stop();
-    }
-
-    Sound.SetLeftInputChannel ( iNewChan );
-    Settings.iSndCrdLeftInputChannel = Sound.GetLeftInputChannel();
-    Init();
-
-    if ( bWasRunning )
-    {
-        // restart client
-        Sound.Start();
-    }
-}
-
-void CClient::SetSndCrdRightInputChannel ( const int iNewChan )
-{
-    // if client was running then first
-    // stop it and restart again after new initialization
-    const bool bWasRunning = Sound.IsRunning();
-    if ( bWasRunning )
-    {
-        Sound.Stop();
-    }
-
-    Sound.SetRightInputChannel ( iNewChan );
-    Settings.iSndCrdRightInputChannel = Sound.GetRightInputChannel();
-    Init();
-
-    if ( bWasRunning )
-    {
-        // restart client
-        Sound.Start();
-    }
-}
-
-void CClient::SetSndCrdLeftOutputChannel ( const int iNewChan )
-{
-    // if client was running then first
-    // stop it and restart again after new initialization
-    const bool bWasRunning = Sound.IsRunning();
-    if ( bWasRunning )
-    {
-        Sound.Stop();
-    }
-
-    Sound.SetLeftOutputChannel ( iNewChan );
-    Settings.iSndCrdLeftOutputChannel = Sound.GetLeftOutputChannel();
-    Init();
-
-    if ( bWasRunning )
-    {
-        // restart client
-        Sound.Start();
-    }
-}
-
-void CClient::SetSndCrdRightOutputChannel ( const int iNewChan )
-{
-    // if client was running then first
-    // stop it and restart again after new initialization
-    const bool bWasRunning = Sound.IsRunning();
-    if ( bWasRunning )
-    {
-        Sound.Stop();
-    }
-
-    Sound.SetRightOutputChannel ( iNewChan );
-    Settings.iSndCrdRightOutputChannel = Sound.GetRightOutputChannel();
-    Init();
-
-    if ( bWasRunning )
-    {
-        // restart client
-        Sound.Start();
+        Settings.SetSndCrdPrefFrameSizeFactor ( iSndCrdPrefFrameSizeFactor );
     }
 }
 
@@ -897,7 +869,7 @@ void CClient::Init()
     // Calculate the current sound card frame size factor. In case
     // the current mono block size is not a multiple of the system
     // frame size, we have to use a sound card conversion buffer.
-    if ( ( ( iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_PREFERRED ) ) && Settings.bEnableOPUS64 ) ||
+    if ( ( ( iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_PREFERRED ) ) && Settings.GetEnableOPUS64() ) ||
          ( iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_DEFAULT ) ) ||
          ( iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_SAFE ) ) )
     {
@@ -924,7 +896,7 @@ void CClient::Init()
     // select the OPUS frame size mode depending on current mono block size samples
     if ( bSndCrdConversionBufferRequired )
     {
-        if ( ( iSndCardMonoBlockSizeSamConvBuff < DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES ) && Settings.bEnableOPUS64 )
+        if ( ( iSndCardMonoBlockSizeSamConvBuff < DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES ) && Settings.GetEnableOPUS64() )
         {
             iMonoBlockSizeSam     = SYSTEM_FRAME_SIZE_SAMPLES;
             eAudioCompressionType = CT_OPUS64;
@@ -954,13 +926,13 @@ void CClient::Init()
     {
         iOPUSFrameSizeSamples = DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES;
 
-        if ( Settings.eAudioChannelConfig == CC_MONO )
+        if ( Settings.GetAudioChannelConfig() == CC_MONO )
         {
             CurOpusEncoder    = OpusEncoderMono;
             CurOpusDecoder    = OpusDecoderMono;
             iNumAudioChannels = 1;
 
-            switch ( Settings.eAudioQuality )
+            switch ( Settings.GetAudioQuality() )
             {
             case AQ_LOW:
                 iCeltNumCodedBytes = OPUS_NUM_BYTES_MONO_LOW_QUALITY_DBLE_FRAMESIZE;
@@ -979,7 +951,7 @@ void CClient::Init()
             CurOpusDecoder    = OpusDecoderStereo;
             iNumAudioChannels = 2;
 
-            switch ( Settings.eAudioQuality )
+            switch ( Settings.GetAudioQuality() )
             {
             case AQ_LOW:
                 iCeltNumCodedBytes = OPUS_NUM_BYTES_STEREO_LOW_QUALITY_DBLE_FRAMESIZE;
@@ -997,13 +969,13 @@ void CClient::Init()
     {
         iOPUSFrameSizeSamples = SYSTEM_FRAME_SIZE_SAMPLES;
 
-        if ( Settings.eAudioChannelConfig == CC_MONO )
+        if ( Settings.GetAudioChannelConfig() == CC_MONO )
         {
             CurOpusEncoder    = Opus64EncoderMono;
             CurOpusDecoder    = Opus64DecoderMono;
             iNumAudioChannels = 1;
 
-            switch ( Settings.eAudioQuality )
+            switch ( Settings.GetAudioQuality() )
             {
             case AQ_LOW:
                 iCeltNumCodedBytes = OPUS_NUM_BYTES_MONO_LOW_QUALITY;
@@ -1022,7 +994,7 @@ void CClient::Init()
             CurOpusDecoder    = Opus64DecoderStereo;
             iNumAudioChannels = 2;
 
-            switch ( Settings.eAudioQuality )
+            switch ( Settings.GetAudioQuality() )
             {
             case AQ_LOW:
                 iCeltNumCodedBytes = OPUS_NUM_BYTES_STEREO_LOW_QUALITY;
@@ -1054,7 +1026,7 @@ void CClient::Init()
     Channel.SetAudioStreamProperties ( eAudioCompressionType, iCeltNumCodedBytes, iSndCrdFrameSizeFactor, iNumAudioChannels );
 
     // init reverberation
-    AudioReverb.Init ( Settings.eAudioChannelConfig, iStereoBlockSizeSam, SYSTEM_SAMPLE_RATE_HZ );
+    AudioReverb.Init ( Settings.GetAudioChannelConfig(), iStereoBlockSizeSam, SYSTEM_SAMPLE_RATE_HZ );
 
     // init the sound card conversion buffers
     if ( bSndCrdConversionBufferRequired )
@@ -1133,13 +1105,13 @@ void CClient::ProcessAudioDataIntern ( CVector<int16_t>& vecsStereoSndCrd )
 
     // Transmit signal ---------------------------------------------------------
 
-    if ( Settings.iInputBoost != 1 )
+    if ( Settings.GetInputBoost() != 1 )
     {
         // apply a general gain boost to all audio input:
         for ( i = 0, j = 0; i < iMonoBlockSizeSam; i++, j += 2 )
         {
-            vecsStereoSndCrd[j + 1] = static_cast<int16_t> ( Settings.iInputBoost * vecsStereoSndCrd[j + 1] );
-            vecsStereoSndCrd[j]     = static_cast<int16_t> ( Settings.iInputBoost * vecsStereoSndCrd[j] );
+            vecsStereoSndCrd[j + 1] = static_cast<int16_t> ( Settings.GetInputBoost() * vecsStereoSndCrd[j + 1] );
+            vecsStereoSndCrd[j]     = static_cast<int16_t> ( Settings.GetInputBoost() * vecsStereoSndCrd[j] );
         }
     }
 
@@ -1149,18 +1121,20 @@ void CClient::ProcessAudioDataIntern ( CVector<int16_t>& vecsStereoSndCrd )
 #endif
 
     // add reverberation effect if activated
-    if ( Settings.iReverbLevel != 0 )
+    if ( Settings.GetReverbLevel() != 0 )
     {
-        AudioReverb.Process ( vecsStereoSndCrd, Settings.bReverbOnLeftChan, static_cast<float> ( Settings.iReverbLevel ) / AUD_REVERB_MAX / 4 );
+        AudioReverb.Process ( vecsStereoSndCrd,
+                              Settings.GetReverbOnLeftChannel(),
+                              static_cast<float> ( Settings.GetReverbLevel() ) / AUD_REVERB_MAX / 4 );
     }
 
-    // apply pan (audio fader) and mix mono signals
-    if ( !( ( Settings.iAudioInFader == AUD_FADER_IN_MIDDLE ) && ( Settings.eAudioChannelConfig == CC_STEREO ) ) )
+    // apply balance and mix mono signals
+    if ( !( ( Settings.GetAudioInputBalance() == AUD_FADER_IN_MIDDLE ) && ( Settings.GetAudioChannelConfig() == CC_STEREO ) ) )
     {
         // calculate pan gain in the range 0 to 1, where 0.5 is the middle position
-        const float fPan = static_cast<float> ( Settings.iAudioInFader ) / AUD_FADER_IN_MAX;
+        const float fPan = static_cast<float> ( Settings.GetAudioInputBalance() ) / AUD_FADER_IN_MAX;
 
-        if ( Settings.eAudioChannelConfig == CC_STEREO )
+        if ( Settings.GetAudioChannelConfig() == CC_STEREO )
         {
             // for stereo only apply pan attenuation on one channel (same as pan in the server)
             const float fGainL = MathUtils::GetLeftPan ( fPan, false );
@@ -1178,8 +1152,8 @@ void CClient::ProcessAudioDataIntern ( CVector<int16_t>& vecsStereoSndCrd )
         {
             // for mono implement a cross-fade between channels and mix them, for
             // mono-in/stereo-out use no attenuation in pan center
-            const float fGainL = MathUtils::GetLeftPan ( fPan, Settings.eAudioChannelConfig != CC_MONO_IN_STEREO_OUT );
-            const float fGainR = MathUtils::GetRightPan ( fPan, Settings.eAudioChannelConfig != CC_MONO_IN_STEREO_OUT );
+            const float fGainL = MathUtils::GetLeftPan ( fPan, Settings.GetAudioChannelConfig() != CC_MONO_IN_STEREO_OUT );
+            const float fGainR = MathUtils::GetRightPan ( fPan, Settings.GetAudioChannelConfig() != CC_MONO_IN_STEREO_OUT );
 
             for ( i = 0, j = 0; i < iMonoBlockSizeSam; i++, j += 2 )
             {
@@ -1193,7 +1167,7 @@ void CClient::ProcessAudioDataIntern ( CVector<int16_t>& vecsStereoSndCrd )
     // full stereo mode at the transmission level. The only thing which is done
     // is to mix both sound card inputs together and then put this signal on
     // both stereo channels to be transmitted to the server.
-    if ( Settings.eAudioChannelConfig == CC_MONO_IN_STEREO_OUT )
+    if ( Settings.GetAudioChannelConfig() == CC_MONO_IN_STEREO_OUT )
     {
         // copy mono data in stereo sound card buffer (note that since the input
         // and output is the same buffer, we have to start from the end not to
@@ -1283,7 +1257,7 @@ void CClient::ProcessAudioDataIntern ( CVector<int16_t>& vecsStereoSndCrd )
     // check if channel is connected and if we do not have the initialization phase
     if ( Channel.IsConnected() && ( !bIsInitializationPhase ) )
     {
-        if ( Settings.eAudioChannelConfig == CC_MONO )
+        if ( Settings.GetAudioChannelConfig() == CC_MONO )
         {
             // copy mono data in stereo sound card buffer (note that since the input
             // and output is the same buffer, we have to start from the end not to
@@ -1315,10 +1289,9 @@ int CClient::EstimatedOverallDelay ( const int iPingTimeMs )
     // length. Since that is usually not the case but the buffers are usually
     // a bit larger than necessary, we introduce some factor for compensation.
     // Consider the jitter buffer on the client and on the server side, too.
-    Settings.bAutoSockBufSize        = Channel.GetDoAutoSockBufSize();
-    Settings.iClientSockBufNumFrames = Channel.GetSockBufNumFrames();
 
-    const float fTotalJitterBufferDelayMs = fSystemBlockDurationMs * ( Settings.iClientSockBufNumFrames + Settings.iServerSockBufNumFrames ) * 0.7f;
+    const float fTotalJitterBufferDelayMs =
+        fSystemBlockDurationMs * ( Settings.GetClientSockBufNumFrames() + Settings.GetServerSockBufNumFrames() ) * 0.7f;
 
     // consider delay introduced by the sound card conversion buffer by using
     // "GetSndCrdConvBufAdditionalDelayMonoBlSize()"

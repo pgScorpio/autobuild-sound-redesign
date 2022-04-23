@@ -39,6 +39,9 @@ How to handle overriding commandline parameters?
 
 Future improvements:
 
+main should only read the --server commandline parameter
+all others should be read by CCLientSettings/CServerSettings.
+
 Better solution for notifiers: 
     Get/Set functions in Settings class and the Set functions should emit the "Changed" notifier from Settings.
     In this way we don't need separate notifiers from Dialogs and RPC.

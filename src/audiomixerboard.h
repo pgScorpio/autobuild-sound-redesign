@@ -190,10 +190,10 @@ public:
     {
         pSettings = pNSet;
 
-        SetNumMixerPanelRows ( pSettings->iNumMixerPanelRows );
+        SetNumMixerPanelRows ( pSettings->GetNumMixerPanelRows() );
         SetFaderSorting ( pSettings->eChannelSortType );
-        SetMeterStyle ( pSettings->eMeterStyle );
-        SetGUIDesign ( pSettings->eGUIDesign );
+        SetMeterStyle ( pSettings->GetMeterStyle() );
+        SetGUIDesign ( pSettings->GetGUIDesign() );
     }
 
     void    HideAll();
