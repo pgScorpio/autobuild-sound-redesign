@@ -562,6 +562,41 @@ void CClientDlg::closeEvent ( QCloseEvent* Event )
     Event->accept();
 }
 
+void CClientDlg::closeEvent ( QCloseEvent* Event )
+{
+    // if connected, terminate connection
+    if ( Settings.bConnectedState )
+    {
+        Client.Stop();
+    }
+
+    // store window positions
+    Settings.vecWindowPosMain     = saveGeometry();
+    Settings.vecWindowPosSettings = ClientSettingsDlg.saveGeometry();
+    Settings.vecWindowPosChat     = ChatDlg.saveGeometry();
+    Settings.vecWindowPosConnect  = ConnectDlg.saveGeometry();
+
+    Settings.bWindowWasShownSettings = ClientSettingsDlg.isVisible();
+    Settings.bWindowWasShownChat     = ChatDlg.isVisible();
+    Settings.bWindowWasShownConnect  = ConnectDlg.isVisible();
+
+    // if settings/connect dialog or chat dialog is open, close it
+    ClientSettingsDlg.close();
+    ChatDlg.close();
+    ConnectDlg.close();
+    AnalyzerConsole.close();
+
+    // make sure all current fader settings are applied to the settings struct
+    MainMixerBoard->StoreAllFaderSettings();
+
+    Settings.bConnectDlgShowAllMusicians = ConnectDlg.GetShowAllMusicians();
+    Settings.eChannelSortType            = MainMixerBoard->GetFaderSorting();
+    Settings.SetNumMixerPanelRows ( MainMixerBoard->GetNumMixerPanelRows() );
+
+    // default implementation of this event handler routine
+    Event->accept();
+}
+
 void CClientDlg::showEvent ( QShowEvent* Event )
 {
     Event->accept();

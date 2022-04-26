@@ -93,6 +93,14 @@ void OnFatalError ( QString errMsg ) { throw CErrorExit ( qUtf8Printable ( errMs
 
 // Implementation **************************************************************
 
+QString UsageArguments ( char* argv );
+
+void OnFatalError ( QString errMsg )
+{
+    qCritical() << qUtf8Printable ( errMsg );
+    exit ( 1 );
+}
+
 int main ( int argc, char** argv )
 {
     int exit_code = 0;
@@ -413,6 +421,11 @@ int main ( int argc, char** argv )
                 qInfo() << "- licence required";
             }
 
+            if ( CommandlineOptions.licence.IsSet() )
+            {
+                qInfo() << "- licence required";
+            }
+
             // load settings from init-file (command line options override)
             CServerSettings Settings ( commandlineOptions );
 
@@ -465,7 +478,6 @@ int main ( int argc, char** argv )
                 {
                     Server.SetDirectoryType ( AT_CUSTOM );
                 }
-                //### TODO: END ###//
 
                 // initialise message boxes
                 CMessages::init ( NULL, GetAppName() );
