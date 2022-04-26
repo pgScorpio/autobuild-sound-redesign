@@ -29,6 +29,7 @@
 #include <QSettings>
 #include <QDir>
 #include "global.h"
+#include "cmdlnoptions.h"
 #include "util.h"
 
 /* Definitions ****************************************************************/
@@ -41,33 +42,38 @@
 #define AUD_REVERB_MAX 100
 
 /* Classes ********************************************************************/
+
 class CSettings : public QObject
 {
     Q_OBJECT
 
 public:
-    CSettings() :
+    CSettings ( CCommandlineOptions& cmdlnOptions ) :
+        CommandlineOptions ( cmdlnOptions ),
         vecWindowPosMain(), // empty array
-        strLanguage ( "" ),
-        strFileName ( "" )
+        strLanguage(),
+        strFileName()
     {}
 
-    // common settings
+    inline bool HaveGui() const { return !CommandlineOptions.nogui.IsSet(); }
+
+public: // common settings
+    CCommandlineOptions& CommandlineOptions;
+
     QByteArray vecWindowPosMain;
     QString    strLanguage;
 
 protected:
+    QString strFileName;
+
+protected:
+    void SetFileName ( const QString& sNFiName, const QString& sDefaultFileName );
+
     void Load();
     void Save();
 
-    virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument )        = 0;
-    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) = 0;
-
     void ReadFromFile ( const QString& strCurFileName, QDomDocument& XMLDocument );
-
     void WriteToFile ( const QString& strCurFileName, const QDomDocument& XMLDocument );
-
-    void SetFileName ( const QString& sNFiName, const QString& sDefaultFileName );
 
     // The following functions implement the conversion from the general string
     // to base64 (which should be used for binary data in XML files). This
@@ -93,16 +99,19 @@ protected:
                             const int           iRangeStop,
                             int&                iValue );
 
-    void SetFlagIniSet ( QDomDocument& xmlFile, const QString& strSection, const QString& strKey, const bool bValue = false );
-
     bool GetFlagIniSet ( const QDomDocument& xmlFile, const QString& strSection, const QString& strKey, bool& bValue );
+
+    void SetFlagIniSet ( QDomDocument& xmlFile, const QString& strSection, const QString& strKey, const bool bValue = false );
 
     // actual working function for init-file access
     QString GetIniSetting ( const QDomDocument& xmlFile, const QString& sSection, const QString& sKey, const QString& sDefaultVal = "" );
 
     void PutIniSetting ( QDomDocument& xmlFile, const QString& sSection, const QString& sKey, const QString& sValue = "" );
 
-    QString strFileName;
+protected:
+    virtual void ReadCommandLineOptions()                                   = 0;
+    virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument )        = 0;
+    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) = 0;
 };
 
 #ifndef SERVER_ONLY
@@ -111,8 +120,8 @@ class CClientSettings : public CSettings
     Q_OBJECT
 
 public:
-    CClientSettings ( const QString& sNFiName ) :
-        CSettings(),
+    CClientSettings ( CCommandlineOptions& cmdlnOptions ) :
+        CSettings ( cmdlnOptions ),
         vecStoredFaderTags ( MAX_NUM_STORED_FADER_SETTINGS, "" ),
         vecStoredFaderLevels ( MAX_NUM_STORED_FADER_SETTINGS, AUD_MIX_FADER_MAX ),
         vecStoredPanValues ( MAX_NUM_STORED_FADER_SETTINGS, AUD_MIX_PAN_MAX / 2 ),
@@ -150,9 +159,9 @@ public:
         bFraSiFactDefSupported ( false ),
         bFraSiFactSafeSupported ( false ),
         bMuteOutStream ( false ),
-        bConnectState ( false )
+        bConnectedState ( false )
     {
-        SetFileName ( sNFiName, DEFAULT_INI_FILE_NAME );
+        SetFileName ( cmdlnOptions.inifile.Value(), DEFAULT_INI_FILE_NAME );
         Load();
         // SelectSoundCard ( strCurrentAudioDevice );
     }
@@ -182,7 +191,7 @@ public:                        // Values without notifiers: (these don't need di
 
     bool bEnableFeedbackDetection;
 
-    // window position/state settings
+public: // window position/state settings
     QByteArray vecWindowPosSettings;
     QByteArray vecWindowPosChat;
     QByteArray vecWindowPosConnect;
@@ -283,7 +292,23 @@ signals:
     void OpenDriverSetup(); // Just needed for signalling, no related value
 
 public:
-    inline QString GetAudioDevice() { return strCurrentAudioDevice; }
+    inline const QString& GetClientName() const { return strClientName; }
+    // TODO: needs to be set from commandline !
+    void SetClientName ( const QString& strName ) { strClientName = strName; }
+
+    inline const QString GetWindowTitle()
+    {
+        if ( strClientName.isEmpty() )
+        {
+            return QString ( APP_NAME );
+        }
+        else
+        {
+            return QString ( APP_NAME ) + " - " + strClientName;
+        }
+    }
+
+    inline QString GetAudioDevice() const { return strCurrentAudioDevice; }
     bool           SetAudioDevice ( QString deviceName, bool bReinit = false )
     {
         if ( bReinit || ( strCurrentAudioDevice != deviceName ) )
@@ -300,7 +325,7 @@ public:
         return false;
     }
 
-    inline int GetInputBoost( /* bool bRight */ ) { return iInputBoost; }
+    inline int GetInputBoost( /* bool bRight */ ) const { return iInputBoost; }
 
     bool SetInputBoost ( /* bool bRight */ int boost )
     {
@@ -315,7 +340,7 @@ public:
         return false;
     }
 
-    int GetInputChannel ( bool bRight )
+    int GetInputChannel ( bool bRight ) const
     {
         if ( bRight )
         {
@@ -353,7 +378,7 @@ public:
         return false;
     }
 
-    int GetOutputChannel ( bool bRight )
+    int GetOutputChannel ( bool bRight ) const
     {
         if ( bRight )
         {
@@ -391,7 +416,7 @@ public:
         return false;
     }
 
-    inline int GetSndCrdPrefFrameSizeFactor() { return iSndCrdPrefFrameSizeFactor; }
+    inline int GetSndCrdPrefFrameSizeFactor() const { return iSndCrdPrefFrameSizeFactor; }
     bool       SetSndCrdPrefFrameSizeFactor ( int iSize )
     {
         if ( iSndCrdPrefFrameSizeFactor != iSize )
@@ -405,7 +430,7 @@ public:
         return false;
     }
 
-    inline EGUIDesign GetGUIDesign() { return eGUIDesign; }
+    inline EGUIDesign GetGUIDesign() const { return eGUIDesign; }
     bool              SetGUIDesign ( EGUIDesign design )
     {
         if ( eGUIDesign != design )
@@ -419,7 +444,7 @@ public:
         return false;
     }
 
-    inline EMeterStyle GetMeterStyle() { return eMeterStyle; }
+    inline EMeterStyle GetMeterStyle() const { return eMeterStyle; }
     bool               SetMeterStyle ( EMeterStyle style )
     {
         if ( eMeterStyle != style )
@@ -433,7 +458,7 @@ public:
         return false;
     }
 
-    inline EAudChanConf GetAudioChannelConfig() { return eAudioChannelConfig; }
+    inline EAudChanConf GetAudioChannelConfig() const { return eAudioChannelConfig; }
     bool                SetAudioChannelConfig ( EAudChanConf config )
     {
         if ( eAudioChannelConfig != config )
@@ -447,7 +472,7 @@ public:
         return false;
     }
 
-    inline EAudioQuality GetAudioQuality() { return eAudioQuality; }
+    inline EAudioQuality GetAudioQuality() const { return eAudioQuality; }
     bool                 SetAudioQuality ( EAudioQuality quality )
     {
         if ( eAudioQuality != quality )
@@ -469,7 +494,9 @@ public:
 
         return true;
     }
-    bool SetChannelInfoName ( const QString& name )
+
+    inline const QString& GetChannelInfoName() const { return ChannelInfo.strName; }
+    bool                  SetChannelInfoName ( const QString& name )
     {
         if ( ChannelInfo.strName != name )
         {
@@ -481,7 +508,9 @@ public:
 
         return false;
     }
-    bool SetChannelInfoCountry ( const QLocale::Country country )
+
+    inline const QLocale::Country GetChannelInfoCountry() const { return ChannelInfo.eCountry; }
+    bool                          SetChannelInfoCountry ( const QLocale::Country country )
     {
         if ( ChannelInfo.eCountry != country )
         {
@@ -493,7 +522,9 @@ public:
 
         return false;
     }
-    bool SetChannelInfoCity ( const QString& city )
+
+    inline const QString& GetChannelInfoCity() const { return ChannelInfo.strCity; }
+    bool                  SetChannelInfoCity ( const QString& city )
     {
         if ( ChannelInfo.strCity != city )
         {
@@ -505,7 +536,9 @@ public:
 
         return false;
     }
-    bool SetChannelInfoInstrument ( const int instrument )
+
+    inline int GetChannelInfoInstrument() const { return ChannelInfo.iInstrument; }
+    bool       SetChannelInfoInstrument ( const int instrument )
     {
         if ( ChannelInfo.iInstrument != instrument )
         {
@@ -517,7 +550,9 @@ public:
 
         return false;
     }
-    bool SetChannelInfoSkillLevel ( ESkillLevel skillLevel )
+
+    inline ESkillLevel GetChannelInfoSkillLevel() const { return ChannelInfo.eSkillLevel; }
+    bool               SetChannelInfoSkillLevel ( ESkillLevel skillLevel )
     {
         if ( ChannelInfo.eSkillLevel != skillLevel )
         {
@@ -530,7 +565,7 @@ public:
         return false;
     }
 
-    inline int GetClientSockBufNumFrames() { return iClientSockBufNumFrames; }
+    inline int GetClientSockBufNumFrames() const { return iClientSockBufNumFrames; }
     bool       SetClientSockBufNumFrames ( int numFrames )
     {
         if ( iClientSockBufNumFrames != numFrames )
@@ -544,7 +579,7 @@ public:
         return false;
     }
 
-    inline int GetServerSockBufNumFrames() { return iServerSockBufNumFrames; }
+    inline int GetServerSockBufNumFrames() const { return iServerSockBufNumFrames; }
     bool       SetServerSockBufNumFrames ( int numFrames )
     {
         if ( iServerSockBufNumFrames != numFrames )
@@ -558,7 +593,7 @@ public:
         return false;
     }
 
-    inline bool GetAutoSockBufSize() { return bAutoSockBufSize; }
+    inline bool GetAutoSockBufSize() const { return bAutoSockBufSize; }
     bool        SetAutoSockBufSize ( bool bAuto )
     {
         if ( bAutoSockBufSize != bAuto )
@@ -572,7 +607,7 @@ public:
         return false;
     }
 
-    inline bool GetEnableOPUS64() { return bEnableOPUS64; }
+    inline bool GetEnableOPUS64() const { return bEnableOPUS64; }
     bool        SetEnableOPUS64 ( bool bEnable )
     {
         if ( bEnableOPUS64 != bEnable )
@@ -586,7 +621,7 @@ public:
         return false;
     }
 
-    inline int GetNumMixerPanelRows() { return iNumMixerPanelRows; }
+    inline int GetNumMixerPanelRows() const { return iNumMixerPanelRows; }
     bool       SetNumMixerPanelRows ( int rows )
     {
         if ( iNumMixerPanelRows != rows )
@@ -600,7 +635,7 @@ public:
         return false;
     }
 
-    inline int GetAudioInputBalance() { return iAudioInputBalance; }
+    inline int GetAudioInputBalance() const { return iAudioInputBalance; }
     bool       SetAudioInputBalance ( int iValue )
     {
         if ( iAudioInputBalance != iValue )
@@ -614,7 +649,7 @@ public:
         return false;
     }
 
-    inline int GetReverbLevel() { return iReverbLevel; }
+    inline int GetReverbLevel() const { return iReverbLevel; }
     bool       SetReverbLevel ( int iLevel )
     {
         if ( iReverbLevel != iLevel )
@@ -628,7 +663,7 @@ public:
         return false;
     }
 
-    inline bool GetReverbOnLeftChannel() { return bReverbOnLeftChan; }
+    inline bool GetReverbOnLeftChannel() const { return bReverbOnLeftChan; }
     bool        SetReverbOnLeftChannel ( bool bOnLeftChannel )
     {
         if ( bReverbOnLeftChan != bOnLeftChannel )
@@ -642,7 +677,7 @@ public:
         return false;
     }
 
-    inline bool GetOwnFaderFirst() { return bOwnFaderFirst; }
+    inline bool GetOwnFaderFirst() const { return bOwnFaderFirst; }
     bool        SetOwnFaderFirst ( bool bOwnFirst )
     {
         if ( bOwnFaderFirst != bOwnFirst )
@@ -656,11 +691,12 @@ public:
         return false;
     }
 
-public: // Unsaved settings, needed by CClientSettingsDlg
+protected: // Unsaved settings:
     QString strClientName;
 
+public: // Unsaved settings, needed by CClientSettingsDlg
     //### TODO: BEGIN ###//
-    // these could be set by CSound on device selection !
+    // these could be set by CSound on device selection or included in SoundProperties !
     // no more need for separate calls to CSound from CClient.Init() then.
     bool bFraSiFactPrefSupported;
     bool bFraSiFactDefSupported;
@@ -668,7 +704,7 @@ public: // Unsaved settings, needed by CClientSettingsDlg
     //### TODO: END ###//
 
     bool bMuteOutStream;
-    bool bConnectState;
+    bool bConnectedState; // true if we are Connecting or Connected, false if we are Disconnecting or Disconnected
 
 public:
     void LoadFaderSettings ( const QString& strCurFileName );
@@ -677,26 +713,38 @@ public:
     void RequestDriverSetup() { emit OpenDriverSetup(); }
 
 protected:
-    // No CommandLineOptions used when reading Client inifile
-    virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument ) override;
-    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) override;
-
     void ReadFaderSettingsFromXML ( const QDomDocument& IniXMLDocument );
     void WriteFaderSettingsToXML ( QDomDocument& IniXMLDocument );
+
+protected:
+    virtual void ReadCommandLineOptions() override;
+    virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) override;
+    virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument ) override;
 };
 #endif
 
 class CServerSettings : public CSettings
 {
 public:
-    CServerSettings ( const QString& sNFiName ) : CSettings()
+    CServerSettings ( CCommandlineOptions& cmdlnOptions ) :
+        CSettings ( cmdlnOptions ),
+        eServerCountry ( QLocale::Country::UnitedStates ),
+        bEnableRecording ( false ),
+        strWelcomeMessage(),
+        strRecordingDir(),
+        strDirectoryAddress(),
+        eDirectoryType ( AT_NONE ),
+        strServerListFileName(),
+        bAutoRunMinimized ( false ),
+        bDelayPan ( false )
     {
-        SetFileName ( sNFiName, DEFAULT_INI_FILE_NAME_SERVER );
+        SetFileName ( cmdlnOptions.inifile.Value(), DEFAULT_INI_FILE_NAME_SERVER );
         Load();
     }
 
     ~CServerSettings() { Save(); }
 
+public:
     //### TODO: BEGIN ###//
     // CHECK! these new values need to be initialised in constructor and read by CClient
     QString          strServerName;
@@ -712,7 +760,22 @@ public:
     bool             bDelayPan;
     //### TODO: END ###//
 
+public:
+    inline const QString& GetServerName() const { return strServerName; }
+    inline const QString  GetWindowTitle()
+    {
+        if ( GetServerName().isEmpty() )
+        {
+            return QString ( APP_NAME );
+        }
+        else
+        {
+            return QString ( APP_NAME ) + " - " + GetServerName();
+        }
+    }
+
 protected:
-    virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument ) override;
+    virtual void ReadCommandLineOptions() override;
     virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) override;
+    virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument ) override;
 };

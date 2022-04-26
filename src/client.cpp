@@ -25,15 +25,7 @@
 #include "client.h"
 
 /* Implementation *************************************************************/
-CClient::CClient ( CClientSettings& cSettings,
-                   const quint16    iPortNumber,
-                   const quint16    iQosNumber,
-                   const QString&   strConnOnStartupAddress,
-                   const QString&   strMIDISetup,
-                   const bool       bNoAutoJackConnect,
-                   const QString&   strNClientName,
-                   const bool       bNEnableIPv6,
-                   const bool       bNMuteMeInPersonalMix ) :
+CClient::CClient ( CClientSettings& cSettings ) :
     Settings ( cSettings ),
     Channel ( false ), /* we need a client channel -> "false" */
     CurOpusEncoder ( nullptr ),
@@ -44,21 +36,29 @@ CClient::CClient ( CClientSettings& cSettings,
     iNumAudioChannels ( 1 ),
     bIsInitializationPhase ( true ),
     fMuteOutStreamGain ( 1.0f ),
-    Socket ( &Channel, iPortNumber, iQosNumber, "", bNEnableIPv6 ),
+    Socket ( &Channel,
+             cSettings.CommandlineOptions.port.Value(),
+             cSettings.CommandlineOptions.qos.Value(),
+             "",
+             cSettings.CommandlineOptions.enableipv6.IsSet() ),
     //### TODO: BEGIN//
     // pass Settings to CCsound too
-    Sound ( AudioCallback, this, strMIDISetup, bNoAutoJackConnect, strNClientName ),
+    Sound ( AudioCallback,
+            this,
+            cSettings.CommandlineOptions.ctrlmidich.Value(),
+            cSettings.CommandlineOptions.nojackconnect.IsSet(),
+            cSettings.CommandlineOptions.clientname.Value() ),
     //### TODO: END//
     iSndCrdPrefFrameSizeFactor ( FRAME_SIZE_FACTOR_DEFAULT ),
     iSndCrdFrameSizeFactor ( FRAME_SIZE_FACTOR_DEFAULT ),
     bSndCrdConversionBufferRequired ( false ),
     iSndCardMonoBlockSizeSamConvBuff ( 0 ),
     bJitterBufferOK ( true ),
-    bEnableIPv6 ( bNEnableIPv6 ),
-    bMuteMeInPersonalMix ( bNMuteMeInPersonalMix ),
+    bEnableIPv6 ( cSettings.CommandlineOptions.enableipv6.IsSet() ),
+    bMuteMeInPersonalMix ( cSettings.CommandlineOptions.mutemyown.IsSet() ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
-    Settings.strClientName = strNClientName;
+    Settings.SetClientName ( cSettings.CommandlineOptions.clientname.Value() );
 
     int iOpusError;
 
@@ -164,9 +164,9 @@ CClient::CClient ( CClientSettings& cSettings,
     Socket.Start();
 
     // do an immediate start if a server address is given
-    if ( !strConnOnStartupAddress.isEmpty() )
+    if ( !cSettings.CommandlineOptions.connect.Value().isEmpty() )
     {
-        SetServerAddr ( strConnOnStartupAddress );
+        SetServerAddr ( cSettings.CommandlineOptions.connect.Value() );
         Start();
     }
 }
@@ -218,12 +218,7 @@ void CClient::ApplySettings()
     emit SoundDeviceChanged ( strError );
 }
 
-void CClient::OnAboutToQuit()
-{
-    // Settings.ChannelInfo = Channel.GetChanInfo();
-
-    // Channel.GetDoAutoSockBufSize() ??
-}
+void CClient::OnAboutToQuit() {}
 
 void CClient::OnSendProtMessage ( CVector<uint8_t> vecMessage )
 {
@@ -791,8 +786,8 @@ void CClient::Start()
     Init();
 
     // enable channel
-    Settings.bConnectState = true;
-    Channel.SetEnable ( Settings.bConnectState );
+    Settings.bConnectedState = true;
+    Channel.SetEnable ( true );
 
     // start audio interface
     Sound.Start();
@@ -804,8 +799,8 @@ void CClient::Stop()
     Sound.Stop();
 
     // disable channel
-    Settings.bConnectState = false;
-    Channel.SetEnable ( Settings.bConnectState );
+    Settings.bConnectedState = false;
+    Channel.SetEnable ( false );
 
     ConnLessProtocol.CreateCLDisconnection ( Channel.GetAddress() );
 

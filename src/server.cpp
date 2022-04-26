@@ -212,62 +212,46 @@ void CHighPrecisionTimer::run()
 #endif
 
 // CServer implementation ******************************************************
-CServer::CServer ( CServerSettings&   cSettings,
-                   const int          iNewMaxNumChan,
-                   const QString&     strLoggingFileName,
-                   const QString&     strServerBindIP,
-                   const quint16      iPortNumber,
-                   const quint16      iQosNumber,
-                   const QString&     strHTMLStatusFileName,
-                   const QString&     strDirectoryServer,
-                   const QString&     strServerListFileName,
-                   const QString&     strServerInfo,
-                   const QString&     strServerListFilter,
-                   const QString&     strServerPublicIP,
-                   const QString&     strNewWelcomeMessage,
-                   const QString&     strRecordingDirName,
-                   const bool         bNDisconnectAllClientsOnQuit,
-                   const bool         bNUseDoubleSystemFrameSize,
-                   const bool         bNUseMultithreading,
-                   const bool         bDisableRecording,
-                   const bool         bNDelayPan,
-                   const bool         bNEnableIPv6,
-                   const ELicenceType eNLicenceType ) :
+CServer::CServer ( CServerSettings& cSettings ) :
     Settings ( cSettings ),
-    bUseDoubleSystemFrameSize ( bNUseDoubleSystemFrameSize ),
-    bUseMultithreading ( bNUseMultithreading ),
-    iMaxNumChannels ( iNewMaxNumChan ),
+    bUseDoubleSystemFrameSize ( !cSettings.CommandlineOptions.fastupdate.IsSet() ),
+    bUseMultithreading ( cSettings.CommandlineOptions.multithreading.IsSet() ),
+    iMaxNumChannels ( cSettings.CommandlineOptions.numchannels.Value() ),
     iCurNumChannels ( 0 ),
-    Socket ( this, iPortNumber, iQosNumber, strServerBindIP, bNEnableIPv6 ),
+    Socket ( this,
+             cSettings.CommandlineOptions.port.Value(),
+             cSettings.CommandlineOptions.qos.Value(),
+             cSettings.CommandlineOptions.serverbindip.Value(),
+             cSettings.CommandlineOptions.enableipv6.IsSet() ),
     Logging(),
     iFrameCount ( 0 ),
     bWriteStatusHTMLFile ( false ),
-    strServerHTMLFileListName ( strHTMLStatusFileName ),
-    HighPrecisionTimer ( bNUseDoubleSystemFrameSize ),
-    ServerListManager ( iPortNumber,
-                        strDirectoryServer,
-                        strServerListFileName,
-                        strServerInfo,
-                        strServerPublicIP,
-                        strServerListFilter,
-                        iNewMaxNumChan,
-                        bNEnableIPv6,
+    strServerHTMLFileListName ( cSettings.CommandlineOptions.htmlstatus.Value() ),
+    HighPrecisionTimer ( !cSettings.CommandlineOptions.fastupdate.IsSet() ),
+    ServerListManager ( cSettings.CommandlineOptions.port.Value(),
+                        cSettings.CommandlineOptions.directoryserver.Value(),
+                        cSettings.CommandlineOptions.directoryfile.Value(),
+                        cSettings.CommandlineOptions.serverinfo.Value(),
+                        cSettings.CommandlineOptions.serverpublicip.Value(),
+                        cSettings.CommandlineOptions.listfilter.Value(),
+                        cSettings.CommandlineOptions.numchannels.Value(),
+                        cSettings.CommandlineOptions.enableipv6.IsSet(),
                         &ConnLessProtocol ),
     JamController ( this ),
-    bEnableIPv6 ( bNEnableIPv6 ),
-    eLicenceType ( eNLicenceType ),
-    bDisconnectAllClientsOnQuit ( bNDisconnectAllClientsOnQuit ),
+    bEnableIPv6 ( cSettings.CommandlineOptions.enableipv6.IsSet() ),
+    eLicenceType ( cSettings.CommandlineOptions.licence.IsSet() ? LT_CREATIVECOMMONS : LT_NO_LICENCE ),
+    bDisconnectAllClientsOnQuit ( cSettings.CommandlineOptions.discononquit.IsSet() ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
     int iOpusError;
     int i;
 
-    if ( bDisableRecording )
+    if ( Settings.CommandlineOptions.norecord.IsSet() )
     {
         Settings.bEnableRecording = false;
     }
 
-    if ( bNDelayPan )
+    if ( Settings.CommandlineOptions.delaypan.IsSet() )
     {
         Settings.bDelayPan = false;
     }
@@ -382,9 +366,9 @@ CServer::CServer ( CServerSettings&   cSettings,
     vecChannelLevels.Init ( iMaxNumChannels );
 
     // enable logging (if requested)
-    if ( !strLoggingFileName.isEmpty() )
+    if ( !Settings.CommandlineOptions.log.Value().isEmpty() )
     {
-        Logging.Start ( strLoggingFileName );
+        Logging.Start ( Settings.CommandlineOptions.log.Value() );
     }
 
     // HTML status file writing
@@ -397,11 +381,11 @@ CServer::CServer ( CServerSettings&   cSettings,
 
     // manage welcome message: if the welcome message is a valid link to a local
     // file, the content of that file is used as the welcome message (#361)
-    SetWelcomeMessage ( strNewWelcomeMessage ); // first use given text, may be overwritten
+    SetWelcomeMessage ( Settings.CommandlineOptions.welcomemessage.Value() ); // first use given text, may be overwritten
 
-    if ( QFileInfo ( strNewWelcomeMessage ).exists() )
+    if ( QFileInfo ( Settings.CommandlineOptions.welcomemessage.Value() ).exists() )
     {
-        QFile file ( strNewWelcomeMessage );
+        QFile file ( Settings.CommandlineOptions.welcomemessage.Value() );
 
         if ( file.open ( QIODevice::ReadOnly | QIODevice::Text ) )
         {
@@ -413,7 +397,7 @@ CServer::CServer ( CServerSettings&   cSettings,
     // enable jam recording (if requested) - kicks off the thread (note
     // that jam recorder needs the frame size which is given to the jam
     // recorder in the SetRecordingDir() function)
-    SetRecordingDir ( strRecordingDirName );
+    SetRecordingDir ( Settings.CommandlineOptions.recording.Value() );
 
     // enable all channels (for the server all channel must be enabled the
     // entire life time of the software)

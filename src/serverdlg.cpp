@@ -25,10 +25,10 @@
 #include "serverdlg.h"
 
 /* Implementation *************************************************************/
-CServerDlg::CServerDlg ( CServer* pNServP, CServerSettings* pNSetP, const bool bStartMinimized, QWidget* parent ) :
+CServerDlg::CServerDlg ( CServer* server, CServerSettings* settings, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Window ), // use Qt::Window to get min/max window buttons
-    pServer ( pNServP ),
-    pSettings ( pNSetP ),
+    pServer ( server ),
+    pSettings ( settings ),
     BitmapSystemTrayInactive ( QString::fromUtf8 ( ":/png/main/res/servertrayiconinactive.png" ) ),
     BitmapSystemTrayActive ( QString::fromUtf8 ( ":/png/main/res/servertrayiconactive.png" ) )
 {
@@ -255,7 +255,7 @@ CServerDlg::CServerDlg ( CServer* pNServP, CServerSettings* pNSetP, const bool b
 
     // act on "start minimized" flag (note, this has to be done after setting
     // and acting on the correct value for the system tray icon availablility)
-    if ( bStartMinimized )
+    if ( pSettings->CommandlineOptions.startminimized.IsSet() )
     {
         showMinimized();
     }

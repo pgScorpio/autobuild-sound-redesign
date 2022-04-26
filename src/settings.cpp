@@ -27,6 +27,8 @@
 /* Implementation *************************************************************/
 void CSettings::Load()
 {
+    ReadCommandLineOptions();
+
     // prepare file name for loading initialization data from XML file and read
     // data from file if possible
     QDomDocument IniXMLDocument;
@@ -224,6 +226,13 @@ void CClientSettings::SaveFaderSettings ( const QString& strCurFileName )
     // prepare file name for storing initialization data in XML file and store
     // XML data in file
     WriteToFile ( strCurFileName, IniXMLDocument );
+}
+
+void CClientSettings::ReadCommandLineOptions()
+{
+    //### TODO: BEGIN ###//
+    // Implement this one as soon as "Global commandline" gets implemented.
+    //### TODO: END ###//
 }
 
 void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
@@ -762,6 +771,13 @@ void CClientSettings::WriteFaderSettingsToXML ( QDomDocument& IniXMLDocument )
 #endif
 
 // Server settings -------------------------------------------------------------
+void CServerSettings::ReadCommandLineOptions()
+{
+    //### TODO: BEGIN ###//
+    // Implement this one as soon as "Global commandline" gets implemented.
+    //### TODO: END ###//
+}
+
 // that this gets called means we are not headless
 void CServerSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
 {

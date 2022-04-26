@@ -25,27 +25,19 @@
 #include "clientdlg.h"
 
 /* Implementation *************************************************************/
-CClientDlg::CClientDlg ( CClient&         cClient,
-                         CClientSettings& cSettings,
-                         const QString&   strConnOnStartupAddress,
-                         const QString&   strMIDISetup,
-                         const bool       bNewShowComplRegConnList,
-                         const bool       bShowAnalyzerConsole,
-                         const bool       bMuteStream,
-                         const bool       bNEnableIPv6,
-                         QWidget*         parent ) :
+CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Window ), // use Qt::Window to get min/max window buttons
     Client ( cClient ),
     Settings ( cSettings ),
     bConnectDlgWasShown ( false ),
-    bMIDICtrlUsed ( !strMIDISetup.isEmpty() ),
+    bMIDICtrlUsed ( !cSettings.CommandlineOptions.ctrlmidich.Value().isEmpty() ),
     bDetectFeedback ( false ),
-    bEnableIPv6 ( bNEnableIPv6 ),
+    bEnableIPv6 ( cSettings.CommandlineOptions.enableipv6.IsSet() ),
     eLastRecorderState ( RS_UNDEFINED ), // for SetMixerBoardDeco
     eLastDesign ( GD_ORIGINAL ),         //          "
     ClientSettingsDlg ( Client, cSettings, parent ),
     ChatDlg ( parent ),
-    ConnectDlg ( cSettings, bNewShowComplRegConnList, parent ),
+    ConnectDlg ( cSettings, cSettings.CommandlineOptions.showallservers.IsSet(), parent ),
     AnalyzerConsole ( &cClient, parent )
 {
     setupUi ( this );
@@ -268,11 +260,11 @@ CClientDlg::CClientDlg ( CClient&         cClient,
     TimerDetectFeedback.setSingleShot ( true );
 
     // Connect on startup ------------------------------------------------------
-    if ( !strConnOnStartupAddress.isEmpty() )
+    if ( !cSettings.CommandlineOptions.connect.Value().isEmpty() )
     {
         // initiate connection (always show the address in the mixer board
         // (no alias))
-        Connect ( strConnOnStartupAddress, strConnOnStartupAddress );
+        Connect ( cSettings.CommandlineOptions.connect.Value(), cSettings.CommandlineOptions.connect.Value() );
     }
 
     // File menu  --------------------------------------------------------------
@@ -370,7 +362,7 @@ CClientDlg::CClientDlg ( CClient&         cClient,
     pViewMenu->addAction ( tr ( "C&hat..." ), this, SLOT ( OnOpenChatDialog() ), QKeySequence ( Qt::CTRL + Qt::Key_H ) );
 
     // optionally show analyzer console entry
-    if ( bShowAnalyzerConsole )
+    if ( cSettings.CommandlineOptions.showanalyzerconsole.IsSet() )
     {
         pViewMenu->addAction ( tr ( "&Analyzer Console..." ), this, SLOT ( OnOpenAnalyzerConsole() ) );
     }
@@ -512,7 +504,7 @@ CClientDlg::CClientDlg ( CClient&         cClient,
     TimerStatus.start ( LED_BAR_UPDATE_TIME_MS );
 
     // mute stream on startup (must be done after the signal connections)
-    if ( bMuteStream )
+    if ( cSettings.CommandlineOptions.mutestream.IsSet() )
     {
         chbLocalMute->setCheckState ( Qt::Checked );
     }
@@ -537,6 +529,41 @@ CClientDlg::CClientDlg ( CClient&         cClient,
     }
 }
 
+void CClientDlg::closeEvent ( QCloseEvent* Event )
+{
+    // if connected, terminate connection
+    if ( Settings.bConnectedState )
+    {
+        Client.Stop();
+    }
+
+    // store window positions
+    Settings.vecWindowPosMain     = saveGeometry();
+    Settings.vecWindowPosSettings = ClientSettingsDlg.saveGeometry();
+    Settings.vecWindowPosChat     = ChatDlg.saveGeometry();
+    Settings.vecWindowPosConnect  = ConnectDlg.saveGeometry();
+
+    Settings.bWindowWasShownSettings = ClientSettingsDlg.isVisible();
+    Settings.bWindowWasShownChat     = ChatDlg.isVisible();
+    Settings.bWindowWasShownConnect  = ConnectDlg.isVisible();
+
+    // if settings/connect dialog or chat dialog is open, close it
+    ClientSettingsDlg.close();
+    ChatDlg.close();
+    ConnectDlg.close();
+    AnalyzerConsole.close();
+
+    // make sure all current fader settings are applied to the settings struct
+    MainMixerBoard->StoreAllFaderSettings();
+
+    Settings.bConnectDlgShowAllMusicians = ConnectDlg.GetShowAllMusicians();
+    Settings.eChannelSortType            = MainMixerBoard->GetFaderSorting();
+    Settings.SetNumMixerPanelRows ( MainMixerBoard->GetNumMixerPanelRows() );
+
+    // default implementation of this event handler routine
+    Event->accept();
+}
+
 void CClientDlg::showEvent ( QShowEvent* Event )
 {
     Event->accept();
@@ -555,41 +582,6 @@ void CClientDlg::showEvent ( QShowEvent* Event )
     {
         ShowConnectionSetupDialog();
     }
-}
-
-void CClientDlg::closeEvent ( QCloseEvent* Event )
-{
-    // store window positions
-    Settings.vecWindowPosMain     = saveGeometry();
-    Settings.vecWindowPosSettings = ClientSettingsDlg.saveGeometry();
-    Settings.vecWindowPosChat     = ChatDlg.saveGeometry();
-    Settings.vecWindowPosConnect  = ConnectDlg.saveGeometry();
-
-    Settings.bWindowWasShownSettings = ClientSettingsDlg.isVisible();
-    Settings.bWindowWasShownChat     = ChatDlg.isVisible();
-    Settings.bWindowWasShownConnect  = ConnectDlg.isVisible();
-
-    // if settings/connect dialog or chat dialog is open, close it
-    ClientSettingsDlg.close();
-    ChatDlg.close();
-    ConnectDlg.close();
-    AnalyzerConsole.close();
-
-    // if connected, terminate connection
-    if ( Settings.bConnectState )
-    {
-        Client.Stop();
-    }
-
-    // make sure all current fader settings are applied to the settings struct
-    MainMixerBoard->StoreAllFaderSettings();
-
-    Settings.bConnectDlgShowAllMusicians = ConnectDlg.GetShowAllMusicians();
-    Settings.eChannelSortType            = MainMixerBoard->GetFaderSorting();
-    Settings.SetNumMixerPanelRows ( MainMixerBoard->GetNumMixerPanelRows() );
-
-    // default implementation of this event handler routine
-    Event->accept();
 }
 
 void CClientDlg::ManageDragNDrop ( QDropEvent* Event, const bool bCheckAccept )
@@ -699,7 +691,7 @@ void CClientDlg::OnConnectDlgAccepted()
 
         // first check if we are already connected, if this is the case we have to
         // disconnect the old server first
-        if ( Settings.bConnectState )
+        if ( Settings.bConnectedState )
         {
             Disconnect();
         }
@@ -715,7 +707,7 @@ void CClientDlg::OnConnectDlgAccepted()
 void CClientDlg::OnConnectDisconBut()
 {
     // the connect/disconnect button implements a toggle functionality
-    if ( Settings.bConnectState )
+    if ( Settings.bConnectedState )
     {
         Disconnect();
         SetMixerBoardDeco ( RS_UNDEFINED );
@@ -863,40 +855,19 @@ void CClientDlg::SetMyWindowTitle ( const int iNumClients )
     // set the window title (and therefore also the task bar icon text of the OS)
     // according to the following specification (#559):
     // <ServerName> - <N> users - Jamulus
-    QString    strWinTitle;
-    const bool bClientNameIsUsed = !Client.Settings.strClientName.isEmpty();
+    QString strWinTitle = Settings.GetWindowTitle();
 
-    if ( bClientNameIsUsed )
+    if ( iNumClients > 0 )
     {
-        // if --clientname is used, the APP_NAME must be the very first word in
-        // the title, otherwise some user scripts do not work anymore, see #789
-        strWinTitle += QString ( APP_NAME ) + " - " + Client.Settings.strClientName + " ";
-    }
-
-    if ( iNumClients == 0 )
-    {
-        // only application name
-        if ( !bClientNameIsUsed ) // if --clientname is used, the APP_NAME is the first word in title
-        {
-            strWinTitle += QString ( APP_NAME );
-        }
-    }
-    else
-    {
-        strWinTitle += MainMixerBoard->GetServerName();
+        strWinTitle += " " + MainMixerBoard->GetServerName();
 
         if ( iNumClients == 1 )
         {
             strWinTitle += " - 1 " + tr ( "user" );
         }
-        else if ( iNumClients > 1 )
+        else
         {
             strWinTitle += " - " + QString::number ( iNumClients ) + " " + tr ( "users" );
-        }
-
-        if ( !bClientNameIsUsed ) // if --clientname is used, the APP_NAME is the first word in title
-        {
-            strWinTitle += " - " + QString ( APP_NAME );
         }
     }
 
@@ -926,7 +897,7 @@ void CClientDlg::ShowConnectionSetupDialog()
     // show connect dialog
     bConnectDlgWasShown = true;
     ConnectDlg.show();
-    ConnectDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Connect" ), Client.Settings.strClientName ) );
+    ConnectDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Connect" ), Client.Settings.GetClientName() ) );
 
     // make sure dialog is upfront and has focus
     ConnectDlg.raise();
@@ -938,7 +909,7 @@ void CClientDlg::ShowGeneralSettings ( int iTab )
     // open general settings dialog
     emit SendTabChange ( iTab );
     ClientSettingsDlg.show();
-    ClientSettingsDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Settings" ), Client.Settings.strClientName ) );
+    ClientSettingsDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Settings" ), Client.Settings.GetClientName() ) );
 
     // make sure dialog is upfront and has focus
     ClientSettingsDlg.raise();
@@ -948,7 +919,7 @@ void CClientDlg::ShowGeneralSettings ( int iTab )
 void CClientDlg::ShowChatWindow ( const bool bForceRaise )
 {
     ChatDlg.show();
-    ChatDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Chat" ), Client.Settings.strClientName ) );
+    ChatDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Chat" ), Client.Settings.GetClientName() ) );
 
     if ( bForceRaise )
     {
@@ -1124,7 +1095,7 @@ void CClientDlg::OnSoundDeviceChanged ( QString strError )
     if ( !strError.isEmpty() )
     {
         // the sound device setup has a problem, disconnect any active connection
-        if ( Settings.bConnectState )
+        if ( Settings.bConnectedState )
         {
             Disconnect();
         }

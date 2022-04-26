@@ -74,15 +74,7 @@ class CClientDlg : public CBaseDlg, private Ui_CClientDlgBase
     Q_OBJECT
 
 public:
-    CClientDlg ( CClient&         cClient,
-                 CClientSettings& cSettings,
-                 const QString&   strConnOnStartupAddress,
-                 const QString&   strMIDISetup,
-                 const bool       bNewShowComplRegConnList,
-                 const bool       bShowAnalyzerConsole,
-                 const bool       bMuteStream,
-                 const bool       bNEnableIPv6,
-                 QWidget*         parent = nullptr );
+    CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* parent = nullptr );
 
 protected:
     void SetGUIDesign ( const EGUIDesign eNewDesign );

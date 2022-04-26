@@ -100,15 +100,7 @@ class CClient : public QObject
     Q_OBJECT
 
 public:
-    CClient ( CClientSettings& cSettings,
-              const quint16    iPortNumber,
-              const quint16    iQosNumber,
-              const QString&   strConnOnStartupAddress,
-              const QString&   strMIDISetup,
-              const bool       bNoAutoJackConnect,
-              const QString&   strNClientName,
-              const bool       bNEnableIPv6,
-              const bool       bNMuteMeInPersonalMix );
+    CClient ( CClientSettings& cSettings );
 
     virtual ~CClient();
 

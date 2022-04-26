@@ -1042,7 +1042,7 @@ void CClientSettingsDlg::UpdateDisplay()
     UpdateJitterBufferFrame();
     UpdateBufferDelayFrame();
 
-    if ( !Settings.bConnectState )
+    if ( !Settings.bConnectedState )
     {
         // clear text labels with client parameters
         lblUpstreamValue->setText ( "---" );

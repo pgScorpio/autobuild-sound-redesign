@@ -132,11 +132,11 @@ CClientRpc::CClientRpc ( CClient* pClient, CRpcServer* pRpcServer, QObject* pare
     pRpcServer->HandleMethod ( "jamulusclient/getChannelInfo", [=] ( const QJsonObject& params, QJsonObject& response ) {
         QJsonObject result{
             // TODO: We cannot include "id" here is pClient->ChannelInfo is a CChannelCoreInfo which lacks that field.
-            { "name", pClient->Settings.GetChannelInfo().strName },
-            { "countryId", pClient->Settings.GetChannelInfo().eCountry },
-            { "city", pClient->Settings.GetChannelInfo().strCity },
-            { "instrumentId", pClient->Settings.GetChannelInfo().iInstrument },
-            { "skillLevel", SerializeSkillLevel ( pClient->Settings.GetChannelInfo().eSkillLevel ) },
+            { "name", pClient->Settings.GetChannelInfoName() },
+            { "countryId", pClient->Settings.GetChannelInfoCountry() },
+            { "city", pClient->Settings.GetChannelInfoCity() },
+            { "instrumentId", pClient->Settings.GetChannelInfoInstrument() },
+            { "skillLevel", SerializeSkillLevel ( pClient->Settings.GetChannelInfoSkillLevel() ) },
         };
         response["result"] = result;
         Q_UNUSED ( params );
@@ -172,8 +172,7 @@ CClientRpc::CClientRpc ( CClient* pClient, CRpcServer* pRpcServer, QObject* pare
             return;
         }
 
-        pClient->Settings.GetChannelInfo().strName = TruncateString ( jsonName.toString(), MAX_LEN_FADER_TAG );
-        pClient->OnChannelInfoChanged();
+        pClient->Settings.SetChannelInfoName ( TruncateString ( jsonName.toString(), MAX_LEN_FADER_TAG ) );
 
         response["result"] = "ok";
     } );
@@ -186,8 +185,7 @@ CClientRpc::CClientRpc ( CClient* pClient, CRpcServer* pRpcServer, QObject* pare
         auto jsonSkillLevel = params["skillLevel"];
         if ( jsonSkillLevel.isNull() )
         {
-            pClient->Settings.GetChannelInfo().eSkillLevel = SL_NOT_SET;
-            pClient->OnChannelInfoChanged();
+            pClient->Settings.SetChannelInfoSkillLevel ( SL_NOT_SET );
             return;
         }
 
@@ -217,7 +215,6 @@ CClientRpc::CClientRpc ( CClient* pClient, CRpcServer* pRpcServer, QObject* pare
             return;
         }
 
-        pClient->OnChannelInfoChanged();
         response["result"] = "ok";
     } );
 

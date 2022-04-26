@@ -153,27 +153,7 @@ class CServer : public QObject, public CServerSlots<MAX_NUM_CHANNELS>
     Q_OBJECT
 
 public:
-    CServer ( CServerSettings&   cSettings,
-              const int          iNewMaxNumChan,
-              const QString&     strLoggingFileName,
-              const QString&     strServerBindIP,
-              const quint16      iPortNumber,
-              const quint16      iQosNumber,
-              const QString&     strHTMLStatusFileName,
-              const QString&     strDirectoryServer,
-              const QString&     strServerListFileName,
-              const QString&     strServerInfo,
-              const QString&     strServerListFilter,
-              const QString&     strServerPublicIP,
-              const QString&     strNewWelcomeMessage,
-              const QString&     strRecordingDirName,
-              const bool         bNDisconnectAllClientsOnQuit,
-              const bool         bNUseDoubleSystemFrameSize,
-              const bool         bNUseMultithreading,
-              const bool         bDisableRecording,
-              const bool         bNDelayPan,
-              const bool         bNEnableIPv6,
-              const ELicenceType eNLicenceType );
+    CServer ( CServerSettings& cSettings );
 
     virtual ~CServer();
 
