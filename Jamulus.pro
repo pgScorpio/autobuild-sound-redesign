@@ -88,7 +88,6 @@ win32 {
             advapi32.lib \
             winmm.lib \
             ws2_32.lib
-<<<<<<< HEAD
         greaterThan(QT_MAJOR_VERSION, 5) {
             # Qt5 had a special qtmain library which took care of forwarding the MSVC default WinMain() entrypoint to
             # the platform-agnostic main().
@@ -97,8 +96,6 @@ win32 {
             # main() entrypoint directly:
             QMAKE_LFLAGS += /subsystem:windows /ENTRY:mainCRTStartup
         }
-=======
->>>>>>> d25fe1ce (Fix wrong clang-format action)
     }
 
     contains(CONFIG, "serveronly") {
@@ -165,14 +162,8 @@ win32 {
         RC_FILE = mac/mainicon.icns
     }
 
-<<<<<<< HEAD
     HEADERS += mac/activity.h mac/badgelabel.h
     OBJECTIVE_SOURCES += mac/activity.mm mac/badgelabel.mm
-=======
-    QT += macextras
-    HEADERS += mac/activity.h
-    OBJECTIVE_SOURCES += mac/activity.mm
->>>>>>> d25fe1ce (Fix wrong clang-format action)
     CONFIG += x86
     QMAKE_TARGET_BUNDLE_PREFIX = io.jamulus
 
@@ -201,12 +192,8 @@ win32 {
         -framework CoreMIDI \
         -framework AudioToolbox \
         -framework AudioUnit \
-<<<<<<< HEAD
         -framework Foundation \
         -framework AppKit
-=======
-        -framework Foundation
->>>>>>> d25fe1ce (Fix wrong clang-format action)
 
     contains(CONFIG, "jackonmac") {
         message(Using JACK.)
@@ -229,10 +216,6 @@ win32 {
 
 } else:ios {
     QMAKE_INFO_PLIST = ios/Info.plist
-<<<<<<< HEAD
-=======
-    QT += macextras
->>>>>>> d25fe1ce (Fix wrong clang-format action)
     OBJECTIVE_SOURCES += ios/ios_app_delegate.mm
     HEADERS += ios/ios_app_delegate.h
     HEADERS += ios/sound.h
