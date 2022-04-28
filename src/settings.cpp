@@ -640,7 +640,7 @@ void CClientSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )
     SetNumericIniSet ( IniXMLDocument, "client", "instrument", ChannelInfo.iInstrument );
 
     // country
-    SetNumericIniSet ( IniXMLDocument, "client", "country", static_cast<int> ( ChannelInfo.eCountry ) );
+    SetNumericIniSet ( IniXMLDocument, "client", "country", CLocale::QtCountryToWireFormatCountryCode ( ChannelInfo.eCountry ) );
 
     // city
     PutIniSetting ( IniXMLDocument, "client", "city_base64", ToBase64 ( ChannelInfo.strCity ) );
@@ -810,7 +810,7 @@ void CServerSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
         // country
         if ( GetNumericIniSet ( IniXMLDocument, "server", "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
         {
-            eServerCountry = static_cast<QLocale::Country> ( iValue );
+            eServerCountry = CLocale::WireFormatCountryCodeToQtCountry ( iValue );
         }
     }
 
@@ -943,7 +943,7 @@ void CServerSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )
     PutIniSetting ( IniXMLDocument, "server", "city", strServerCity );
 
     // country
-    SetNumericIniSet ( IniXMLDocument, "server", "country", static_cast<int> ( eServerCountry ) );
+    SetNumericIniSet ( IniXMLDocument, "server", "country", CLocale::QtCountryToWireFormatCountryCode ( eServerCountry ) );
 
     // norecord flag
     SetFlagIniSet ( IniXMLDocument, "server", "norecord", !bEnableRecording );
