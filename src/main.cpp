@@ -95,11 +95,23 @@ void OnFatalError ( QString errMsg ) { throw CErrorExit ( qUtf8Printable ( errMs
 
 QString UsageArguments ( char* argv );
 
-void OnFatalError ( QString errMsg )
+const QString getServerNameFromInfo ( const QString strServerInfo )
 {
-    qCritical() << qUtf8Printable ( errMsg );
-    exit ( 1 );
+    if ( !strServerInfo.isEmpty() )
+    {
+        QStringList servInfoParams = strServerInfo.split ( ";" );
+        if ( servInfoParams.count() > 0 )
+        {
+            return servInfoParams[0];
+        }
+    }
+
+    return QString();
 }
+
+void OnFatalError ( QString errMsg ) { throw CErrorExit ( qUtf8Printable ( errMsg ) ); }
+
+// Implementation **************************************************************
 
 int main ( int argc, char** argv )
 {
@@ -421,7 +433,15 @@ int main ( int argc, char** argv )
                 qInfo() << "- licence required";
             }
 
-            if ( CommandlineOptions.licence.IsSet() )
+                    if ( strServerName.length() > MAX_LEN_SERVER_NAME )
+                    {
+                        qWarning() << qUtf8Printable (
+                            QString ( "- server name will be truncated to %1" ).arg ( strServerName.left ( MAX_LEN_SERVER_NAME ) ) );
+                    }
+                }
+            }
+
+            if ( commandlineOptions.licence.IsSet() )
             {
                 qInfo() << "- licence required";
             }
