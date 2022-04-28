@@ -565,9 +565,10 @@ void CClientDlg::closeEvent ( QCloseEvent* Event )
 void CClientDlg::closeEvent ( QCloseEvent* Event )
 {
     // if connected, terminate connection
-    if ( Settings.bConnectedState )
+    if ( Settings.GetConnectionEnabled() )
     {
-        Client.Stop();
+        Settings.EndConnection();
+        QCoreApplication::processEvents ( QEventLoop::ExcludeUserInputEvents, 100 );
     }
 
     // store window positions

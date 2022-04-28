@@ -705,6 +705,12 @@ public:
         return false;
     }
 
+    /*
+    protected:
+        void SelectSoundCard ( QString strName );
+        void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
+    */
+
 protected: // Unsaved settings:
     QString strClientName;
 
@@ -727,6 +733,104 @@ public:
 
     // void SelectSoundCard ( QString strName );
     // void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
+
+protected:
+    // Status values
+    QString strServerAddress;
+    QString strServerName;
+
+    bool bConnectRequested;
+    bool bDisconnectRequested;
+    bool bConnectionEnabled; // true if we are Connecting or Connected, false if we are Disconnecting or Disconnected
+    bool bConnected;
+
+public:
+    // Status values
+
+    inline const QString GetServerAddress() const { return strServerAddress; }
+    inline const QString GetServerName() const { return strServerName; }
+    inline bool          GetConnectionEnabled() const { return bConnectionEnabled || bConnectRequested; }
+    bool                 StartConnection ( const QString& serverAddress, const QString& serverName )
+    {
+        if ( !bConnectionEnabled && !bConnectRequested && !serverAddress.isEmpty() )
+        {
+            strServerAddress  = serverAddress;
+            strServerName     = serverName.isEmpty() ? serverAddress : serverName;
+            bConnectRequested = true;
+            emit ConnectRequest();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    bool EndConnection()
+    {
+        if ( bConnectionEnabled )
+        {
+            if ( !bDisconnectRequested )
+            {
+                bDisconnectRequested = true;
+                emit DisconnectRequest();
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    void AckConnecting ( bool ack )
+    {
+        if ( bConnectRequested )
+        {
+            bConnectRequested  = false;
+            bConnectionEnabled = ack;
+
+            if ( ack )
+            {
+                emit Connecting();
+            }
+            else
+            {
+                bConnected = false;
+            }
+        }
+    }
+
+    void AckDisconnecting ( bool ack )
+    {
+        if ( bDisconnectRequested )
+        {
+            bDisconnectRequested = false;
+
+            if ( ack )
+            {
+                emit Disconnecting();
+            }
+        }
+    }
+
+    inline bool GetConnected() const { return bConnected; }
+    void        SetConnected ( bool bState = true )
+    {
+        bState &= bConnectionEnabled; // can't be connected if connection is not enabled !
+
+        if ( bConnected != bState )
+        {
+            bConnected = bState;
+            if ( bConnected )
+            {
+                emit Connected();
+            }
+            else
+            {
+                bConnectionEnabled = false;
+                emit Disconnected();
+            }
+        }
+    }
 
 protected:
     // Status values
