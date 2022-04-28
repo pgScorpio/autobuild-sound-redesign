@@ -1,56 +1,75 @@
 VERSION = 3.8.2dev
 
-#use target name which does not use a capital letter at the beginning
-    contains ( CONFIG, "noupcasename" )
-{
-    message ( The target name is jamulus instead of Jamulus.) TARGET = jamulus
+# use target name which does not use a capital letter at the beginning
+contains(CONFIG, "noupcasename") {
+    message(The target name is jamulus instead of Jamulus.)
+    TARGET = jamulus
 }
 
-#allow detailed version info for intermediate builds( #475 )
-contains ( VERSION, .*dev.*)
-{
-    exists ( ".git/config" )
-    {
-        GIT_DESCRIPTION = $$system ( git describe-- match = xxxxxxxxxxxxxxxxxxxx-- always-- abbrev-- dirty ) #the match should never match VERSION =
-            "$$VERSION" - $$GIT_DESCRIPTION message ( "building version \"$$VERSION\" (intermediate in git repository)" )
+# allow detailed version info for intermediate builds (#475)
+contains(VERSION, .*dev.*) {
+    exists(".git/config") {
+        GIT_DESCRIPTION=$$system(git describe --match=xxxxxxxxxxxxxxxxxxxx --always --abbrev --dirty) # the match should never match
+        VERSION = "$$VERSION"-$$GIT_DESCRIPTION
+        message("building version \"$$VERSION\" (intermediate in git repository)")
+    } else {
+        VERSION = "$$VERSION"-nogit
+        message("building version \"$$VERSION\" (intermediate without git repository)")
     }
-    else { VERSION = "$$VERSION" - nogit message ( "building version \"$$VERSION\" (intermediate without git repository)" ) }
+} else {
+    message("building version \"$$VERSION\" (release)")
 }
-else { message ( "building version \"$$VERSION\" (release)" ) }
 
-CONFIG += qt thread lrelease
+CONFIG += qt \
+    thread \
+    lrelease
 
-    QT += network xml concurrent
+QT += network \
+    xml \
+    concurrent
 
-        contains ( CONFIG, "nosound" ){ CONFIG -= "nosound" CONFIG +=
-                                        "serveronly" warning ( "\"nosound\" is deprecated: please use \"serveronly\" for a server-only build." ) }
-
-contains ( CONFIG, "headless" )
-{
-    message ( Headless mode activated.) QT -= gui
+contains(CONFIG, "nosound") {
+    CONFIG -= "nosound"
+    CONFIG += "serveronly"
+    warning("\"nosound\" is deprecated: please use \"serveronly\" for a server-only build.")
 }
-else { QT += widgets }
 
-LRELEASE_DIR = src / translation                            TRANSLATIONS =
-                   src / translation / translation_de_DE.ts src / translation / translation_fr_FR.ts src / translation / translation_pt_PT.ts src /
-                   translation / translation_pt_BR.ts src / translation / translation_es_ES.ts src / translation / translation_nl_NL.ts src /
-                   translation / translation_pl_PL.ts src / translation / translation_sk_SK.ts src / translation / translation_it_IT.ts src /
-                   translation / translation_sv_SE.ts src / translation /
-                   translation_zh_CN.ts
+contains(CONFIG, "headless") {
+    message(Headless mode activated.)
+    QT -= gui
+} else {
+    QT += widgets
+}
 
-                       INCLUDEPATH += src
+LRELEASE_DIR = src/translation
+TRANSLATIONS = src/translation/translation_de_DE.ts \
+    src/translation/translation_fr_FR.ts \
+    src/translation/translation_pt_PT.ts \
+    src/translation/translation_pt_BR.ts \
+    src/translation/translation_es_ES.ts \
+    src/translation/translation_nl_NL.ts \
+    src/translation/translation_pl_PL.ts \
+    src/translation/translation_sk_SK.ts \
+    src/translation/translation_it_IT.ts \
+    src/translation/translation_sv_SE.ts \
+    src/translation/translation_zh_CN.ts
 
-                                                 INCLUDEPATH_OPUS =
-                           libs / opus / include libs / opus / celt libs / opus / silk libs / opus / silk / float libs / opus / silk / fixed libs /
-                           opus
+INCLUDEPATH += src
 
-                               DEFINES += APP_VERSION =\\\"$$VERSION\\\" \
+INCLUDEPATH_OPUS = libs/opus/include \
+    libs/opus/celt \
+    libs/opus/silk \
+    libs/opus/silk/float \
+    libs/opus/silk/fixed \
+    libs/opus
+
+DEFINES += APP_VERSION=\\\"$$VERSION\\\" \
     CUSTOM_MODES \
     _REENTRANT
 
-#some depreciated functions need to be kept for older versions to build
-#TODO as soon as we drop support for the old Qt version, remove the following line
-    DEFINES += QT_NO_DEPRECATED_WARNINGS
+# some depreciated functions need to be kept for older versions to build
+# TODO as soon as we drop support for the old Qt version, remove the following line
+DEFINES += QT_NO_DEPRECATED_WARNINGS
 
 win32 {
     DEFINES -= UNICODE # fixes issue with ASIO SDK (asiolist.cpp is not unicode compatible)
@@ -69,6 +88,7 @@ win32 {
             advapi32.lib \
             winmm.lib \
             ws2_32.lib
+<<<<<<< HEAD
         greaterThan(QT_MAJOR_VERSION, 5) {
             # Qt5 had a special qtmain library which took care of forwarding the MSVC default WinMain() entrypoint to
             # the platform-agnostic main().
@@ -77,78 +97,82 @@ win32 {
             # main() entrypoint directly:
             QMAKE_LFLAGS += /subsystem:windows /ENTRY:mainCRTStartup
         }
+=======
+>>>>>>> d25fe1ce (Fix wrong clang-format action)
     }
 
-    contains ( CONFIG, "serveronly" )
-    {
-        message ( Restricting build to server - only due to CONFIG += serveronly.) DEFINES += SERVER_ONLY
-    }
-    else
-    {
-        contains ( CONFIG, "jackonwindows" )
-        {
-            message ( Using JACK.) contains ( QT_ARCH, "i386" )
-            {
-                exists ( "C:/Program Files (x86)" ) { message ( "Cross compilation build" ) programfilesdir = "C:/Program Files (x86)" }
-                else { message ( "Native i386 build" ) programfilesdir = "C:/Program Files" } libjackname = "libjack.lib"
+    contains(CONFIG, "serveronly") {
+        message(Restricting build to server-only due to CONFIG+=serveronly.)
+        DEFINES += SERVER_ONLY
+    } else {
+        contains(CONFIG, "jackonwindows") {
+            message(Using JACK.)
+            contains(QT_ARCH, "i386") {
+                exists("C:/Program Files (x86)") {
+                    message("Cross compilation build")
+                    programfilesdir = "C:/Program Files (x86)"
+                } else {
+                    message("Native i386 build")
+                    programfilesdir = "C:/Program Files"
+                }
+                libjackname = "libjack.lib"
+            } else {
+                message("Native x86_64 build")
+                programfilesdir = "C:/Program Files"
+                libjackname = "libjack64.lib"
             }
-            else { message ( "Native x86_64 build" ) programfilesdir = "C:/Program Files" libjackname = "libjack64.lib" }
-            !exists ( "$${programfilesdir}/JACK2/include/jack/jack.h" ){
-                error ( "Error: jack.h was not found in the expected location ($${programfilesdir}). Ensure that the right JACK2 variant is "
-                        "installed (32bit vs. 64bit)." ) }
-
-            HEADERS += linux / sound.h SOURCES += linux / sound.cpp DEFINES += WITH_JACK DEFINES += JACK_ON_WINDOWS DEFINES +=
-                _STDINT_H #supposed to solve compilation error in systemdeps.h INCLUDEPATH += "$${programfilesdir}/JACK2/include" LIBS +=
-                "$${programfilesdir}/JACK2/lib/$${libjackname}"
-        }
-        else
-        {
-            message ( Using ASIO.) message ( Please review the ASIO SDK licence.)
-
-                !exists ( windows / ASIOSDK2 )
-            {
-                error ( "Error: ASIOSDK2 must be placed in Jamulus windows folder." )
+            !exists("$${programfilesdir}/JACK2/include/jack/jack.h") {
+                error("Error: jack.h was not found in the expected location ($${programfilesdir}). Ensure that the right JACK2 variant is installed (32bit vs. 64bit).")
             }
-#Important : Keep those ASIO includes local to this build target in
-#order to avoid poisoning other builds                           license - wise.
-            HEADERS += windows / sound.h SOURCES += windows / sound.cpp windows / ASIOSDK2 / common / asio.cpp windows / ASIOSDK2 / host /
-                                                    asiodrivers.cpp windows / ASIOSDK2 / host / pc / asiolist.cpp INCLUDEPATH +=
-                windows / ASIOSDK2 / common windows / ASIOSDK2 / host windows / ASIOSDK2 / host / pc
+
+            HEADERS += linux/sound.h
+            SOURCES += linux/sound.cpp
+            DEFINES += WITH_JACK
+            DEFINES += JACK_ON_WINDOWS
+            DEFINES += _STDINT_H # supposed to solve compilation error in systemdeps.h
+            INCLUDEPATH += "$${programfilesdir}/JACK2/include"
+            LIBS += "$${programfilesdir}/JACK2/lib/$${libjackname}"
+        } else {
+            message(Using ASIO.)
+            message(Please review the ASIO SDK licence.)
+
+            !exists(windows/ASIOSDK2) {
+                error("Error: ASIOSDK2 must be placed in Jamulus windows folder.")
+            }
+            # Important: Keep those ASIO includes local to this build target in
+            # order to avoid poisoning other builds license-wise.
+            HEADERS += windows/sound.h
+            SOURCES += windows/sound.cpp \
+                windows/ASIOSDK2/common/asio.cpp \
+                windows/ASIOSDK2/host/asiodrivers.cpp \
+                windows/ASIOSDK2/host/pc/asiolist.cpp
+            INCLUDEPATH += windows/ASIOSDK2/common \
+                windows/ASIOSDK2/host \
+                windows/ASIOSDK2/host/pc
         }
     }
-}
-else : macx
-{
-    contains ( CONFIG, "server_bundle" )
-    {
-        message ( The generated application bundle will run a server instance.)
 
-            DEFINES += SERVER_BUNDLE TARGET = $${ TARGET } Server MACOSX_BUNDLE_ICON.files = mac / jamulus - server - icon - 2020.icns RC_FILE =
-                                                                                                 mac / jamulus - server - icon - 2020.icns
-    }
-    else { MACOSX_BUNDLE_ICON.files = mac / mainicon.icns RC_FILE = mac / mainicon.icns }
+} else:macx {
+    contains(CONFIG, "server_bundle") {
+        message(The generated application bundle will run a server instance.)
 
-    QT += macextras HEADERS += mac / activity.h OBJECTIVE_SOURCES += mac / activity.mm CONFIG +=
-        x86                                                                            QMAKE_TARGET_BUNDLE_PREFIX = io.jamulus
-
-                                             OSX_ENTITLEMENTS.files = mac / Jamulus.entitlements OSX_ENTITLEMENTS.path =
-                                                                          Contents / Resources   QMAKE_BUNDLE_DATA += OSX_ENTITLEMENTS
-
-                                                                                                                        macx -
-                                                                                                                    xcode
-    {
-        QMAKE_INFO_PLIST = mac / Info - xcode.plist XCODE_ENTITLEMENTS.name = CODE_SIGN_ENTITLEMENTS XCODE_ENTITLEMENTS.value =
-                               mac / Jamulus.entitlements QMAKE_MAC_XCODE_SETTINGS += XCODE_ENTITLEMENTS MACOSX_BUNDLE_ICON.path =
-                                   Contents / Resources                                                  QMAKE_BUNDLE_DATA += MACOSX_BUNDLE_ICON
-    }
-    else
-    {
-        equals ( QT_VERSION, "5.9.9" ) { QMAKE_INFO_PLIST = mac / Info - make - legacy.plist }
-        else { QMAKE_INFO_PLIST = mac / Info - make.plist }
+        DEFINES += SERVER_BUNDLE
+        TARGET = $${TARGET}Server
+        MACOSX_BUNDLE_ICON.files = mac/jamulus-server-icon-2020.icns
+        RC_FILE = mac/jamulus-server-icon-2020.icns
+    } else {
+        MACOSX_BUNDLE_ICON.files = mac/mainicon.icns
+        RC_FILE = mac/mainicon.icns
     }
 
+<<<<<<< HEAD
     HEADERS += mac/activity.h mac/badgelabel.h
     OBJECTIVE_SOURCES += mac/activity.mm mac/badgelabel.mm
+=======
+    QT += macextras
+    HEADERS += mac/activity.h
+    OBJECTIVE_SOURCES += mac/activity.mm
+>>>>>>> d25fe1ce (Fix wrong clang-format action)
     CONFIG += x86
     QMAKE_TARGET_BUNDLE_PREFIX = io.jamulus
 
@@ -177,8 +201,12 @@ else : macx
         -framework CoreMIDI \
         -framework AudioToolbox \
         -framework AudioUnit \
+<<<<<<< HEAD
         -framework Foundation \
         -framework AppKit
+=======
+        -framework Foundation
+>>>>>>> d25fe1ce (Fix wrong clang-format action)
 
     contains(CONFIG, "jackonmac") {
         message(Using JACK.)
@@ -187,12 +215,24 @@ else : macx
                  error("Error: jack.h was not found at the usual place, maybe jack is not installed")
             }
         }
-        HEADERS += linux / sound.h SOURCES += linux / sound.cpp DEFINES += WITH_JACK DEFINES += JACK_REPLACES_COREAUDIO INCLUDEPATH +=
-            / usr / local / include LIBS += / usr / local / lib / libjack.dylib
+        HEADERS += linux/sound.h
+        SOURCES += linux/sound.cpp
+        DEFINES += WITH_JACK
+        DEFINES += JACK_REPLACES_COREAUDIO
+        INCLUDEPATH += /usr/local/include
+        LIBS += /usr/local/lib/libjack.dylib
+    } else {
+        message(Using CoreAudio.)
+        HEADERS += mac/sound.h
+        SOURCES += mac/sound.cpp
     }
 
 } else:ios {
     QMAKE_INFO_PLIST = ios/Info.plist
+<<<<<<< HEAD
+=======
+    QT += macextras
+>>>>>>> d25fe1ce (Fix wrong clang-format action)
     OBJECTIVE_SOURCES += ios/ios_app_delegate.mm
     HEADERS += ios/ios_app_delegate.h
     HEADERS += ios/sound.h
@@ -206,12 +246,12 @@ else : macx
     ANDROID_VERSION_CODE = $$system(git log --oneline | wc -l)
     message("Setting ANDROID_VERSION_NAME=$${ANDROID_VERSION_NAME} ANDROID_VERSION_CODE=$${ANDROID_VERSION_CODE}")
 
-#liboboe requires C++ 17 for std::timed_mutex
+    # liboboe requires C++17 for std::timed_mutex
     CONFIG += c++17
 
     QT += androidextras
 
-#enabled only for debugging on android devices
+    # enabled only for debugging on android devices
     DEFINES += ANDROIDDEBUG
 
     target.path = /tmp/your_executable # path on device
@@ -226,8 +266,8 @@ else : macx
     ANDROID_PACKAGE_SOURCE_DIR = $$PWD/android
     DISTFILES += android/AndroidManifest.xml
 
-#if compiling for android you need to use Oboe library which is included as a git submodule
-#    make sure you git pull with submodules to pull the latest Oboe library
+    # if compiling for android you need to use Oboe library which is included as a git submodule
+    # make sure you git pull with submodules to pull the latest Oboe library
     OBOE_SOURCES = $$files(libs/oboe/src/*.cpp, true)
     OBOE_HEADERS = $$files(libs/oboe/src/*.h, true)
 
