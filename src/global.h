@@ -76,6 +76,8 @@ LED bar:      lbr
 #define VERSION  APP_VERSION
 #define APP_NAME "Jamulus"
 
+extern const QString GetAppName(); // APP_NAME will be appended by " - <clientname>" or "Server - <servername>"
+
 // Windows registry key name of auto run entry for the server
 #define AUTORUN_SERVER_REG_NAME "Jamulus server"
 
@@ -319,11 +321,41 @@ typedef unsigned char      uint8_t;
 // definition for custom event
 #define MS_PACKET_RECEIVED 0
 
-/* Classes ********************************************************************/
+/* Exception Classes **********************************************************/
+
+class CInfoExit
+{
+public:
+    CInfoExit ( QString strMsg ) : strInfoMsg ( strMsg ) {}
+
+    QString GetInfoMessage() const { return strInfoMsg; }
+
+protected:
+    QString strInfoMsg;
+};
+
+class CErrorExit
+{
+public:
+    CErrorExit ( QString strNewErrorMsg, int iNewExitCode = 1 ) : strErrorMsg ( strNewErrorMsg ), iExitCode ( iNewExitCode ) {}
+
+    QString GetErrorMessage() const { return strErrorMsg; }
+
+    int GetExitCode() const { return iExitCode; }
+
+protected:
+    QString strErrorMsg;
+    int     iExitCode;
+};
+
 class CGenErr
 {
 public:
-    CGenErr ( QString strNewErrorMsg, QString strNewErrorType = "" ) : strErrorMsg ( strNewErrorMsg ), strErrorType ( strNewErrorType ) {}
+    CGenErr ( QString strNewErrorMsg, QString strNewErrorType = "", int iNewExitCode = 1 ) :
+        strErrorMsg ( strNewErrorMsg ),
+        strErrorType ( strNewErrorType ),
+        iExitCode ( iNewExitCode )
+    {}
 
     QString GetErrorText() const
     {
@@ -338,10 +370,15 @@ public:
         }
     }
 
+    int GetExitCode() const { return iExitCode; }
+
 protected:
     QString strErrorMsg;
     QString strErrorType;
+    int     iExitCode;
 };
+
+/* Event Classes **************************************************************/
 
 class CCustomEvent : public QEvent
 {
