@@ -1032,8 +1032,16 @@ void CClientSettingsDlg::OnNumMixerPanelRowsChanged() { Settings.SetNumMixerPane
 void CClientSettingsDlg::UpdateUploadRate()
 {
     // update upstream rate information label
-    lblUpstreamValue->setText ( QString().setNum ( Client.GetUploadRateKbps() ) );
-    lblUpstreamUnit->setText ( "kbps" );
+    if ( Settings.GetConnected() )
+    {
+        lblUpstreamValue->setText ( QString().setNum ( Client.GetUploadRateKbps() ) );
+        lblUpstreamUnit->setText ( "kbps" );
+    }
+    else
+    {
+        lblUpstreamValue->setText ( "---" );
+        lblUpstreamUnit->setText ( "" );
+    }
 }
 
 void CClientSettingsDlg::UpdateDisplay()
@@ -1041,13 +1049,7 @@ void CClientSettingsDlg::UpdateDisplay()
     // update slider controls (settings might have been changed)
     UpdateJitterBufferFrame();
     UpdateBufferDelayFrame();
-
-    if ( !Settings.bConnectedState )
-    {
-        // clear text labels with client parameters
-        lblUpstreamValue->setText ( "---" );
-        lblUpstreamUnit->setText ( "" );
-    }
+    UpdateUploadRate();
 }
 
 void CClientSettingsDlg::UpdateDirectoryServerComboBox()

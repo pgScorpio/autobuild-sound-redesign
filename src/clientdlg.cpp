@@ -32,12 +32,11 @@ CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* 
     bConnectDlgWasShown ( false ),
     bMIDICtrlUsed ( !cSettings.CommandlineOptions.ctrlmidich.Value().isEmpty() ),
     bDetectFeedback ( false ),
-    bEnableIPv6 ( cSettings.CommandlineOptions.enableipv6.IsSet() ),
     eLastRecorderState ( RS_UNDEFINED ), // for SetMixerBoardDeco
     eLastDesign ( GD_ORIGINAL ),         //          "
     ClientSettingsDlg ( Client, cSettings, parent ),
     ChatDlg ( parent ),
-    ConnectDlg ( cSettings, cSettings.CommandlineOptions.showallservers.IsSet(), parent ),
+    ConnectDlg ( cSettings, parent ),
     AnalyzerConsole ( &cClient, parent )
 {
     setupUi ( this );
@@ -259,14 +258,6 @@ CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* 
     TimerCheckAudioDeviceOk.setSingleShot ( true ); // only check once after connection
     TimerDetectFeedback.setSingleShot ( true );
 
-    // Connect on startup ------------------------------------------------------
-    if ( !cSettings.CommandlineOptions.connect.Value().isEmpty() )
-    {
-        // initiate connection (always show the address in the mixer board
-        // (no alias))
-        Connect ( cSettings.CommandlineOptions.connect.Value(), cSettings.CommandlineOptions.connect.Value() );
-    }
-
     // File menu  --------------------------------------------------------------
     QMenu* pFileMenu = new QMenu ( tr ( "&File" ), this );
 
@@ -449,7 +440,6 @@ CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* 
     QObject::connect ( &Client, &CClient::LicenceRequired, this, &CClientDlg::OnLicenceRequired, Qt::QueuedConnection );
 
     QObject::connect ( &Client, &CClient::ConClientListMesReceived, this, &CClientDlg::OnConClientListMesReceived );
-    QObject::connect ( &Client, &CClient::Disconnected, this, &CClientDlg::OnDisconnected );
     QObject::connect ( &Client, &CClient::ChatTextReceived, this, &CClientDlg::OnChatTextReceived );
     QObject::connect ( &Client, &CClient::ClientIDReceived, this, &CClientDlg::OnClientIDReceived );
     QObject::connect ( &Client, &CClient::MuteStateHasChangedReceived, this, &CClientDlg::OnMuteStateHasChangedReceived );
@@ -469,6 +459,10 @@ CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* 
     QObject::connect ( &Client, &CClient::CLVersionAndOSReceived, this, &CClientDlg::OnCLVersionAndOSReceived );
     QObject::connect ( &Client, &CClient::SoundDeviceChanged, this, &CClientDlg::OnSoundDeviceChanged );
 
+    QObject::connect ( &Settings, &CClientSettings::Connecting, this, &CClientDlg::OnConnecting );
+    QObject::connect ( &Settings, &CClientSettings::Disconnecting, this, &CClientDlg::OnDisconnecting );
+    QObject::connect ( &Settings, &CClientSettings::Connected, this, &CClientDlg::OnConnected );
+    QObject::connect ( &Settings, &CClientSettings::Disconnected, this, &CClientDlg::OnDisconnected );
     QObject::connect ( &Settings, &CClientSettings::GUIDesignChanged, this, &CClientDlg::OnGUIDesignChanged );
     QObject::connect ( &Settings, &CClientSettings::MeterStyleChanged, this, &CClientDlg::OnMeterStyleChanged );
     QObject::connect ( &Settings, &CClientSettings::AudioChannelConfigChanged, this, &CClientDlg::OnAudioChannelConfigChanged );
@@ -517,24 +511,28 @@ CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* 
 
     // Send the request to two servers for redundancy if either or both of them
     // has a higher release version number, the reply will trigger the notification.
-
-    if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK1_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
     {
-        Client.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
-    }
+        bool bEnableIPv6 = Settings.CommandlineOptions.enableipv6.IsSet();
 
-    if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK2_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
-    {
-        Client.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
+        if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK1_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
+        {
+            Client.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
+        }
+
+        if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK2_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
+        {
+            Client.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
+        }
     }
 }
 
 void CClientDlg::closeEvent ( QCloseEvent* Event )
 {
     // if connected, terminate connection
-    if ( Settings.bConnectedState )
+    if ( Settings.GetConnectionEnabled() )
     {
-        Client.Stop();
+        Settings.EndConnection();
+        QCoreApplication::processEvents ( QEventLoop::ExcludeUserInputEvents, 100 );
     }
 
     // store window positions
@@ -649,6 +647,13 @@ void CClientDlg::OnConnectDlgAccepted()
     // we process the accepted signal only once after the dialog was initially shown.
     if ( bConnectDlgWasShown )
     {
+        // first check if we are already connected, if this is the case we have to
+        // disconnect the old server first
+        if ( Settings.GetConnectionEnabled() )
+        {
+            Settings.EndConnection();
+        }
+
         // get the address from the connect dialog
         QString strSelectedAddress = ConnectDlg.GetSelectedAddress();
 
@@ -689,15 +694,8 @@ void CClientDlg::OnConnectDlgAccepted()
             }
         }
 
-        // first check if we are already connected, if this is the case we have to
-        // disconnect the old server first
-        if ( Settings.bConnectedState )
-        {
-            Disconnect();
-        }
-
         // initiate connection
-        Connect ( strSelectedAddress, strMixerBoardLabel );
+        Settings.StartConnection ( strSelectedAddress, strMixerBoardLabel );
 
         // reset flag
         bConnectDlgWasShown = false;
@@ -707,9 +705,9 @@ void CClientDlg::OnConnectDlgAccepted()
 void CClientDlg::OnConnectDisconBut()
 {
     // the connect/disconnect button implements a toggle functionality
-    if ( Settings.bConnectedState )
+    if ( Settings.GetConnectionEnabled() )
     {
-        Disconnect();
+        Settings.EndConnection();
         SetMixerBoardDeco ( RS_UNDEFINED );
     }
     else
@@ -812,7 +810,7 @@ void CClientDlg::OnLicenceRequired ( ELicenceType eLicenceType )
         // disconnect from that server.
         if ( !LicenceDlg.exec() )
         {
-            Disconnect();
+            Settings.EndConnection();
         }
 
         // unmute the client output stream if local mute button is not pressed
@@ -897,7 +895,7 @@ void CClientDlg::ShowConnectionSetupDialog()
     // show connect dialog
     bConnectDlgWasShown = true;
     ConnectDlg.show();
-    ConnectDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Connect" ), Client.Settings.GetClientName() ) );
+    ConnectDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Connect" ), Settings.GetClientName() ) );
 
     // make sure dialog is upfront and has focus
     ConnectDlg.raise();
@@ -909,7 +907,7 @@ void CClientDlg::ShowGeneralSettings ( int iTab )
     // open general settings dialog
     emit SendTabChange ( iTab );
     ClientSettingsDlg.show();
-    ClientSettingsDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Settings" ), Client.Settings.GetClientName() ) );
+    ClientSettingsDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Settings" ), Settings.GetClientName() ) );
 
     // make sure dialog is upfront and has focus
     ClientSettingsDlg.raise();
@@ -983,6 +981,12 @@ void CClientDlg::OnLocalMuteStateChanged ( int value )
 
 void CClientDlg::OnTimerSigMet()
 {
+    //### TODO: BEGIN ###//
+    // DetectFeedback is a client duty !!
+    // should also work in headless mode !!!
+    // Levelmeter updates should come from an OnInputLevelChanged slot !
+    //### TODO: END ###//
+
     // show current level
     lbrInputLevelL->SetValue ( Client.GetLevelForMeterdBLeft() );
     lbrInputLevelR->SetValue ( Client.GetLevelForMeterdBRight() );
@@ -990,6 +994,7 @@ void CClientDlg::OnTimerSigMet()
     if ( bDetectFeedback &&
          ( Client.GetLevelForMeterdBLeft() > NUM_STEPS_LED_BAR - 0.5 || Client.GetLevelForMeterdBRight() > NUM_STEPS_LED_BAR - 0.5 ) )
     {
+        //
         // mute locally and mute channel
         chbLocalMute->setCheckState ( Qt::Checked );
         MainMixerBoard->MuteMyChannel();
@@ -1095,9 +1100,9 @@ void CClientDlg::OnSoundDeviceChanged ( QString strError )
     if ( !strError.isEmpty() )
     {
         // the sound device setup has a problem, disconnect any active connection
-        if ( Settings.bConnectedState )
+        if ( Settings.GetConnectionEnabled() )
         {
-            Disconnect();
+            Settings.EndConnection();
         }
 
         // show the error message of the device setup
@@ -1126,65 +1131,48 @@ void CClientDlg::OnCLPingTimeWithNumClientsReceived ( CHostAddress InetAddr, int
     ConnectDlg.SetPingTimeAndNumClientsResult ( InetAddr, iPingTime, iNumClients );
 }
 
-void CClientDlg::Connect ( const QString& strSelectedAddress, const QString& strMixerBoardLabel )
+void CClientDlg::OnConnecting()
 {
-    // set address and check if address is valid
-    if ( Client.SetServerAddr ( strSelectedAddress ) )
-    {
-        // try to start client, if error occurred, do not go in
-        // running state but show error message
-        try
-        {
-            if ( !Client.IsRunning() )
-            {
-                Client.Start();
-            }
-        }
-
-        catch ( const CGenErr& generr )
-        {
-            // show error message and return the function
-            QMessageBox::critical ( this, APP_NAME, generr.GetErrorText(), "Close", nullptr );
-            return;
-        }
-
-        // hide label connect to server
-        lblConnectToServer->hide();
-        lbrInputLevelL->setEnabled ( true );
-        lbrInputLevelR->setEnabled ( true );
-
-        // change connect button text to "disconnect"
-        butConnect->setText ( tr ( "&Disconnect" ) );
-
-        // set server name in audio mixer group box title
-        MainMixerBoard->SetServerName ( strMixerBoardLabel );
-
-        // start timer for level meter bar and ping time measurement
-        TimerSigMet.start ( LEVELMETER_UPDATE_TIME_MS );
-        TimerBuffersLED.start ( BUFFER_LED_UPDATE_TIME_MS );
-        TimerPing.start ( PING_UPDATE_TIME_MS );
-        TimerCheckAudioDeviceOk.start ( CHECK_AUDIO_DEV_OK_TIME_MS ); // is single shot timer
-
-        // audio feedback detection
-        if ( Settings.bEnableFeedbackDetection )
-        {
-            TimerDetectFeedback.start ( DETECT_FEEDBACK_TIME_MS ); // single shot timer
-            bDetectFeedback = true;
-        }
-    }
+    // hide label connect to server
+    lblConnectToServer->hide();
+    // change connect button text to "disconnect"
+    butConnect->setText ( tr ( "&Disconnect" ) );
+    butConnect->setEnabled ( false );
 }
 
-void CClientDlg::Disconnect()
+void CClientDlg::OnDisconnecting() { butConnect->setEnabled ( false ); }
+
+void CClientDlg::OnConnected()
 {
-    // only stop client if currently running, in case we received
-    // the stopped message, the client is already stopped but the
-    // connect/disconnect button and other GUI controls must be
-    // updated
-    if ( Client.IsRunning() )
+    // hide label connect to server
+    lblConnectToServer->hide();
+
+    // change connect button text to "disconnect"
+    butConnect->setText ( tr ( "&Disconnect" ) );
+
+    // set server name in audio mixer group box title
+    MainMixerBoard->SetServerName ( Settings.GetServerName() );
+
+    // start timer for level meter bar and ping time measurement
+    TimerSigMet.start ( LEVELMETER_UPDATE_TIME_MS );
+    TimerBuffersLED.start ( BUFFER_LED_UPDATE_TIME_MS );
+    TimerPing.start ( PING_UPDATE_TIME_MS );
+    TimerCheckAudioDeviceOk.start ( CHECK_AUDIO_DEV_OK_TIME_MS ); // is single shot timer
+
+    // audio feedback detection
+    if ( Settings.bEnableFeedbackDetection )
     {
-        Client.Stop();
+        TimerDetectFeedback.start ( DETECT_FEEDBACK_TIME_MS ); // single shot timer
+        bDetectFeedback = true;
     }
 
+    lbrInputLevelL->setEnabled ( true );
+    lbrInputLevelR->setEnabled ( true );
+    butConnect->setEnabled ( true );
+}
+
+void CClientDlg::OnDisconnected()
+{
     // change connect button text to "connect"
     butConnect->setText ( tr ( "C&onnect" ) );
 
@@ -1226,6 +1214,8 @@ OnTimerStatus();
 
     // clear mixer board (remove all faders)
     MainMixerBoard->HideAll();
+
+    butConnect->setEnabled ( true );
 }
 
 void CClientDlg::UpdateDisplay()

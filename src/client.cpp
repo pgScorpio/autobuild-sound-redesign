@@ -104,8 +104,8 @@ CClient::CClient ( CClientSettings& cSettings ) :
     QObject::connect ( &Channel, &CChannel::JittBufSizeChanged, this, &CClient::OnServerJittBufSizeChanged );
     QObject::connect ( &Channel, &CChannel::ReqChanInfo, this, &CClient::OnChannelInfoChanged );
     QObject::connect ( &Channel, &CChannel::ConClientListMesReceived, this, &CClient::ConClientListMesReceived );
-    QObject::connect ( &Channel, &CChannel::Disconnected, this, &CClient::Disconnected );
-    QObject::connect ( &Channel, &CChannel::NewConnection, this, &CClient::OnNewConnection );
+    QObject::connect ( &Channel, &CChannel::NewConnection, this, &CClient::OnConnected );
+    QObject::connect ( &Channel, &CChannel::Disconnected, this, &CClient::OnDisconnected );
     QObject::connect ( &Channel, &CChannel::ChatTextReceived, this, &CClient::ChatTextReceived );
     QObject::connect ( &Channel, &CChannel::ClientIDReceived, this, &CClient::OnClientIDReceived );
     QObject::connect ( &Channel, &CChannel::MuteStateHasChangedReceived, this, &CClient::MuteStateHasChangedReceived );
@@ -130,6 +130,9 @@ CClient::CClient ( CClientSettings& cSettings ) :
     QObject::connect ( &Sound, &CSound::ControllerInFaderIsSolo, this, &CClient::OnControllerInFaderIsSolo );
     QObject::connect ( &Sound, &CSound::ControllerInFaderIsMute, this, &CClient::OnControllerInFaderIsMute );
     QObject::connect ( &Sound, &CSound::ControllerInMuteMyself, this, &CClient::OnControllerInMuteMyself );
+
+    QObject::connect ( &Settings, &CClientSettings::ConnectRequest, this, &CClient::OnConnectRequest );
+    QObject::connect ( &Settings, &CClientSettings::DisconnectRequest, this, &CClient::OnDisconnectRequest );
 
     QObject::connect ( &Settings, &CClientSettings::AudioDeviceChanged, this, &CClient::OnAudioDeviceChanged );
     QObject::connect ( &Settings, &CClientSettings::InputChannelChanged, this, &CClient::OnInputChannelChanged );
@@ -164,10 +167,9 @@ CClient::CClient ( CClientSettings& cSettings ) :
     Socket.Start();
 
     // do an immediate start if a server address is given
-    if ( !cSettings.CommandlineOptions.connect.Value().isEmpty() )
+    if ( !Settings.CommandlineOptions.connect.Value().isEmpty() )
     {
-        SetServerAddr ( cSettings.CommandlineOptions.connect.Value() );
-        Start();
+        Settings.StartConnection ( Settings.CommandlineOptions.connect.Value(), "" );
     }
 }
 
@@ -263,27 +265,6 @@ void CClient::OnServerJittBufSizeChanged ( int iNewJitBufSize )
         // to the server which is incorrect.
         Settings.SetServerSockBufNumFrames ( iNewJitBufSize );
     }
-}
-
-void CClient::OnNewConnection()
-{
-    // a new connection was successfully initiated, send infos and request
-    // connected clients list
-    Channel.SetRemoteInfo ( Settings.GetChannelInfo() );
-
-    // We have to send a connected clients list request since it can happen
-    // that we just had connected to the server and then disconnected but
-    // the server still thinks that we are connected (the server is still
-    // waiting for the channel time-out). If we now connect again, we would
-    // not get the list because the server does not know about a new connection.
-    // Same problem is with the jitter buffer message.
-    Channel.CreateReqConnClientsList();
-    CreateServerJitterBufferMessage();
-
-    // clang-format off
-// TODO needed for compatibility to old servers >= 3.4.6 and <= 3.5.12
-Channel.CreateReqChannelLevelListMes();
-    // clang-format on
 }
 
 void CClient::CreateServerJitterBufferMessage()
@@ -780,54 +761,103 @@ void CClient::OnClientIDReceived ( int iChanID )
     emit ClientIDReceived ( iChanID );
 }
 
-void CClient::Start()
+void CClient::OnConnectRequest()
 {
-    // init object
-    Init();
-
-    // enable channel
-    Settings.bConnectedState = true;
-    Channel.SetEnable ( true );
-
-    // start audio interface
-    Sound.Start();
-}
-
-void CClient::Stop()
-{
-    // stop audio interface
-    Sound.Stop();
-
-    // disable channel
-    Settings.bConnectedState = false;
-    Channel.SetEnable ( false );
-
-    ConnLessProtocol.CreateCLDisconnection ( Channel.GetAddress() );
-
-    // wait for approx. 100 ms to make sure no audio packet is still in the
-    // network queue causing the channel to be reconnected right after having
-    // received the disconnect message (seems not to gain much, disconnect is
-    // still not working reliably)
-    QTime DieTime = QTime::currentTime().addMSecs ( 100 );
-    while ( QTime::currentTime() < DieTime )
+    if ( !Channel.IsEnabled() )
     {
-        // exclude user input events because if we use AllEvents, it happens
-        // that if the user initiates a connection and disconnection quickly
-        // (e.g. quickly pressing enter five times), the software can get into
-        // an unknown state
-        QCoreApplication::processEvents ( QEventLoop::ExcludeUserInputEvents, 100 );
+        // init object
+        Init();
+
+        // enable channel
+        if ( SetServerAddr ( Settings.GetServerAddress() ) )
+        {
+            Settings.AckConnecting ( true );
+            Channel.SetEnable ( true );
+
+            // start audio interface
+            Sound.Start();
+
+            return;
+        }
     }
 
-    // Send disconnect message to server (Since we disable our protocol
-    // receive mechanism with the next command, we do not evaluate any
-    // respond from the server, therefore we just hope that the message
-    // gets its way to the server, if not, the old behaviour time-out
-    // disconnects the connection anyway).
-    ConnLessProtocol.CreateCLDisconnection ( Channel.GetAddress() );
+    Settings.AckConnecting ( false );
+}
+
+void CClient::OnDisconnectRequest()
+{
+    if ( Channel.IsEnabled() )
+    {
+        Settings.AckDisconnecting ( true );
+
+        // Send disconnect message to server
+        ConnLessProtocol.CreateCLDisconnection ( Channel.GetAddress() );
+
+        // initiate a disconnect in channel
+        Channel.Disconnect();
+
+        // wait some time for disconnection
+        QTime DieTime = QTime::currentTime().addMSecs ( 250 );
+        while ( QTime::currentTime() < DieTime && Settings.GetConnected() )
+        {
+            // exclude user input events because if we use AllEvents, it happens
+            // that if the user initiates a connection and disconnection quickly
+            // (e.g. quickly pressing enter five times), the software can get into
+            // an unknown state
+            QCoreApplication::processEvents ( QEventLoop::ExcludeUserInputEvents, 50 );
+        }
+
+        // Check if we timed out !
+        if ( Settings.GetConnected() )
+        {
+            // Send disconnect message to server again
+            ConnLessProtocol.CreateCLDisconnection ( Channel.GetAddress() );
+            // and force disconnected state
+            Settings.SetConnected ( false );
+        }
+
+        Sound.Stop();
+        Channel.SetEnable ( false );
+    }
+    else
+    {
+        Settings.AckDisconnecting ( false );
+    }
 
     // reset current signal level and LEDs
     bJitterBufferOK = true;
     SignalLevelMeter.Reset();
+}
+
+void CClient::OnConnected()
+{
+    // a new connection was successfully initiated, send infos and request
+    // connected clients list
+    Channel.SetRemoteInfo ( Settings.GetChannelInfo() );
+
+    // We have to send a connected clients list request since it can happen
+    // that we just had connected to the server and then disconnected but
+    // the server still thinks that we are connected (the server is still
+    // waiting for the channel time-out). If we now connect again, we would
+    // not get the list because the server does not know about a new connection.
+    // Same problem is with the jitter buffer message.
+    Channel.CreateReqConnClientsList();
+    CreateServerJitterBufferMessage();
+
+    // clang-format off
+// TODO needed for compatibility to old servers >= 3.4.6 and <= 3.5.12
+Channel.CreateReqChannelLevelListMes();
+    // clang-format on
+
+    Settings.SetConnected ( true );
+}
+
+void CClient::OnDisconnected()
+{
+    Sound.Stop();
+    Channel.SetEnable ( false );
+    Settings.EndConnection();
+    Settings.SetConnected ( false );
 }
 
 void CClient::Init()

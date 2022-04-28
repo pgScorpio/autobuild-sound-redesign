@@ -106,8 +106,6 @@ public:
 
     void ApplySettings();
 
-    void Start();
-    void Stop();
     bool IsRunning() { return Sound.IsRunning(); }
     bool IsCallbackEntered() const { return Sound.IsCallbackEntered(); }
 
@@ -120,9 +118,11 @@ public:
     // settings
     CClientSettings& Settings;
 
-    bool SetServerAddr ( QString strNAddr );
     void SetRemoteChanGain ( const int iId, const float fGain, const bool bIsMyOwnFader );
     void SetRemoteChanPan ( const int iId, const float fPan ) { Channel.SetRemoteChanPan ( iId, fPan ); }
+
+protected:
+    bool SetServerAddr ( QString strNAddr );
 
 public:
     bool GetAndResetbJitterBufferOKFlag();
@@ -302,14 +302,18 @@ protected slots:
 
     void OnReqJittBufSize() { CreateServerJitterBufferMessage(); }
     void OnServerJittBufSizeChanged ( int iNewJitBufSize );
-    void OnNewConnection();
+    void OnConnected();    // From Channel
+    void OnDisconnected(); // From Channel
+
     void OnCLDisconnection ( CHostAddress InetAddr )
     {
         if ( InetAddr == Channel.GetAddress() )
         {
-            emit Disconnected();
+            Settings.EndConnection();
+            Settings.SetConnected ( false );
         }
     }
+
     void OnCLPingReceived ( CHostAddress InetAddr, int iMs );
 
     void OnSendCLProtMessage ( CHostAddress InetAddr, CVector<uint8_t> vecMessage );
@@ -331,6 +335,9 @@ protected slots:
     void OnPrefFrameSizeFactorChanged();
 
 public slots:
+    void OnConnectRequest();
+    void OnDisconnectRequest();
+
     void OnReInitRequest();
     void OnReverbChannelChanged();
     void OnChannelInfoChanged();
@@ -383,7 +390,7 @@ signals:
 
     void CLChannelLevelListReceived ( CHostAddress InetAddr, CVector<uint16_t> vecLevelList );
 
-    void Disconnected();
+    //  void Disconnected();
     void SoundDeviceChanged ( QString strError );
     void ControllerInFaderLevel ( int iChannelIdx, int iValue );
     void ControllerInPanValue ( int iChannelIdx, int iValue );

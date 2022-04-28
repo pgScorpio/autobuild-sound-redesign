@@ -238,7 +238,6 @@ CServer::CServer ( CServerSettings& cSettings ) :
                         cSettings.CommandlineOptions.enableipv6.IsSet(),
                         &ConnLessProtocol ),
     JamController ( this ),
-    bEnableIPv6 ( cSettings.CommandlineOptions.enableipv6.IsSet() ),
     eLicenceType ( cSettings.CommandlineOptions.licence.IsSet() ? LT_CREATIVECOMMONS : LT_NO_LICENCE ),
     bDisconnectAllClientsOnQuit ( cSettings.CommandlineOptions.discononquit.IsSet() ),
     pSignalHandler ( CSignalHandler::getSingletonP() )

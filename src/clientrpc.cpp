@@ -97,7 +97,9 @@ CClientRpc::CClientRpc ( CClient* pClient, CRpcServer* pRpcServer, QObject* pare
     /// @rpc_notification jamulusclient/disconnected
     /// @brief Emitted when the client is disconnected from the server.
     /// @param {object} params - No parameters (empty object).
-    connect ( pClient, &CClient::Disconnected, [=]() { pRpcServer->BroadcastNotification ( "jamulusclient/disconnected", QJsonObject{} ); } );
+    connect ( &pClient->Settings, &CClientSettings::Disconnected, [=]() {
+        pRpcServer->BroadcastNotification ( "jamulusclient/disconnected", QJsonObject{} );
+    } );
 
     /// @rpc_method jamulus/getMode
     /// @brief Returns the current mode, i.e. whether Jamulus is running as a server or client.

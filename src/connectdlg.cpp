@@ -25,18 +25,17 @@
 #include "connectdlg.h"
 
 /* Implementation *************************************************************/
-CConnectDlg::CConnectDlg ( CClientSettings& cSettings, const bool bNewShowCompleteRegList, const bool bNEnableIPv6, QWidget* parent ) :
+CConnectDlg::CConnectDlg ( CClientSettings& cSettings, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Dialog ),
     Settings ( cSettings ),
     strSelectedAddress ( "" ),
     strSelectedServerName ( "" ),
-    bShowCompleteRegList ( bNewShowCompleteRegList ),
+    bShowCompleteRegList ( cSettings.CommandlineOptions.showallservers.IsSet() ),
     bServerListReceived ( false ),
     bReducedServerListReceived ( false ),
     bServerListItemWasChosen ( false ),
     bListFilterWasActive ( false ),
-    bShowAllMusicians ( true ),
-    bEnableIPv6 ( bNEnableIPv6 )
+    bShowAllMusicians ( true )
 {
     setupUi ( this );
 
@@ -747,7 +746,7 @@ void CConnectDlg::OnTimerPing()
         // in the server list item GUI control element
         if ( NetworkUtil().ParseNetworkAddress ( lvwServers->topLevelItem ( iIdx )->data ( 0, Qt::UserRole ).toString(),
                                                  haServerAddress,
-                                                 bEnableIPv6 ) )
+                                                 Settings.CommandlineOptions.enableipv6.IsSet() ) )
         {
             // if address is valid, send ping message using a new thread
             QtConcurrent::run ( this, &CConnectDlg::EmitCLServerListPingMes, haServerAddress );

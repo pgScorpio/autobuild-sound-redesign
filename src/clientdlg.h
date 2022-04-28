@@ -86,19 +86,18 @@ protected:
     void ShowAnalyzerConsole();
     void UpdateAudioFaderSlider();
     void UpdateRevSelection();
-    void Connect ( const QString& strSelectedAddress, const QString& strMixerBoardLabel );
-    void Disconnect();
+    //    void Connect ( const QString& strSelectedAddress, const QString& strMixerBoardLabel );
+    //    void Disconnect();
     void ManageDragNDrop ( QDropEvent* Event, const bool bCheckAccept );
     void SetPingTime ( const int iPingTime, const int iOverallDelayMs, const CMultiColorLED::ELightColor eOverallDelayLEDColor );
 
     CClient&         Client;
     CClientSettings& Settings;
 
-    bool           bConnected;
-    bool           bConnectDlgWasShown;
-    bool           bMIDICtrlUsed;
+    bool bConnectDlgWasShown;
+    bool bMIDICtrlUsed;
+
     bool           bDetectFeedback;
-    bool           bEnableIPv6;
     ERecorderState eLastRecorderState;
     EGUIDesign     eLastDesign;
     QTimer         TimerSigMet;
@@ -222,7 +221,10 @@ public slots:
     void OnOwnFaderFirstChanged() { MainMixerBoard->SetFaderSorting ( Settings.eChannelSortType ); }
 
     void OnConnectDlgAccepted();
-    void OnDisconnected() { Disconnect(); }
+    void OnConnecting();
+    void OnDisconnecting();
+    void OnConnected();
+    void OnDisconnected();
     void OnGUIDesignChanged();
     void OnMeterStyleChanged();
     void OnRecorderStateReceived ( ERecorderState eRecorderState );
