@@ -21,6 +21,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA
  *
 \******************************************************************************/
+
 #ifdef HEADLESS
 #    if defined( Q_OS_IOS )
 #        error HEADLES mode is not valid for IOS
@@ -106,7 +107,13 @@ int main ( int argc, char** argv )
     qt_set_sequence_auto_mnemonic ( true );
 #endif
 
-#ifndef HEADLESS
+#ifdef HEADLESS
+    // note: pApplication will never be used in headless mode,
+    // but if we define it here we can use the same source code
+    // with far less ifdef's
+#    define QApplication QCoreApplication
+#    define pApplication pCoreApplication
+#else
     QApplication* pApplication = NULL;
 #endif
     QCoreApplication* pCoreApplication = NULL;
@@ -131,9 +138,6 @@ int main ( int argc, char** argv )
 
         CCommandline cmdLine ( OnFatalError );
 
-        bool bIsClient = true;
-        bool bUseGUI   = true;
-
         // Help ----------------------------------------------------------------
         if ( cmdLine.GetFlagArgument ( CMDLN_HELP ) || cmdLine.GetFlagArgument ( CMDLN_HELP2 ) )
         {
@@ -146,39 +150,47 @@ int main ( int argc, char** argv )
             throw CInfoExit ( GetVersionAndNameStr ( false ) );
         }
 
-        // Server and Gui mode flags -------------------------------------------
+        // Client/Server/GUI ---------------------------------------------------
+        bool bIsClient = !cmdLine.GetFlagArgument ( CMDLN_SERVER );
+        bool bUseGUI   = !cmdLine.GetFlagArgument ( CMDLN_NOGUI );
+
+        // Check validity Server and GUI mode flags ----------------------------
 
 #if ( defined( SERVER_BUNDLE ) && defined( Q_OS_MACX ) ) || defined( SERVER_ONLY )
         // if we are on MacOS and we are building a server bundle or requested build with serveronly, start Jamulus in server mode
-        bIsClient = false;
-        qInfo() << "- Starting in server mode by default (due to compile time option)";
-        if ( cmdLine.GetFlagArgument ( CMDLN_NOGUI ) )
+        if ( bIsClient )
         {
-            bUseGUI = false;
+            bIsClient = false;
+            qInfo() << "- Starting in server mode by default (due to compile time option)";
+        }
+        if ( !bUseGUI )
+        {
             qInfo() << "- no GUI mode chosen";
         }
 #else
         // IOS is Client with gui only - TODO: maybe a switch in interface to change to server?
 #    if defined( Q_OS_IOS )
-        bIsClient = true; // Client only - TODO: maybe a switch in interface to change to server?
-#    else
-        if ( cmdLine.GetFlagArgument ( CMDLN_SERVER ) )
+        if ( !bIsClient )
         {
-            bIsClient = false;
+            bIsClient = true; // Client only - TODO: maybe a switch in interface to change to server?
+            qInfo() << "- Starting in client mode by default (due to compile time option)";
+        }
+#    else
+        if ( !bIsClient )
+        {
             qInfo() << "- server mode chosen";
         }
 #    endif
 
 #    ifdef HEADLESS
-#        if defined( Q_OS_IOS )
-#            error HEADLESS mode defined for IOS
-#        endif
-        bUseGUI   = false;
-        qInfo() << "- Starting in no GUI mode by default (due to compile time option)";
-#    else
-        if ( cmdLine.GetFlagArgument ( CMDLN_NOGUI ) )
+        if ( bUseGUI )
         {
             bUseGUI = false;
+            qInfo() << "- Starting in headless mode by default (due to compile time option)";
+        }
+#    else
+        if ( !bUseGUI )
+        {
             qInfo() << "- no GUI mode chosen";
         }
 
@@ -187,6 +199,7 @@ int main ( int argc, char** argv )
 #endif
 
         // Final checks on bIsClient and bUseGUI -------------------------------
+        // note: These should be set correctly already. If not, that's a coding error !
 
 #ifdef SERVER_ONLY
         if ( bIsClient )
@@ -204,7 +217,6 @@ int main ( int argc, char** argv )
 
         // Application setup ---------------------------------------------------
 
-#ifndef HEADLESS
         if ( bUseGUI )
         {
             pApplication = new QApplication ( argc, argv );
@@ -213,9 +225,6 @@ int main ( int argc, char** argv )
         {
             pCoreApplication = new QCoreApplication ( argc, argv );
         }
-#else
-        pCoreApplication = new QCoreApplication ( argc, argv );
-#endif
 
 #ifdef ANDROID
         // special Android coded needed for record audio permission handling
@@ -235,7 +244,7 @@ int main ( int argc, char** argv )
 #ifdef _WIN32
         // set application priority class -> high priority
         SetPriorityClass ( GetCurrentProcess(), HIGH_PRIORITY_CLASS );
-#    ifndef HEADLESS
+
         // For accessible support we need to add a plugin to qt. The plugin has to
         // be located in the install directory of the software by the installer.
         // Here, we set the path to our application path.
@@ -249,15 +258,6 @@ int main ( int argc, char** argv )
             QDir ApplDir ( QCoreApplication::applicationDirPath() );
             pCoreApplication->addLibraryPath ( QString ( ApplDir.absolutePath() ) );
         }
-#    else
-        // For accessible support we need to add a plugin to qt. The plugin has to
-        // be located in the install directory of the software by the installer.
-        // Here, we set the path to our application path.
-        {
-            QDir ApplDir ( QCoreApplication::applicationDirPath() );
-            pCoreApplication->addLibraryPath ( QString ( ApplDir.absolutePath() ) );
-        }
-#    endif
 #endif
 
 #if defined( Q_OS_MACX )
@@ -317,11 +317,8 @@ int main ( int argc, char** argv )
             qWarning() << "- JSON-RPC: This interface is experimental and is subject to breaking changes even on patch versions "
                           "(not subject to semantic versioning) during the initial phase.";
 
-#ifndef HEADLESS
-            pRpcServer = new CRpcServer ( bUseGUI ? pApplication : pCoreApplication, commandlineOptions.jsonrpcport.Value(), strJsonRpcSecret );
-#else
             pRpcServer = new CRpcServer ( pCoreApplication, commandlineOptions.jsonrpcport.Value(), strJsonRpcSecret );
-#endif
+
             if ( !pRpcServer->Start() )
             {
                 throw CErrorExit ( qUtf8Printable ( QString ( "- JSON-RPC: Server failed to start. Exiting." ) ) );
@@ -344,11 +341,7 @@ int main ( int argc, char** argv )
             // load translation
             if ( bUseGUI && !commandlineOptions.notranslation.IsSet() )
             {
-#    ifndef HEADLESS
                 CLocale::LoadTranslation ( Settings.strLanguage, pApplication );
-#    else
-                CLocale::LoadTranslation ( Settings.strLanguage, pCoreApplication );
-#    endif
                 CInstPictures::UpdateTableOnLanguageChange();
             }
 
@@ -419,11 +412,7 @@ int main ( int argc, char** argv )
             // load translation
             if ( bUseGUI && !commandlineOptions.notranslation.IsSet() )
             {
-#ifndef HEADLESS
-                CLocale::LoadTranslation ( Settings.strLanguage, pApplication );
-#else
                 CLocale::LoadTranslation ( Settings.strLanguage, pCoreApplication );
-#endif
                 CInstPictures::UpdateTableOnLanguageChange();
             }
 
@@ -525,6 +514,8 @@ int main ( int argc, char** argv )
     }
 
 #ifndef HEADLESS
+    // note: pApplication is the same pointer as pCoreApplication in headless mode!
+    //       so pApplication is already deleted!
     if ( pApplication )
     {
         delete pApplication;
