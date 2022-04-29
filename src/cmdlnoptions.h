@@ -84,15 +84,20 @@ public:
         eDestType ( destType ),
         strShortName ( shortName ),
         strLongName ( longName ),
-        pDepricated ( NULL )
+        bDepricated ( false ),
+        strDepricated(),
+        pReplacedBy ( NULL )
     {}
 
-    inline bool IsDepricated() { return ( pDepricated != NULL ); };
+    inline bool           IsDepricated() const { return bDepricated; };
+    inline const QString& GetDepricatedMsg() const { return strDepricated; };
 
 protected:
     friend class CCommandlineOptions;
 
-    CCmdlnOptBase*          pDepricated;
+    bool                    bDepricated;
+    QString                 strDepricated;
+    CCmdlnOptBase*          pReplacedBy;
     bool                    bSet;
     const ECmdlnOptValType  eValueType;
     const ECmdlnOptDestType eDestType;
@@ -113,20 +118,37 @@ protected:
     friend class CClientSettings;
     friend class CServerSettings;
 
+    void SetIsDepricated ( const QString& strDep, CCmdlnOptBase* pReplacement = NULL )
+    {
+        strDepricated = strDep;
+        pReplacedBy   = pReplacement;
+        bDepricated   = true;
+    }
+
     void Set()
     {
-        bSet = true;
-        if ( pDepricated )
+        if ( bDepricated )
         {
-            pDepricated->bSet = true;
+            if ( pReplacedBy )
+            {
+                // if pReplacedBy is set *pReplacedBy should already be set instead !
+                bSet = !pReplacedBy->bSet;
+            }
+
+            if ( !strDepricated.isEmpty() )
+            {
+                qWarning() << qUtf8Printable ( strDepricated );
+            }
+        }
+        else
+        {
+            bSet = true;
         }
     }
 
     void Unset() { bSet = false; }
 
 public:
-    inline void SetDepricated ( CCmdlnOptBase& dep ) { pDepricated = &dep; }
-
     inline bool IsSet() const { return bSet; }
 
     virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue ) = 0;
@@ -143,12 +165,13 @@ public:
         CCmdlnOptBase ( ECmdlnOptValType::Flag, destType, shortName, longName )
     {}
 
-    inline CCmndlnFlagOption& Depricated() { return pDepricated ? *dynamic_cast<CCmndlnFlagOption*> ( pDepricated ) : *this; };
-
 protected:
     friend class CCommandlineOptions;
 
-    inline void SetDepricated ( CCmndlnFlagOption& dep ) { pDepricated = &dep; }
+    inline void SetDepricated ( const QString& strDep, CCmndlnFlagOption* pReplacement = NULL )
+    {
+        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
+    }
 
 public:
     virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue ) override;
@@ -179,24 +202,26 @@ public:
 
     inline const QString& Value() const { return strValue; }
 
-    inline CCmndlnStringOption& Depricated() { return pDepricated ? *dynamic_cast<CCmndlnStringOption*> ( pDepricated ) : *this; };
-
 protected:
     friend class CCommandlineOptions;
 
     int     iMaxLen;
     QString strValue;
 
-    inline void SetDepricated ( CCmndlnStringOption& dep ) { pDepricated = &dep; }
+    inline void SetDepricated ( const QString& strDep, CCmndlnStringOption* pReplacement = NULL )
+    {
+        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
+    }
 
     bool Set ( QString val )
     {
         bool res = true;
 
-        if ( pDepricated )
+        if ( pReplacedBy )
         {
-            res      = static_cast<CCmndlnStringOption*> ( pDepricated )->Set ( val );
-            strValue = static_cast<CCmndlnStringOption*> ( pDepricated )->strValue;
+            // Set replacement instead...
+            res      = static_cast<CCmndlnStringOption*> ( pReplacedBy )->Set ( val );
+            strValue = static_cast<CCmndlnStringOption*> ( pReplacedBy )->strValue;
         }
         else
         {
@@ -209,7 +234,7 @@ protected:
             }
         }
 
-        bSet = true;
+        CCmdlnOptBase::Set();
 
         return res;
     }
@@ -239,8 +264,6 @@ public:
 
     inline double Value() { return dValue; };
 
-    inline CCmndlnDoubleOption& Depricated() { return pDepricated ? *dynamic_cast<CCmndlnDoubleOption*> ( pDepricated ) : *this; };
-
 protected:
     friend class CCommandlineOptions;
 
@@ -248,16 +271,20 @@ protected:
     double dMin;
     double dMax;
 
-    inline void SetDepricated ( CCmndlnDoubleOption& dep ) { pDepricated = &dep; }
+    inline void SetDepricated ( const QString& strDep, CCmndlnDoubleOption* pReplacement = NULL )
+    {
+        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
+    }
 
     bool Set ( double val )
     {
         bool res = true;
 
-        if ( pDepricated )
+        if ( pReplacedBy )
         {
-            res    = static_cast<CCmndlnDoubleOption*> ( pDepricated )->Set ( val );
-            dValue = static_cast<CCmndlnDoubleOption*> ( pDepricated )->dValue;
+            // Set replacement instead...
+            res    = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->Set ( val );
+            dValue = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->dValue;
         }
         else
         {
@@ -276,7 +303,7 @@ protected:
             }
         }
 
-        bSet = true;
+        CCmdlnOptBase::Set();
 
         return res;
     }
@@ -306,8 +333,6 @@ public:
 
     inline unsigned int Value() { return iValue; };
 
-    inline CCmndlnIntOption& Depricated() { return pDepricated ? *dynamic_cast<CCmndlnIntOption*> ( pDepricated ) : *this; };
-
 protected:
     friend class CCommandlineOptions;
 
@@ -315,16 +340,20 @@ protected:
     int iMin;
     int iMax;
 
-    inline void SetDepricated ( CCmndlnIntOption& dep ) { pDepricated = &dep; }
+    inline void SetDepricated ( const QString& strDep, CCmndlnIntOption* pReplacement = NULL )
+    {
+        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
+    }
 
     bool Set ( int val )
     {
         bool res = true;
 
-        if ( pDepricated )
+        if ( pReplacedBy )
         {
-            res    = static_cast<CCmndlnIntOption*> ( pDepricated )->Set ( val );
-            iValue = static_cast<CCmndlnIntOption*> ( pDepricated )->iValue;
+            // Set replacement instead...
+            res    = static_cast<CCmndlnIntOption*> ( pReplacedBy )->Set ( val );
+            iValue = static_cast<CCmndlnIntOption*> ( pReplacedBy )->iValue;
         }
         else
         {
@@ -343,7 +372,7 @@ protected:
             }
         }
 
-        bSet = true;
+        CCmdlnOptBase::Set();
 
         return res;
     }
@@ -373,8 +402,6 @@ public:
 
     inline unsigned int Value() { return uiValue; };
 
-    inline CCmndlnUIntOption& Depricated() { return pDepricated ? *dynamic_cast<CCmndlnUIntOption*> ( pDepricated ) : *this; };
-
 protected:
     friend class CCommandlineOptions;
 
@@ -382,21 +409,24 @@ protected:
     unsigned int uiMin;
     unsigned int uiMax;
 
-    inline void SetDepricated ( CCmndlnUIntOption& dep ) { pDepricated = &dep; }
+    inline void SetDepricated ( const QString& strDep, CCmndlnUIntOption* pReplacement = NULL )
+    {
+        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
+    }
 
     bool Set ( unsigned int val )
     {
         bool res = true;
 
-        if ( pDepricated )
+        if ( pReplacedBy )
         {
-            res     = static_cast<CCmndlnUIntOption*> ( pDepricated )->Set ( val );
-            uiValue = static_cast<CCmndlnUIntOption*> ( pDepricated )->uiValue;
+            // Set replacement instead...
+            res     = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->Set ( val );
+            uiValue = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->uiValue;
         }
         else
         {
             uiValue = val;
-            bSet    = true;
 
             if ( uiValue < uiMin )
             {
@@ -410,7 +440,7 @@ protected:
             }
         }
 
-        bSet = true;
+        CCmdlnOptBase::Set();
 
         return res;
     }

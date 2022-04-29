@@ -68,12 +68,19 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
     {
     case ECmdlnOptValType::None:
     case ECmdlnOptValType::Flag:
+        strValue.clear();
         res = ECmdlnOptCheckResult::OkFlag;
         break;
 
     case ECmdlnOptValType::String:
-        if ( strValue.isEmpty() || ( strValue[0] == "-" ) ) // One should use "" if string starts with - !
+        if ( strValue.isEmpty() )
         {
+            res = ECmdlnOptCheckResult::NoValue;
+        }
+        else if ( strValue[0] == "-" )
+        {
+            // One should use "" if string starts with - !
+            strValue.clear();
             res = ECmdlnOptCheckResult::NoValue;
         }
         else
@@ -301,7 +308,7 @@ CCommandlineOptions::CCommandlineOptions() :
     // ignore invalid options after this option
     special ( ECmdlnOptDestType::Common, CMDLN_SPECIAL )
 {
-    centralserver.SetDepricated ( directoryserver );
+    centralserver.SetDepricated ( "--centralserver is depricated, please use --directoryserver instead", &directoryserver );
 }
 
 bool CCommandlineOptions::check ( ECmdlnOptDestType eDestType,
@@ -346,9 +353,9 @@ bool CCommandlineOptions::check ( ECmdlnOptDestType eDestType,
     else if ( depricatedParams.size() )
     {
         QString message;
-        message = TR ( "Depricated option(s) on commandline" );
-        CMessages::ShowInfo ( message + ":" + depricatedParams + ", " +
-                              TR ( "run %1 with %2 option for the correct options." ).arg ( APP_NAME, "--help" ) );
+        message = htmlBold ( TR ( "Depricated option(s) on the commandline:" ) ) + htmlNewLine();
+        CMessages::ShowWarning ( message + depricatedParams + htmlNewLine() + htmlNewLine() +
+                                 TR ( "run %1 %2 to see the valid options." ).arg ( APP_NAME, "--help" ) );
     }
 
     return ok;
@@ -452,13 +459,17 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** 
                 {
                     depricatedParams += " " + strParam;
                 }
+
                 break;
             }
         }
 
-        if ( !optionFound && !special.IsSet() )
+        if ( !optionFound )
         {
-            unknowOptions += " " + strParam;
+            if ( !special.IsSet() )
+            {
+                unknowOptions += " " + strParam;
+            }
         }
     }
 
@@ -469,23 +480,23 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** 
         if ( bIsClient && server.IsSet() )
         {
             server.Unset();
-            qWarning() << message.arg ( "Client" );
+            qWarning() << qUtf8Printable ( message.arg ( "Client" ) );
         }
         else if ( !bIsClient && !server.IsSet() )
         {
             server.Set();
-            qWarning() << message.arg ( "Server" );
+            qWarning() << qUtf8Printable ( message.arg ( "Server" ) );
         }
 
         if ( bUseGUI && nogui.IsSet() )
         {
             nogui.Unset();
-            qWarning() << message.arg ( "GUI" );
+            qWarning() << qUtf8Printable ( message.arg ( "GUI" ) );
         }
         else if ( !bUseGUI && !nogui.IsSet() )
         {
             nogui.Set();
-            qWarning() << message.arg ( "HEADLESS" );
+            qWarning() << qUtf8Printable ( message.arg ( "HEADLESS" ) );
         }
 
         return true;
