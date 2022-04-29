@@ -108,6 +108,11 @@ protected:
                                    QString&          strValue,
                                    double&           dblValue );
 
+protected:
+    friend class CSettings;
+    friend class CClientSettings;
+    friend class CServerSettings;
+
     void Set()
     {
         bSet = true;

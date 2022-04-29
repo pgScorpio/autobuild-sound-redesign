@@ -109,12 +109,36 @@ protected:
     void PutIniSetting ( QDomDocument& xmlFile, const QString& sSection, const QString& sKey, const QString& sValue = "" );
 
 protected:
-    virtual void ReadCommandLineOptions()                                   = 0;
     virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument )        = 0;
     virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) = 0;
 };
 
 #ifndef SERVER_ONLY
+class CAudioDeviceSettings
+{
+public:
+    CAudioDeviceSettings() :
+        strName ( "" ),
+        iLeftInputChannel ( 0 ),
+        iRightInputChannel ( 1 ),
+        iLeftOutputChannel ( 0 ),
+        iRightOutputChannel ( 1 ),
+        iPrefFrameSizeFactor ( 128 ),
+        iInputBoost ( 1 )
+    {}
+
+public:
+    QString strName;
+    int     iLeftInputChannel;
+    int     iRightInputChannel;
+    int     iLeftOutputChannel;
+    int     iRightOutputChannel;
+    int     iPrefFrameSizeFactor;
+    int     iInputBoost;
+    // int  iLeftInputBoost;
+    // int  iRightInputBoost;
+};
+
 class CClientSettings : public CSettings
 {
     Q_OBJECT
@@ -122,6 +146,7 @@ class CClientSettings : public CSettings
 public:
     CClientSettings ( CCommandlineOptions& cmdlnOptions ) :
         CSettings ( cmdlnOptions ),
+        cAudioDevice(),
         vecStoredFaderTags ( MAX_NUM_STORED_FADER_SETTINGS, "" ),
         vecStoredFaderLevels ( MAX_NUM_STORED_FADER_SETTINGS, AUD_MIX_FADER_MAX ),
         vecStoredPanValues ( MAX_NUM_STORED_FADER_SETTINGS, AUD_MIX_PAN_MAX / 2 ),
@@ -130,7 +155,6 @@ public:
         vecStoredFaderGroupID ( MAX_NUM_STORED_FADER_SETTINGS, INVALID_INDEX ),
         vstrIPAddress ( MAX_NUM_SERVER_ADDR_ITEMS, "" ),
         iNewClientFaderLevel ( 100 ),
-        iInputBoost ( 1 ),
         iSettingsTab ( SETTING_TAB_AUDIONET ),
         bConnectDlgShowAllMusicians ( true ),
         eChannelSortType ( ST_NO_SORT ),
@@ -172,11 +196,7 @@ public:
         // SelectSoundCard ( strCurrentAudioDevice );
     }
 
-    ~CClientSettings()
-    {
-        // StoreSoundCard( CurrentSoundCard );
-        Save();
-    }
+    ~CClientSettings() { Save(); }
 
 public:                        // Values without notifiers: (these don't need direct action on change, they are used 'on the fly')
     int iCustomDirectoryIndex; // index of selected custom directory server
@@ -225,15 +245,7 @@ protected: // values with notifiers: use Get/Set functions !
     // Which will store sndCardSettings in the matching SoundCard[x], or add a new device to
     // SoundCard[] when no SoundCard[x] with sndCardSettings.strName already exists.
     //
-    QString strCurrentAudioDevice;
-    int     iSndCrdLeftInputChannel;
-    int     iSndCrdRightInputChannel;
-    int     iSndCrdLeftOutputChannel;
-    int     iSndCrdRightOutputChannel;
-    int     iSndCrdPrefFrameSizeFactor;
-    int     iInputBoost;
-    // int  iSndCrdLeftInputBoost;
-    // int  iSndCrdRightInputBoost;
+    CAudioDeviceSettings cAudioDevice;
     //### TODO: END ###//
 
     EGUIDesign  eGUIDesign;
@@ -323,14 +335,14 @@ public:
         }
     }
 
-    inline QString GetAudioDevice() const { return strCurrentAudioDevice; }
+    inline QString GetAudioDevice() const { return cAudioDevice.strName; }
     bool           SetAudioDevice ( QString deviceName, bool bReinit = false )
     {
-        if ( bReinit || ( strCurrentAudioDevice != deviceName ) )
+        if ( bReinit || ( cAudioDevice.strName != deviceName ) )
         {
             //### TODO: BEGIN ###//
-            // get other audio device settings for this device too!
-            strCurrentAudioDevice = deviceName;
+            // get complete cAudioDevice for this device!
+            cAudioDevice.strName = deviceName;
             //### TODO: END ###//
             emit AudioDeviceChanged();
 
@@ -340,13 +352,13 @@ public:
         return false;
     }
 
-    inline int GetInputBoost( /* bool bRight */ ) const { return iInputBoost; }
+    inline int GetInputBoost( /* bool bRight */ ) const { return cAudioDevice.iInputBoost; }
 
     bool SetInputBoost ( /* bool bRight */ int boost )
     {
-        if ( iInputBoost != boost )
+        if ( cAudioDevice.iInputBoost != boost )
         {
-            iInputBoost = boost;
+            cAudioDevice.iInputBoost = boost;
             emit InputBoostChanged();
 
             return true;
@@ -359,11 +371,11 @@ public:
     {
         if ( bRight )
         {
-            return iSndCrdRightInputChannel;
+            return cAudioDevice.iRightInputChannel;
         }
         else
         {
-            return iSndCrdLeftInputChannel;
+            return cAudioDevice.iLeftInputChannel;
         }
     }
 
@@ -371,9 +383,9 @@ public:
     {
         if ( bRight )
         {
-            if ( iSndCrdRightInputChannel != chNum )
+            if ( cAudioDevice.iRightInputChannel != chNum )
             {
-                iSndCrdRightInputChannel = chNum;
+                cAudioDevice.iRightInputChannel = chNum;
                 emit InputChannelChanged();
 
                 return true;
@@ -381,9 +393,9 @@ public:
         }
         else
         {
-            if ( iSndCrdLeftInputChannel != chNum )
+            if ( cAudioDevice.iLeftInputChannel != chNum )
             {
-                iSndCrdLeftInputChannel = chNum;
+                cAudioDevice.iLeftInputChannel = chNum;
                 emit InputChannelChanged();
 
                 return true;
@@ -397,11 +409,11 @@ public:
     {
         if ( bRight )
         {
-            return iSndCrdRightOutputChannel;
+            return cAudioDevice.iRightOutputChannel;
         }
         else
         {
-            return iSndCrdLeftOutputChannel;
+            return cAudioDevice.iLeftOutputChannel;
         }
     }
 
@@ -409,9 +421,9 @@ public:
     {
         if ( bRight )
         {
-            if ( iSndCrdRightOutputChannel != chNum )
+            if ( cAudioDevice.iRightOutputChannel != chNum )
             {
-                iSndCrdRightOutputChannel = chNum;
+                cAudioDevice.iRightOutputChannel = chNum;
                 emit OutputChannelChanged();
 
                 return true;
@@ -419,9 +431,9 @@ public:
         }
         else
         {
-            if ( iSndCrdLeftOutputChannel != chNum )
+            if ( cAudioDevice.iLeftOutputChannel != chNum )
             {
-                iSndCrdLeftOutputChannel = chNum;
+                cAudioDevice.iLeftOutputChannel = chNum;
                 emit OutputChannelChanged();
 
                 return true;
@@ -431,12 +443,12 @@ public:
         return false;
     }
 
-    inline int GetSndCrdPrefFrameSizeFactor() const { return iSndCrdPrefFrameSizeFactor; }
+    inline int GetSndCrdPrefFrameSizeFactor() const { return cAudioDevice.iPrefFrameSizeFactor; }
     bool       SetSndCrdPrefFrameSizeFactor ( int iSize )
     {
-        if ( iSndCrdPrefFrameSizeFactor != iSize )
+        if ( cAudioDevice.iPrefFrameSizeFactor != iSize )
         {
-            iSndCrdPrefFrameSizeFactor = iSize;
+            cAudioDevice.iPrefFrameSizeFactor = iSize;
             emit PrefFrameSizeFactorChanged();
 
             return true;
@@ -712,8 +724,8 @@ public:
         void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
     */
 
-protected: // Unsaved settings:
-    QString strClientName;
+protected:                 // Unsaved settings:
+    QString strClientName; // Though this one actually should be saved, especially when --inifile is given !
 
 public: // Unsaved settings, needed by CClientSettingsDlg
     //### TODO: BEGIN ###//
@@ -747,6 +759,10 @@ protected:
 
 public:
     // Status values
+
+    //### TODO: BEGIN ###//
+    // Use a separate Status class for Client and Server
+    // These classes should provide control and status values like connection status, ping time, overall delay, etc...
 
     inline const QString GetServerAddress() const { return strServerAddress; }
     inline const QString GetServerName() const { return strServerName; }
@@ -833,12 +849,13 @@ public:
         }
     }
 
+    //### TODO: END ###//
+
 protected:
     void ReadFaderSettingsFromXML ( const QDomDocument& IniXMLDocument );
     void WriteFaderSettingsToXML ( QDomDocument& IniXMLDocument );
 
 protected:
-    virtual void ReadCommandLineOptions() override;
     virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) override;
     virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument ) override;
 };
@@ -849,9 +866,11 @@ class CServerSettings : public CSettings
 public:
     CServerSettings ( CCommandlineOptions& cmdlnOptions ) :
         CSettings ( cmdlnOptions ),
+        strServerName ( "" ),
+        strServerCity ( "" ),
         eServerCountry ( QLocale::Country::UnitedStates ),
         bEnableRecording ( false ),
-        strWelcomeMessage(),
+        strWelcomeMessage ( "" ),
         strRecordingDir(),
         strDirectoryAddress(),
         eDirectoryType ( AT_NONE ),
@@ -865,9 +884,7 @@ public:
 
     ~CServerSettings() { Save(); }
 
-public:
-    //### TODO: BEGIN ###//
-    // CHECK! these new values need to be initialised in constructor and read by CClient
+protected:
     QString          strServerName;
     QString          strServerCity;
     QLocale::Country eServerCountry;
@@ -879,24 +896,130 @@ public:
     QString          strServerListFileName;
     bool             bAutoRunMinimized;
     bool             bDelayPan;
+
+public:
+    const QString    GetServerName() const { return strServerName; }
+    const QString    GetServerCity() const { return strServerCity; }
+    QLocale::Country GetServerCountry() const { return eServerCountry; }
+
+    bool GetEnableRecording() const { return CommandlineOptions.norecord.IsSet() ? false : bEnableRecording; }
+    void SetEnableRecording ( bool newEnableRecording )
+    {
+        CommandlineOptions.norecord.Unset();
+
+        if ( bEnableRecording != newEnableRecording )
+        {
+            bEnableRecording = newEnableRecording;
+            // todo: emit Changed
+        }
+    }
+
+    const QString GetWelcomeMessage() const
+    {
+        return CommandlineOptions.welcomemessage.IsSet() ? CommandlineOptions.welcomemessage.Value() : strWelcomeMessage;
+    }
+    void SetWelcomeMessage ( const QString& newWelcomeMessage )
+    {
+        CommandlineOptions.welcomemessage.Unset();
+
+        if ( strWelcomeMessage != newWelcomeMessage )
+        {
+            strWelcomeMessage = newWelcomeMessage;
+            // todo: emit Changed
+        }
+    }
+
+    const QString GetRecordingDir() const { return CommandlineOptions.recording.IsSet() ? CommandlineOptions.recording.Value() : strRecordingDir; }
+    void          SetRecordingDir ( const QString& newRecordingDir )
+    {
+        CommandlineOptions.recording.Unset();
+
+        if ( strRecordingDir != newRecordingDir )
+        {
+            strRecordingDir != newRecordingDir;
+            // todo: emit Changed
+        }
+    }
+
+    const QString GetDirectoryAddress() const
+    {
+        return CommandlineOptions.directoryserver.IsSet() ? CommandlineOptions.directoryserver.Value() : strDirectoryAddress;
+    }
+
+    void SetDirectoryAddress ( const QString& strNewAddress )
+    {
+        CommandlineOptions.directoryserver.Unset();
+
+        if ( strDirectoryAddress != strNewAddress )
+        {
+            strDirectoryAddress = strNewAddress;
+            // todo: emit Changed
+        }
+    }
+
+    EDirectoryType GetDirectoryType() const { return eDirectoryType; }
+    void           SetDirectoryType ( EDirectoryType newDirectoryType )
+    {
+        if ( eDirectoryType != newDirectoryType )
+        {
+            eDirectoryType = newDirectoryType;
+            // todo: emit Changed
+        }
+    }
+
+    const QString GetServerListFileName() const
+    {
+        return CommandlineOptions.directoryfile.IsSet() ? CommandlineOptions.directoryfile.Value() : strServerListFileName;
+    }
+    void SetServerListFileName ( const QString& strNewServerListFileName )
+    {
+        CommandlineOptions.directoryfile.Unset();
+
+        if ( strServerListFileName != strNewServerListFileName )
+        {
+            strServerListFileName = strNewServerListFileName;
+            // todo: emit Changed
+        }
+    }
+    bool GetAutoRunMinimized() const { return CommandlineOptions.startminimized.IsSet() ? true : bAutoRunMinimized; }
+    void SetAutoRunMinimized ( bool newAutoRunMinimized )
+    {
+        CommandlineOptions.startminimized.Unset();
+
+        if ( bAutoRunMinimized != newAutoRunMinimized )
+        {
+            bAutoRunMinimized = newAutoRunMinimized;
+            // todo: emit Changed
+        }
+    }
+
+    bool GetDelayPan() const { return CommandlineOptions.delaypan.IsSet() ? true : bDelayPan; }
+    void SetDelayPan ( bool newDelayPan )
+    {
+        CommandlineOptions.delaypan.Unset();
+
+        if ( bDelayPan != newDelayPan )
+        {
+            bDelayPan = newDelayPan;
+            // todo: emit Changed
+        }
+    }
     //### TODO: END ###//
 
 public:
-    inline const QString& GetServerName() const { return strServerName; }
-    inline const QString  GetWindowTitle()
+    inline const QString GetWindowTitle()
     {
         if ( GetServerName().isEmpty() )
         {
-            return QString ( APP_NAME );
+            return QString ( APP_NAME ) + "Server";
         }
         else
         {
-            return QString ( APP_NAME ) + " - " + GetServerName();
+            return QString ( APP_NAME ) + "Server - " + GetServerName();
         }
     }
 
 protected:
-    virtual void ReadCommandLineOptions() override;
     virtual void ReadSettingsFromXML ( const QDomDocument& IniXMLDocument ) override;
     virtual void WriteSettingsToXML ( QDomDocument& IniXMLDocument ) override;
 };

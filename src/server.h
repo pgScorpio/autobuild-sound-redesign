@@ -195,23 +195,23 @@ public:
 
     bool    GetRecorderInitialised() { return JamController.GetRecorderInitialised(); }
     void    SetEnableRecording ( bool bNewEnableRecording );
-    bool    GetDisableRecording() { return !Settings.bEnableRecording; }
+    bool    GetDisableRecording() { return !Settings.GetEnableRecording(); }
     QString GetRecorderErrMsg() { return JamController.GetRecorderErrMsg(); }
     bool    GetRecordingEnabled() { return JamController.GetRecordingEnabled(); }
     void    RequestNewRecording() { JamController.RequestNewRecording(); }
     void    SetRecordingDir ( QString newRecordingDir )
     {
-        JamController.SetRecordingDir ( newRecordingDir, iServerFrameSizeSamples, !Settings.bEnableRecording );
+        JamController.SetRecordingDir ( newRecordingDir, iServerFrameSizeSamples, !Settings.GetEnableRecording() );
     }
     QString GetRecordingDir() { return JamController.GetRecordingDir(); }
 
     void    SetWelcomeMessage ( const QString& strNWelcMess );
-    QString GetWelcomeMessage() { return Settings.strWelcomeMessage; }
+    QString GetWelcomeMessage() { return Settings.GetWelcomeMessage(); }
 
     void SetDirectoryAddress ( const QString& sNDirectoryAddress )
     {
         ServerListManager.SetDirectoryAddress ( sNDirectoryAddress );
-        Settings.strDirectoryAddress = sNDirectoryAddress;
+        Settings.SetDirectoryAddress ( sNDirectoryAddress );
     }
     QString GetDirectoryAddress() { return ServerListManager.GetDirectoryAddress(); }
 
@@ -220,18 +220,18 @@ public:
     {
         if ( ServerListManager.SetServerListFileName ( strFilename ) )
         {
-            Settings.strServerListFileName = strFilename;
+            Settings.SetServerListFileName ( strFilename );
             return true;
         }
 
         return false;
     }
 
-    void SetAutoRunMinimized ( const bool NAuRuMin ) { Settings.bAutoRunMinimized = NAuRuMin; }
-    bool GetAutoRunMinimized() { return Settings.bAutoRunMinimized; }
+    void SetAutoRunMinimized ( const bool NAuRuMin ) { Settings.SetAutoRunMinimized ( NAuRuMin ); }
+    bool GetAutoRunMinimized() { return Settings.GetAutoRunMinimized(); }
 
-    void SetEnableDelayPanning ( bool bDelayPanningOn ) { Settings.bDelayPan = bDelayPanningOn; }
-    bool IsDelayPanningEnabled() { return Settings.bDelayPan; }
+    void SetEnableDelayPanning ( bool bDelayPanningOn ) { Settings.SetDelayPan ( bDelayPanningOn ); }
+    bool IsDelayPanningEnabled() { return Settings.GetDelayPan(); }
 
 protected:
     // access functions for actual channels

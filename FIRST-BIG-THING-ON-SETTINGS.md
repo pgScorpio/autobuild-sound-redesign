@@ -33,14 +33,21 @@ At startup we now can:
 Notes of attention:
 
 How to handle overriding commandline parameters?
-    The global commandline class would be needed...
     Do we actually want to save the commandline values to the inifile or preserve the original values?
+    I suggest:
+        The global CCommandlineOption class would be needed...
+        Settings should have GetXxx/SetXxx functions (actual values should be protected.)
+        GetXxx returns Xxx Commandline value if given, otherwise it returns the inifile value
+        SetXxx sets inifile value and resets any Xxx commandline parameter. 
+        SetXxx should also emit a XxxChanged signal on change of a value.
 
 
 Future improvements:
+    add a --store commandline parameter to store all given commandline options in the inifile, 
+    so on the next run we only have to give the inifile parameter. (and -s if starting in server mode)
 
 main should only read the --server and --nogui commandline parameters
-all others should be read by a CCommandlineOptions class.
+all others should be read by a CCommandlineOptions class that will be passed to Settings.
 
 Better solution for notifiers:
     Get/Set functions in Settings class and the Set functions should emit the "Changed" notifier from Settings.

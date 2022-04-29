@@ -27,8 +27,6 @@
 /* Implementation *************************************************************/
 void CSettings::Load()
 {
-    ReadCommandLineOptions();
-
     // prepare file name for loading initialization data from XML file and read
     // data from file if possible
     QDomDocument IniXMLDocument;
@@ -228,13 +226,6 @@ void CClientSettings::SaveFaderSettings ( const QString& strCurFileName )
     WriteToFile ( strCurFileName, IniXMLDocument );
 }
 
-void CClientSettings::ReadCommandLineOptions()
-{
-    //### TODO: BEGIN ###//
-    // Implement this one as soon as "Global commandline" gets implemented.
-    //### TODO: END ###//
-}
-
 void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
 {
     int  iIdx;
@@ -251,12 +242,6 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
     if ( GetNumericIniSet ( IniXMLDocument, "client", "newclientlevel", 0, 100, iValue ) )
     {
         iNewClientFaderLevel = iValue;
-    }
-
-    // input boost
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "inputboost", 1, 10, iValue ) )
-    {
-        iInputBoost = iValue;
     }
 
     if ( GetFlagIniSet ( IniXMLDocument, "client", "enablefeedbackdetection", bValue ) )
@@ -341,7 +326,7 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
     }
 
     // sound card selection
-    strCurrentAudioDevice = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "client", "auddev_base64", "" ) );
+    cAudioDevice.strName = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "client", "auddev_base64", "" ) );
 
     //### TODO: BEGIN ###//
     // sound card channel mapping settings: make sure these settings are
@@ -353,26 +338,33 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
 
     if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdinlch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
     {
-        iSndCrdLeftInputChannel = iValue;
+        cAudioDevice.iLeftInputChannel = iValue;
     }
 
     // sound card right input channel mapping
     if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdinrch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
     {
-        iSndCrdRightInputChannel = iValue;
+        cAudioDevice.iRightInputChannel = iValue;
     }
 
     // sound card left output channel mapping
     if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutlch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
     {
-        iSndCrdLeftOutputChannel = iValue;
+        cAudioDevice.iLeftOutputChannel = iValue;
     }
 
     // sound card right output channel mapping
     if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutrch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
     {
-        iSndCrdRightOutputChannel = iValue;
+        cAudioDevice.iRightOutputChannel = iValue;
     }
+
+    // input boost
+    if ( GetNumericIniSet ( IniXMLDocument, "client", "inputboost", 1, 10, iValue ) )
+    {
+        cAudioDevice.iInputBoost = iValue;
+    }
+
     //### TODO:END ###//
 
     // sound card preferred buffer size index
@@ -382,7 +374,7 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
         // defined
         if ( ( iValue == FRAME_SIZE_FACTOR_PREFERRED ) || ( iValue == FRAME_SIZE_FACTOR_DEFAULT ) || ( iValue == FRAME_SIZE_FACTOR_SAFE ) )
         {
-            iSndCrdPrefFrameSizeFactor = iValue;
+            cAudioDevice.iPrefFrameSizeFactor = iValue;
         }
     }
 
@@ -460,34 +452,44 @@ void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
     }
 
     // custom directories
-    // clang-format off
-// TODO compatibility to old version (< 3.6.1)
-QString strDirectoryAddress = GetIniSetting ( IniXMLDocument, "client", "centralservaddr", "" );
-    // clang-format on
+    //
+    //### TODO: BEGIN ###//
+    // TODO compatibility to old version (< 3.6.1)
+
+    QString strDirectoryAddress = GetIniSetting ( IniXMLDocument, "client", "centralservaddr", "" );
+
+    //### TODO: END ###//
+
     for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
     {
-        // clang-format off
-// TODO compatibility to old version (< 3.8.2)
-strDirectoryAddress = GetIniSetting ( IniXMLDocument, "client", QString ( "centralservaddr%1" ).arg ( iIdx ), strDirectoryAddress );
-        // clang-format on
+        //### TODO: BEGIN ###//
+        // compatibility to old version (< 3.8.2)
+
+        strDirectoryAddress = GetIniSetting ( IniXMLDocument, "client", QString ( "centralservaddr%1" ).arg ( iIdx ), strDirectoryAddress );
+
+        //### TODO: END ###//
+
         vstrDirectoryAddress[iIdx] = GetIniSetting ( IniXMLDocument, "client", QString ( "directoryaddress%1" ).arg ( iIdx ), strDirectoryAddress );
         strDirectoryAddress        = "";
     }
 
     // directory type
-    // clang-format off
-// TODO compatibility to old version (<3.4.7)
-// only the case that "centralservaddr" was set in old ini must be considered
-if ( !vstrDirectoryAddress[0].isEmpty() && GetFlagIniSet ( IniXMLDocument, "client", "defcentservaddr", bValue ) && !bValue )
-{
-    eDirectoryType = AT_CUSTOM;
-}
-// TODO compatibility to old version (< 3.8.2)
-else if ( GetNumericIniSet ( IniXMLDocument, "client", "centservaddrtype", 0, static_cast<int> ( AT_CUSTOM ), iValue ) )
-{
-    eDirectoryType = static_cast<EDirectoryType> ( iValue );
-}
-    // clang-format on
+    //
+    //### TODO: BEGIN ###//
+    // compatibility to old version (<3.4.7)
+    // only the case that "centralservaddr" was set in old ini must be considered
+
+    if ( !vstrDirectoryAddress[0].isEmpty() && GetFlagIniSet ( IniXMLDocument, "client", "defcentservaddr", bValue ) && !bValue )
+    {
+        eDirectoryType = AT_CUSTOM;
+    }
+    else if ( GetNumericIniSet ( IniXMLDocument, "client", "centservaddrtype", 0, static_cast<int> ( AT_CUSTOM ), iValue ) )
+    {
+        eDirectoryType = static_cast<EDirectoryType> ( iValue );
+    }
+
+    //### TODO: END ###//
+
     else if ( GetNumericIniSet ( IniXMLDocument, "client", "directorytype", 0, static_cast<int> ( AT_CUSTOM ), iValue ) )
     {
         eDirectoryType = static_cast<EDirectoryType> ( iValue );
@@ -548,6 +550,16 @@ else if ( GetNumericIniSet ( IniXMLDocument, "client", "centservaddrtype", 0, st
 
     // fader settings
     ReadFaderSettingsFromXML ( IniXMLDocument );
+
+    //### TODO: BEGIN ###//
+    /*
+    if ( CommandlineOptions.store.IsSet() )
+    {
+        store applicable CommandlineOptions values in settings
+        and Unset those CommandlineOptions...
+    }
+    */
+    //### TODO: END ###//
 }
 
 void CClientSettings::ReadFaderSettingsFromXML ( const QDomDocument& IniXMLDocument )
@@ -612,9 +624,6 @@ void CClientSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )
     // new client level
     SetNumericIniSet ( IniXMLDocument, "client", "newclientlevel", iNewClientFaderLevel );
 
-    // input boost
-    SetNumericIniSet ( IniXMLDocument, "client", "inputboost", iInputBoost );
-
     // feedback detection
     SetFlagIniSet ( IniXMLDocument, "client", "enablefeedbackdetection", bEnableFeedbackDetection );
 
@@ -657,27 +666,31 @@ void CClientSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )
     // reverberation channel assignment
     SetFlagIniSet ( IniXMLDocument, "client", "reverblchan", bReverbOnLeftChan );
 
-    // sound card selection
-    PutIniSetting ( IniXMLDocument, "client", "auddev_base64", ToBase64 ( strCurrentAudioDevice ) );
-
     //### TODO: BEGIN ###//
     // Soundcard settings should be stored per Audio device.
 
+    // sound card selection
+    PutIniSetting ( IniXMLDocument, "client", "auddev_base64", ToBase64 ( cAudioDevice.strName ) );
+
     // sound card left input channel mapping
-    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdinlch", iSndCrdLeftInputChannel );
+    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdinlch", cAudioDevice.iLeftInputChannel );
 
     // sound card right input channel mapping
-    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdinrch", iSndCrdRightInputChannel );
+    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdinrch", cAudioDevice.iRightInputChannel );
 
     // sound card left output channel mapping
-    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutlch", iSndCrdLeftOutputChannel );
+    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutlch", cAudioDevice.iLeftOutputChannel );
 
     // sound card right output channel mapping
-    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutrch", iSndCrdRightOutputChannel );
-    //### TODO: END ###//
+    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutrch", cAudioDevice.iRightOutputChannel );
+
+    // sound card input boost
+    SetNumericIniSet ( IniXMLDocument, "client", "inputboost", cAudioDevice.iInputBoost );
 
     // sound card preferred buffer size index
-    SetNumericIniSet ( IniXMLDocument, "client", "prefsndcrdbufidx", iSndCrdPrefFrameSizeFactor );
+    SetNumericIniSet ( IniXMLDocument, "client", "prefsndcrdbufidx", cAudioDevice.iPrefFrameSizeFactor );
+
+    //### TODO: END ###//
 
     // automatic network jitter buffer size setting
     SetFlagIniSet ( IniXMLDocument, "client", "autojitbuf", bAutoSockBufSize );
@@ -771,23 +784,9 @@ void CClientSettings::WriteFaderSettingsToXML ( QDomDocument& IniXMLDocument )
 #endif
 
 // Server settings -------------------------------------------------------------
-void CServerSettings::ReadCommandLineOptions()
-{
-    //### TODO: BEGIN ###//
-    // Implement this one as soon as "Global commandline" gets implemented.
-    //### TODO: END ###//
-}
 
-// that this gets called means we are not headless
 void CServerSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
 {
-    //### TODO: BEGIN ###//
-    // CommandLineOptions should be read by CClient
-    // since we don't want to store commandline settings in the inifile on exit
-
-    const QList<QString> CommandLineOptions;
-    //### TODO: BEGIN ###//
-
     int  iValue;
     bool bValue;
 
@@ -799,57 +798,36 @@ void CServerSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
     vecWindowPosMain = FromBase64ToByteArray ( GetIniSetting ( IniXMLDocument, "server", "winposmain_base64" ) );
 
     // name/city/country
-    if ( !CommandLineOptions.contains ( "--serverinfo" ) )
+    // name
+    strServerName = GetIniSetting ( IniXMLDocument, "server", "name" );
+
+    // city
+    strServerCity = GetIniSetting ( IniXMLDocument, "server", "city" );
+
+    // country
+    if ( GetNumericIniSet ( IniXMLDocument, "server", "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
     {
-        // name
-        strServerName = GetIniSetting ( IniXMLDocument, "server", "name" );
-
-        // city
-        strServerCity = GetIniSetting ( IniXMLDocument, "server", "city" );
-
-        // country
-        if ( GetNumericIniSet ( IniXMLDocument, "server", "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
-        {
-            eServerCountry = CLocale::WireFormatCountryCodeToQtCountry ( iValue );
-        }
+        eServerCountry = CLocale::WireFormatCountryCodeToQtCountry ( iValue );
     }
 
     // norecord flag
-    if ( !CommandLineOptions.contains ( "--norecord" ) )
+    if ( GetFlagIniSet ( IniXMLDocument, "server", "norecord", bValue ) )
     {
-        if ( GetFlagIniSet ( IniXMLDocument, "server", "norecord", bValue ) )
-        {
-            bEnableRecording = !bValue;
-        }
+        bEnableRecording = !bValue;
     }
 
     // welcome message
-    if ( !CommandLineOptions.contains ( "--welcomemessage" ) )
-    {
-        strWelcomeMessage = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "welcome" ) );
-    }
+    strWelcomeMessage = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "welcome" ) );
 
     // base recording directory
-    if ( !CommandLineOptions.contains ( "--recording" ) )
-    {
-        strRecordingDir = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "recordingdir_base64" ) );
-    }
+    strRecordingDir = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "recordingdir_base64" ) );
 
     // to avoid multiple registrations, must do this after collecting serverinfo
-    if ( !CommandLineOptions.contains ( "--centralserver" ) && !CommandLineOptions.contains ( "--directoryserver" ) )
-    {
-        // custom directory
-        // CServerListManager defaults to command line argument (or "" if not passed)
-        // Server GUI defaults to ""
-        QString directoryAddress = "";
-        // clang-format off
-// TODO compatibility to old version < 3.8.2
-directoryAddress = GetIniSetting ( IniXMLDocument, "server", "centralservaddr", directoryAddress );
-        // clang-format on
-        directoryAddress = GetIniSetting ( IniXMLDocument, "server", "directoryaddress", directoryAddress );
+    // custom directory
+    // CServerListManager defaults to command line argument (or "" if not passed)
+    // Server GUI defaults to ""
 
-        strDirectoryAddress = directoryAddress;
-    }
+    strDirectoryAddress = GetIniSetting ( IniXMLDocument, "server", "directoryaddress", "" );
 
     // directory type
     // CServerListManager defaults to AT_NONE
@@ -857,30 +835,39 @@ directoryAddress = GetIniSetting ( IniXMLDocument, "server", "centralservaddr", 
     EDirectoryType directoryType = AT_NONE;
 
     // if a command line Directory server address is set, set the Directory Type (genre) to AT_CUSTOM so it's used
-    if ( CommandLineOptions.contains ( "--centralserver" ) || CommandLineOptions.contains ( "--directoryserver" ) )
+    if ( CommandlineOptions.directoryserver.IsSet() )
     {
         directoryType = AT_CUSTOM;
     }
     else
     {
-        // clang-format off
-// TODO compatibility to old version < 3.4.7
-if ( GetFlagIniSet ( IniXMLDocument, "server", "defcentservaddr", bValue ) )
-{
-    directoryType = bValue ? AT_DEFAULT : AT_CUSTOM;
-}
-else
-            // clang-format on
+        //### TODO: BEGIN ###//
+        // compatibility to old version < 3.4.7
+
+        if ( GetFlagIniSet ( IniXMLDocument, "server", "defcentservaddr", bValue ) )
+        {
+            directoryType = bValue ? AT_DEFAULT : AT_CUSTOM;
+        }
+        else
+
+            //### TODO: END ###//
 
             // if "directorytype" itself is set, use it (note "AT_NONE", "AT_DEFAULT" and "AT_CUSTOM" are min/max directory type here)
-            // clang-format off
-// TODO compatibility to old version < 3.8.2
-if ( GetNumericIniSet ( IniXMLDocument, "server", "centservaddrtype", static_cast<int> ( AT_DEFAULT ), static_cast<int> ( AT_CUSTOM ), iValue ) )
-{
-    directoryType = static_cast<EDirectoryType> ( iValue );
-}
-else
-            // clang-format on
+            //### TODO: BEGIN ###//
+            // compatibility to old version < 3.8.2
+
+            if ( GetNumericIniSet ( IniXMLDocument,
+                                    "server",
+                                    "centservaddrtype",
+                                    static_cast<int> ( AT_DEFAULT ),
+                                    static_cast<int> ( AT_CUSTOM ),
+                                    iValue ) )
+        {
+            directoryType = static_cast<EDirectoryType> ( iValue );
+        }
+        else
+            //### TODO: END ###//
+
             if ( GetNumericIniSet ( IniXMLDocument,
                                     "server",
                                     "directorytype",
@@ -891,41 +878,44 @@ else
             directoryType = static_cast<EDirectoryType> ( iValue );
         }
 
-        // clang-format off
-// TODO compatibility to old version < 3.9.0
-// override type to AT_NONE if servlistenabled exists and is false
-if (  GetFlagIniSet ( IniXMLDocument, "server", "servlistenabled", bValue ) && !bValue )
-{
-    directoryType = AT_NONE;
-}
-        // clang-format on
+        //### TODO: BEGIN ###//
+        // compatibility to old version < 3.9.0
+        // override type to AT_NONE if servlistenabled exists and is false
+
+        if ( GetFlagIniSet ( IniXMLDocument, "server", "servlistenabled", bValue ) && !bValue )
+        {
+            directoryType = AT_NONE;
+        }
+
+        //### TODO: END ###//
     }
 
     eDirectoryType = directoryType;
 
     // server list persistence file name
-    if ( !CommandLineOptions.contains ( "--directoryfile" ) )
-    {
-        strServerListFileName = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "directoryfile_base64" ) );
-    }
+    strServerListFileName = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "directoryfile_base64" ) );
 
     // start minimized on OS start
-    if ( !CommandLineOptions.contains ( "--startminimized" ) )
+    if ( GetFlagIniSet ( IniXMLDocument, "server", "autostartmin", bValue ) )
     {
-        if ( GetFlagIniSet ( IniXMLDocument, "server", "autostartmin", bValue ) )
-        {
-            bAutoRunMinimized = bValue;
-        }
+        bAutoRunMinimized = bValue;
     }
 
     // delay panning
-    if ( !CommandLineOptions.contains ( "--delaypan" ) )
+    if ( GetFlagIniSet ( IniXMLDocument, "server", "delaypan", bValue ) )
     {
-        if ( GetFlagIniSet ( IniXMLDocument, "server", "delaypan", bValue ) )
-        {
-            bDelayPan = bValue;
-        }
+        bDelayPan = bValue;
     }
+
+    //### TODO: BEGIN ###//
+    /*
+    if ( CommandlineOptions.store.IsSet() )
+    {
+        store applicable CommandlineOptions values in settings
+        and Unset those CommandlineOptions...
+    }
+    */
+    //### TODO: END ###//
 }
 
 void CServerSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )

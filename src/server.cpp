@@ -247,12 +247,12 @@ CServer::CServer ( CServerSettings& cSettings ) :
 
     if ( Settings.CommandlineOptions.norecord.IsSet() )
     {
-        Settings.bEnableRecording = false;
+        Settings.SetEnableRecording ( false );
     }
 
     if ( Settings.CommandlineOptions.delaypan.IsSet() )
     {
-        Settings.bDelayPan = false;
+        Settings.SetDelayPan ( false );
     }
 
     // create OPUS encoder/decoder for each channel (must be done before
@@ -487,18 +487,18 @@ CServer::CServer ( CServerSettings& cSettings ) :
 
 void CServer::ApplySettings()
 {
-    SetServerName ( Settings.strServerName );
-    SetServerCity ( Settings.strServerCity );
-    SetServerCountry ( Settings.eServerCountry );
-    SetEnableRecording ( Settings.bEnableRecording );
-    SetWelcomeMessage ( Settings.strWelcomeMessage );
+    SetServerName ( Settings.GetServerName() );
+    SetServerCity ( Settings.GetServerCity() );
+    SetServerCountry ( Settings.GetServerCountry() );
+    SetEnableRecording ( Settings.GetEnableRecording() );
+    SetWelcomeMessage ( Settings.GetWelcomeMessage() );
 
-    SetRecordingDir ( Settings.strRecordingDir );
-    SetDirectoryAddress ( Settings.strDirectoryAddress );
-    SetDirectoryType ( Settings.eDirectoryType );
-    SetServerListFileName ( Settings.strServerListFileName );
-    SetAutoRunMinimized ( Settings.bAutoRunMinimized );
-    SetEnableDelayPanning ( Settings.bDelayPan );
+    SetRecordingDir ( Settings.GetRecordingDir() );
+    SetDirectoryAddress ( Settings.GetDirectoryAddress() );
+    SetDirectoryType ( Settings.GetDirectoryType() );
+    SetServerListFileName ( Settings.GetServerListFileName() );
+    SetAutoRunMinimized ( Settings.GetAutoRunMinimized() );
+    SetEnableDelayPanning ( Settings.GetDelayPan() );
 }
 
 template<unsigned int slotId>
@@ -618,11 +618,11 @@ void CServer::OnNewConnection ( int iChID, int iTotChans, CHostAddress RecHostAd
     // send welcome message (if enabled)
     {
         QMutexLocker locker ( &MutexWelcomeMessage );
-        if ( !Settings.strWelcomeMessage.isEmpty() )
+        if ( !Settings.GetWelcomeMessage().isEmpty() )
         {
             // create formatted server welcome message and send it just to
             // the client which just connected to the server
-            const QString strWelcomeMessageFormated = WELCOME_MESSAGE_PREFIX + Settings.strWelcomeMessage;
+            const QString strWelcomeMessageFormated = WELCOME_MESSAGE_PREFIX + Settings.GetWelcomeMessage();
 
             vecChannels[iChID].CreateChatTextMes ( strWelcomeMessageFormated );
         }
@@ -905,7 +905,7 @@ static CTimingMeas JitterMeas ( 1000, "test2.dat" ); JitterMeas.Measure(); // TE
             }
             Futures.clear();
         }
-        if ( Settings.bDelayPan )
+        if ( Settings.GetDelayPan() )
         {
             for ( int i = 0; i < iNumClients; i++ )
             {
@@ -1193,14 +1193,14 @@ void CServer::MixEncodeTransmitData ( const int iChanCnt, const int iNumClients 
             const CVector<int16_t>& vecsData2 = vecvecsData2[j];
 
             const float fGain = vecvecfGains[iChanCnt][j];
-            const float fPan  = Settings.bDelayPan ? 0.5f : vecvecfPannings[iChanCnt][j];
+            const float fPan  = Settings.GetDelayPan() ? 0.5f : vecvecfPannings[iChanCnt][j];
 
             // calculate combined gain/pan for each stereo channel where we define
             // the panning that center equals full gain for both channels
             const float fGainL = MathUtils::GetLeftPan ( fPan, false ) * fGain;
             const float fGainR = MathUtils::GetRightPan ( fPan, false ) * fGain;
 
-            if ( Settings.bDelayPan )
+            if ( Settings.GetDelayPan() )
             {
                 iPanDel  = lround ( (float) ( 2 * maxPanDelay - 2 ) * ( vecvecfPannings[iChanCnt][j] - 0.5f ) );
                 iPanDelL = ( iPanDel > 0 ) ? iPanDel : 0;
@@ -1213,7 +1213,7 @@ void CServer::MixEncodeTransmitData ( const int iChanCnt, const int iNumClients 
                 for ( i = 0, k = 0; i < iServerFrameSizeSamples; i++, k += 2 )
                 {
                     // left/right channel
-                    if ( Settings.bDelayPan )
+                    if ( Settings.GetDelayPan() )
                     {
                         // pan address shift
 
@@ -1256,7 +1256,7 @@ void CServer::MixEncodeTransmitData ( const int iChanCnt, const int iNumClients 
                 for ( i = 0; i < ( 2 * iServerFrameSizeSamples ); i++ )
                 {
                     // left/right channel
-                    if ( Settings.bDelayPan )
+                    if ( Settings.GetDelayPan() )
                     {
                         // pan address shift
                         if ( ( i & 1 ) == 0 )
@@ -1695,7 +1695,7 @@ void CServer::SetEnableRecording ( bool bNewEnableRecording )
     JamController.SetEnableRecording ( bNewEnableRecording, IsRunning() );
 
     // not dependent upon JamController state
-    Settings.bEnableRecording = bNewEnableRecording;
+    Settings.SetEnableRecording ( bNewEnableRecording );
 
     // the recording state may have changed, send recording state message
     CreateAndSendRecorderStateForAllConChannels();
@@ -1706,7 +1706,7 @@ void CServer::SetWelcomeMessage ( const QString& strNWelcMess )
     // we need a mutex to secure access
     QMutexLocker locker ( &MutexWelcomeMessage );
     // restrict welcome message to maximum allowed length
-    Settings.strWelcomeMessage = strNWelcMess.left ( MAX_LEN_CHAT_TEXT );
+    Settings.SetWelcomeMessage ( strNWelcMess.left ( MAX_LEN_CHAT_TEXT ) );
 }
 
 void CServer::WriteHTMLChannelList()
