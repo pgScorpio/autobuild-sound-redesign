@@ -100,6 +100,7 @@ int main ( int argc, char** argv )
 
     CCommandline::argc = argc;
     CCommandline::argv = argv;
+    CMessages::init ( NULL, GetAppName() );
 
 #if defined( Q_OS_MACX )
     // Mnemonic keys are default disabled in Qt for MacOS. The following function enables them.
