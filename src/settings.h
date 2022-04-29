@@ -296,14 +296,15 @@ signals:
     void OpenDriverSetup(); // Just needed for signalling, no related value
 
     // State signals
-    void ConnectRequest();
-    void DisconnectRequest();
-
     void Connecting();
     void Disconnecting();
 
     void Connected();
     void Disconnected();
+
+    // Request signals to CClient
+    void ConnectRequested();
+    void DisconnectRequested();
 
 public:
     inline const QString& GetClientName() const { return strClientName; }
@@ -757,7 +758,7 @@ public:
             strServerAddress  = serverAddress;
             strServerName     = serverName.isEmpty() ? serverAddress : serverName;
             bConnectRequested = true;
-            emit ConnectRequest();
+            emit ConnectRequested();
 
             return true;
         }
@@ -772,7 +773,7 @@ public:
             if ( !bDisconnectRequested )
             {
                 bDisconnectRequested = true;
-                emit DisconnectRequest();
+                emit DisconnectRequested();
             }
 
             return true;
@@ -893,7 +894,6 @@ public:
             return QString ( APP_NAME ) + " - " + GetServerName();
         }
     }
-
 
 protected:
     virtual void ReadCommandLineOptions() override;

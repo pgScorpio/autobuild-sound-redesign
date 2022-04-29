@@ -131,8 +131,8 @@ CClient::CClient ( CClientSettings& cSettings ) :
     QObject::connect ( &Sound, &CSound::ControllerInFaderIsMute, this, &CClient::OnControllerInFaderIsMute );
     QObject::connect ( &Sound, &CSound::ControllerInMuteMyself, this, &CClient::OnControllerInMuteMyself );
 
-    QObject::connect ( &Settings, &CClientSettings::ConnectRequest, this, &CClient::OnConnectRequest );
-    QObject::connect ( &Settings, &CClientSettings::DisconnectRequest, this, &CClient::OnDisconnectRequest );
+    QObject::connect ( &Settings, &CClientSettings::ConnectRequested, this, &CClient::OnConnectRequest, Qt::ConnectionType::QueuedConnection );
+    QObject::connect ( &Settings, &CClientSettings::DisconnectRequested, this, &CClient::OnDisconnectRequest, Qt::ConnectionType::QueuedConnection );
 
     QObject::connect ( &Settings, &CClientSettings::AudioDeviceChanged, this, &CClient::OnAudioDeviceChanged );
     QObject::connect ( &Settings, &CClientSettings::InputChannelChanged, this, &CClient::OnInputChannelChanged );
