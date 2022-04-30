@@ -26,7 +26,7 @@
 \******************************************************************************/
 
 #include "sound.h"
-#include "messages.h" // for htmlNewLine / htmlBold
+#include "messages.h" // for htmlNewLine() / htmlBold()
 
 //============================================================================
 // Helpers for checkNewDeviceCapabilities
@@ -1070,78 +1070,44 @@ unsigned int CSound::getDeviceBufferSize ( unsigned int iDesiredBufferSize )
     return iActualBufferSize;
 }
 
-bool CSound::checkNewDeviceCapabilities()
+bool CSound::checkNewDeviceCapabilities ( CSoundCapabilities& newDeviceCapabilities )
 {
-    // This function checks if our required input/output channel
-    // properties are supported by the selected device. If the return
-    // string is empty, the device can be used, otherwise the error
-    // message is returned.
-    bool ok = true;
-
     if ( !newAsioDriver.IsOpen() )
     {
-        strErrorList.append ( QString ( "Coding Error: Calling CheckDeviceCapabilities() with no newAsioDriver open! " ) );
+        strErrorList.append ( QString ( "CODING ERROR: Calling checkNewDeviceCapabilities() with no newAsioDriver open! " ) );
         return false;
     }
 
     // check the sample rate
-    if ( !newAsioDriver.canSampleRate ( SYSTEM_SAMPLE_RATE_HZ ) )
+    newDeviceCapabilities.bCanSetSystemSampleRate = newAsioDriver.setSampleRate ( SYSTEM_SAMPLE_RATE_HZ );
+    if ( newDeviceCapabilities.bCanSetSystemSampleRate )
     {
-        ok = false;
-        // return error string
-        strErrorList.append ( tr ( "The selected audio device does not support a sample rate of %1 Hz. " ).arg ( SYSTEM_SAMPLE_RATE_HZ ) );
+        newDeviceCapabilities.bCanSystemSampleRate = true;
     }
     else
     {
-        // check if sample rate can be set
-        if ( !newAsioDriver.setSampleRate ( SYSTEM_SAMPLE_RATE_HZ ) )
-        {
-            ok = false;
-            strErrorList.append ( tr ( "The audio devices sample rate could not be set to %2 Hz. " ).arg ( SYSTEM_SAMPLE_RATE_HZ ) );
-        }
+        newDeviceCapabilities.bCanSystemSampleRate = newAsioDriver.canSampleRate ( SYSTEM_SAMPLE_RATE_HZ );
     }
 
-    if ( newAsioDriver.numInputChannels() < DRV_MIN_IN_CHANNELS )
-    {
-        ok = false;
-        strErrorList.append ( tr ( "The selected audio device doesn not support at least"
-                                   "%1 %2 channel(s)." )
-                                  .arg ( DRV_MIN_IN_CHANNELS )
-                                  .arg ( tr ( "input" ) ) );
-    }
+    // check number of channels
+    newDeviceCapabilities.bHasMinNumInputs  = ( newAsioDriver.numInputChannels() >= DRV_MIN_IN_CHANNELS );
+    newDeviceCapabilities.bHasMinNumOutputs = ( newAsioDriver.numOutputChannels() >= DRV_MIN_OUT_CHANNELS );
 
-    if ( newAsioDriver.numOutputChannels() < DRV_MIN_OUT_CHANNELS )
-    {
-        ok = false;
-        strErrorList.append ( tr ( "The selected audio device doesn not support at least"
-                                   "%1 %2 channel(s)." )
-                                  .arg ( DRV_MIN_OUT_CHANNELS )
-                                  .arg ( tr ( "output" ) ) );
-    }
-
-    // query channel infos for all available input channels
-    bool channelOk = true;
+    // check input sample format
+    bool sampleFormatOk = true;
     for ( int i = 0; i < newAsioDriver.numInputChannels(); i++ )
     {
         const ASIOChannelInfo& channel = newAsioDriver.inputChannelInfo ( i );
 
         if ( !SampleTypeSupported ( channel.type ) )
         {
-            // return error string
-            channelOk = false;
+            sampleFormatOk = false;
         }
     }
+    newDeviceCapabilities.bInputSampleFormatOk = sampleFormatOk;
 
-    if ( !channelOk )
-    {
-        ok = false;
-        strErrorList.append ( tr ( "The selected audio device is incompatible since "
-                                   "the required %1 audio sample format isn't available." )
-                                  .arg ( tr ( "input)" ) ) );
-    }
-
-    // query channel infos for all available output channels
-    channelOk = true;
+    // check output sample format
+    sampleFormatOk = true;
     for ( int i = 0; i < newAsioDriver.numOutputChannels(); i++ )
     {
         const ASIOChannelInfo& channel = newAsioDriver.outputChannelInfo ( i );
@@ -1154,54 +1120,12 @@ bool CSound::checkNewDeviceCapabilities()
         // fulfill the sample format requirement (quick hack solution).
         if ( !SampleTypeSupported ( channel.type ) )
         {
-            channelOk = false;
+            sampleFormatOk = false;
         }
     }
+    newDeviceCapabilities.bOutputSampleFormatOk = sampleFormatOk;
 
-    if ( !channelOk )
-    {
-        ok = false;
-        strErrorList.append ( tr ( "The selected audio device is incompatible since "
-                                   "the required %1 audio sample format isn't available." )
-                                  .arg ( tr ( "output)" ) ) );
-    }
-
-    // special case with more than 2 input channels (was exactly 4 channels): support adding channels
-    // But what the hack is this used for ??? Only used for Jack ?? But mixing can be done in Jack, so NOT KISS!
-    if ( ( newAsioDriver.numInputChannels() > 2 ) )
-    {
-        // Total available name size for AddedChannelData
-        const long addednamesize = ( sizeof ( ASIOAddedChannelInfo::ChannelData.name ) + sizeof ( ASIOAddedChannelInfo::AddedName ) );
-
-        // add mixed channels (i.e. 4 normal, 4 mixed channels)
-        const long            numInputChan = newAsioDriver.numInputChannels();
-        const long            numAddedChan = getNumInputChannelsToAdd ( numInputChan );
-        ASIOAddedChannelInfo* addedChannel = newAsioDriver.setNumAddedInputChannels ( numAddedChan );
-
-        for ( long i = 0; i < numAddedChan; i++ )
-        {
-            int iSelChan, iAddChan;
-
-            getInputSelAndAddChannels ( numInputChan + i, numInputChan, numAddedChan, iSelChan, iAddChan );
-
-            char*       combinedName = addedChannel[i].ChannelData.name;
-            const char* firstName    = newAsioDriver.inputChannelInfo ( iSelChan ).name;
-            const char* secondName   = newAsioDriver.inputChannelInfo ( iAddChan ).name;
-
-            if ( ( iSelChan >= 0 ) && ( iAddChan >= 0 ) )
-            {
-                strncpy_s ( combinedName, addednamesize, firstName, sizeof ( ASIOChannelInfo::name ) );
-
-                strcat_s ( combinedName, addednamesize, " + " );
-
-                strncat_s ( combinedName, addednamesize, secondName, sizeof ( ASIOChannelInfo::name ) );
-            }
-        }
-    }
-
-    newAsioDriver.openData.capabilitiesOk = ok;
-
-    return ok;
+    return newAsioDriver.openData.capabilitiesOk = newDeviceCapabilities.Ok();
 }
 
 //============================================================================
@@ -1257,6 +1181,45 @@ bool CSound::checkDeviceChange ( tDeviceChangeCheck mode, int iDriverIndex )
         newAsioDriver.AssignFrom ( &asioDriverData[iDriverIndex] );
         return newAsioDriver.Open();
 
+    case tDeviceChangeCheck::CheckCapabilities:
+        if ( checkNewDeviceCapabilities ( CSoundBase::newDeviceCapabilities ) )
+        {
+            // with more than 2 input channels add added channels
+            if ( ( newAsioDriver.numInputChannels() > 2 ) )
+            {
+                // Total available name size for AddedChannelData
+                const long addednamesize = ( sizeof ( ASIOAddedChannelInfo::ChannelData.name ) + sizeof ( ASIOAddedChannelInfo::AddedName ) );
+
+                // add mixed channels (i.e. 4 normal, 4 mixed channels)
+                const long            numInputChan = newAsioDriver.numInputChannels();
+                const long            numAddedChan = getNumInputChannelsToAdd ( numInputChan );
+                ASIOAddedChannelInfo* addedChannel = newAsioDriver.setNumAddedInputChannels ( numAddedChan );
+
+                for ( long i = 0; i < numAddedChan; i++ )
+                {
+                    int iSelChan, iAddChan;
+
+                    getInputSelAndAddChannels ( numInputChan + i, numInputChan, numAddedChan, iSelChan, iAddChan );
+
+                    char*       combinedName = addedChannel[i].ChannelData.name;
+                    const char* firstName    = newAsioDriver.inputChannelInfo ( iSelChan ).name;
+                    const char* secondName   = newAsioDriver.inputChannelInfo ( iAddChan ).name;
+
+                    if ( ( iSelChan >= 0 ) && ( iAddChan >= 0 ) )
+                    {
+                        strncpy_s ( combinedName, addednamesize, firstName, sizeof ( ASIOChannelInfo::name ) );
+
+                        strcat_s ( combinedName, addednamesize, " + " );
+
+                        strncat_s ( combinedName, addednamesize, secondName, sizeof ( ASIOChannelInfo::name ) );
+                    }
+                }
+            }
+
+            return true;
+        }
+        return false;
+
     case tDeviceChangeCheck::Activate: // Actually changing current device !
         if ( asioDriver.AssignFrom ( &newAsioDriver ) )
         {
@@ -1277,9 +1240,6 @@ bool CSound::checkDeviceChange ( tDeviceChangeCheck mode, int iDriverIndex )
             return true;
         }
         return false;
-
-    case tDeviceChangeCheck::CheckCapabilities:
-        return checkNewDeviceCapabilities();
 
     default:
         return false;

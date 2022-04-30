@@ -373,6 +373,8 @@ bool CSound::checkCapabilities()
 {
     if ( jackClient.IsOpen() )
     {
+        newDeviceCapabilities.SetAllOk(); // Quick hack since Jack uses it's own error messages !
+
         bool ok = true;
         if ( jackClient.GetSamplerate() != SYSTEM_SAMPLE_RATE_HZ )
         {

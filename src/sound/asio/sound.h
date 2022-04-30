@@ -116,7 +116,7 @@ protected:
     void closeAllAsioDrivers();
     bool prepareAsio ( bool bStartAsio ); // Called before starting
 
-    bool checkNewDeviceCapabilities(); // used by checkDeviceChange( checkCapabilities, iDriverIndex)
+    bool checkNewDeviceCapabilities ( CSoundCapabilities& newDeviceCapabilities ); // used by checkDeviceChange( checkCapabilities, iDriverIndex)
 
     //============================================================================
     // Virtual interface to CSoundBase:

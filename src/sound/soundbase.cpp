@@ -166,7 +166,6 @@ CSoundBase::CSoundBase ( const QString& systemDriverTechniqueName,
     iProtocolBufferSize ( 128 ),
     strDriverTechniqueName ( systemDriverTechniqueName ),
     strClientName ( "" ),
-    bAutoConnect ( true ),
     bStarted ( false ),
     bActive ( false ),
     iCurrentDevice ( -1 ),
@@ -583,6 +582,56 @@ bool CSoundBase::OpenDeviceSetup()
 //============================================================================
 // Device handling
 //============================================================================
+void CSoundBase::getDeviceCapabilityErrors ( const CSoundCapabilities deviceCapabilities )
+{
+    if ( !deviceCapabilities.bCanSystemSampleRate )
+    {
+        strErrorList.append ( tr ( "The selected audio device does not support a sample rate of %1 Hz. " ).arg ( SYSTEM_SAMPLE_RATE_HZ ) );
+    }
+    else if ( !deviceCapabilities.bCanSetSystemSampleRate )
+    {
+        strErrorList.append ( tr ( "The audio devices sample rate could not be set to %1 Hz. " ).arg ( SYSTEM_SAMPLE_RATE_HZ ) );
+    }
+
+    if ( !deviceCapabilities.bHasMinNumInputs )
+    {
+        strErrorList.append ( tr ( "The selected audio device doesn not support at least"
+                                   "%1 %2 channel(s)." )
+                                  .arg ( DRV_MIN_IN_CHANNELS )
+                                  .arg ( tr ( "input" ) ) );
+    }
+
+    if ( !deviceCapabilities.bHasMinNumOutputs )
+    {
+        strErrorList.append ( tr ( "The selected audio device doesn not support at least"
+                                   "%1 %2 channel(s)." )
+                                  .arg ( DRV_MIN_OUT_CHANNELS )
+                                  .arg ( tr ( "output" ) ) );
+    }
+
+    if ( !deviceCapabilities.bInputSampleFormatOk && !deviceCapabilities.bOutputSampleFormatOk )
+    {
+        strErrorList.append ( tr ( "The selected audio device is incompatible since "
+                                   "the required audio %1sample format isn't supported." )
+                                  .arg ( "" ) );
+    }
+    else
+    {
+        if ( !deviceCapabilities.bInputSampleFormatOk )
+        {
+            strErrorList.append ( tr ( "The selected audio device is incompatible since "
+                                       "the required %1audio sample format isn't supported." )
+                                      .arg ( tr ( "input" ) + " " ) );
+        }
+
+        if ( !deviceCapabilities.bOutputSampleFormatOk )
+        {
+            strErrorList.append ( tr ( "The selected audio device is incompatible since "
+                                       "the required %1audio sample format isn't supported." )
+                                      .arg ( tr ( "output" ) + " " ) );
+        }
+    }
+}
 
 bool CSoundBase::selectDevice ( int iDriverIndex, bool bOpenDriverSetup, bool bTryAnyDriver )
 {
@@ -613,6 +662,8 @@ bool CSoundBase::selectDevice ( int iDriverIndex, bool bOpenDriverSetup, bool bT
     {
         if ( !driverOk )
         {
+            newDeviceCapabilities.Clear();
+
             driverOk = checkDeviceChange ( tDeviceChangeCheck::CheckOpen, iDriverIndex );
 
             if ( !driverOk )
@@ -661,6 +712,8 @@ bool CSoundBase::selectDevice ( int iDriverIndex, bool bOpenDriverSetup, bool bT
             // check if device is capable
             if ( !capabilitiesOk )
             {
+                getDeviceCapabilityErrors ( newDeviceCapabilities );
+
                 // if requested, open ASIO driver setup in case of an error
                 if ( bOpenDriverSetup && !bTryAnyDriver )
                 {

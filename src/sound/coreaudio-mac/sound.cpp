@@ -1025,9 +1025,6 @@ bool StreamformatOk ( AudioStreamBasicDescription& streamDescription )
 
 bool CSound::CheckDeviceCapabilities ( cDeviceInfo& deviceSelection )
 {
-    bool                        ok                = true;
-    bool                        inputDeviceOk     = true;
-    bool                        outputDeviceOk    = true;
     const Float64               fSystemSampleRate = static_cast<Float64> ( SYSTEM_SAMPLE_RATE_HZ );
     Float64                     inputSampleRate   = 0;
     Float64                     outputSampleRate  = 0;
@@ -1035,93 +1032,60 @@ bool CSound::CheckDeviceCapabilities ( cDeviceInfo& deviceSelection )
     CVector<AudioStreamID>      vInputStreamIDList;
     CVector<AudioStreamID>      vOutputStreamIDList;
 
-    if ( !ahGetDeviceSampleRate ( deviceSelection.InputDeviceId, inputSampleRate ) )
-    {
-        strErrorList.append (
-            tr ( "The audio %1 device is no longer available. Please check if your %1 device is connected correctly." ).arg ( "input" ) );
-        ok = inputDeviceOk = false;
-    }
+    newDeviceCapabilities.SetAllOk(); // asume all ok until proven otherwise
 
-    if ( ( inputDeviceOk ) && ( inputSampleRate != fSystemSampleRate ) )
+    ahGetDeviceSampleRate ( deviceSelection.InputDeviceId, inputSampleRate );
+    ahGetDeviceSampleRate ( deviceSelection.OutputDeviceId, outputSampleRate );
+
+    if ( ( inputSampleRate != fSystemSampleRate ) || ( outputSampleRate != fSystemSampleRate ) )
     {
+        newDeviceCapabilities.bCanSystemSampleRate = false;
+
         // try to change the sample rate
-        if ( !ahSetDeviceSampleRate ( deviceSelection.InputDeviceId, fSystemSampleRate ) )
+        if ( ahSetDeviceSampleRate ( deviceSelection.InputDeviceId, fSystemSampleRate ) && ahSetDeviceSampleRate ( deviceSelection.OutputDeviceId, fSystemSampleRate )
         {
-            strErrorList.append ( tr ( "The sample rate on the current %1 device isn't %2 Hz and is therefore incompatible. " )
-                                      .arg ( "input" )
-                                      .arg ( SYSTEM_SAMPLE_RATE_HZ ) +
-                                  tr ( "Try setting the sample rate to % 1 Hz manually via Audio-MIDI-Setup (in Applications->Utilities)." )
-                                      .arg ( SYSTEM_SAMPLE_RATE_HZ ) );
-            ok = false;
+            newDeviceCapabilities.bCanSystemSampleRate = true;
+        }
+        else
+        {
+            newDeviceCapabilities.bCanSetSystemSampleRate = false;
         }
     }
 
-    if ( !ahGetDeviceSampleRate ( deviceSelection.OutputDeviceId, outputSampleRate ) )
+    if ( !ahGetDeviceStreamIdList ( deviceSelection.InputDeviceId, biINPUT, vInputStreamIDList ) ||
+         ( vInputStreamIDList.size() < DRV_MIN_IN_CHANNELS ) )
     {
-        strErrorList.append (
-            tr ( "The audio %1 device is no longer available. Please check if your %1 device is connected correctly." ).arg ( "output" ) );
-        ok = outputDeviceOk = false;
+        newDeviceCapabilities.bHasMinNumInputs = false;
     }
 
-    if ( outputDeviceOk && ( outputSampleRate != fSystemSampleRate ) )
+    // get the stream ID of the output device (at least one stream must always exist)
+    if ( !ahGetDeviceStreamIdList ( deviceSelection.OutputDeviceId, biOUTPUT, vOutputStreamIDList ) ||
+         ( vOutputStreamIDList.size() < DRV_MIN_OUT_CHANNELS ) )
     {
-        // try to change the sample rate
-        if ( !ahSetDeviceSampleRate ( deviceSelection.OutputDeviceId, fSystemSampleRate ) )
+        newDeviceCapabilities.bHasMinNumOutputs = false;
+    }
+
+    if ( setBufferSize ( deviceSelection.InputDeviceId, deviceSelection.OutputDeviceId, iProtocolBufferSize, iDeviceBufferSize ) )
+    {
+        // According to the AudioHardware documentation: "If the format is a linear PCM
+        // format, the data will always be presented as 32 bit, native endian floating
+        // point. All conversions to and from the true physical format of the hardware
+        // is handled by the devices driver.".
+
+        // check the input
+        if ( !ahGetStreamFormat ( vInputStreamIDList[0], CurDevStreamFormat ) || !StreamformatOk ( CurDevStreamFormat ) )
         {
-            strErrorList.append ( tr ( "The sample rate on the current %1 device isn't %2 Hz and is therefore incompatible. " )
-                                      .arg ( "output" )
-                                      .arg ( SYSTEM_SAMPLE_RATE_HZ ) +
-                                  tr ( "Try setting the sample rate to %1 Hz manually via Audio-MIDI-Setup (in Applications->Utilities)." )
-                                      .arg ( SYSTEM_SAMPLE_RATE_HZ ) );
-            ok = false;
+            newDeviceCapabilities.bInputSampleFormatOk = false;
+        }
+
+        // check the output
+        if ( !ahGetStreamFormat ( vOutputStreamIDList[0], CurDevStreamFormat ) || !StreamformatOk ( CurDevStreamFormat ) )
+        {
+            newDeviceCapabilities.bOutputSampleFormatOk = false;
         }
     }
 
-    if ( inputDeviceOk )
-    {
-        if ( !ahGetDeviceStreamIdList ( deviceSelection.InputDeviceId, biINPUT, vInputStreamIDList ) )
-        {
-            strErrorList.append ( tr ( "The input device doesn't have any valid inputs." ) );
-            ok = inputDeviceOk = false;
-        }
-    }
-
-    if ( outputDeviceOk )
-    {
-        // get the stream ID of the output device (at least one stream must always exist)
-        if ( !ahGetDeviceStreamIdList ( deviceSelection.OutputDeviceId, biOUTPUT, vOutputStreamIDList ) )
-        {
-            strErrorList.append ( tr ( "The output device doesn't have any valid outputs." ) );
-            ok = outputDeviceOk = false;
-        }
-    }
-
-    if ( ok )
-    {
-        ok = setBufferSize ( deviceSelection.InputDeviceId, deviceSelection.OutputDeviceId, iProtocolBufferSize, iDeviceBufferSize );
-        if ( ok )
-        {
-            // According to the AudioHardware documentation: "If the format is a linear PCM
-            // format, the data will always be presented as 32 bit, native endian floating
-            // point. All conversions to and from the true physical format of the hardware
-            // is handled by the devices driver.".
-            // check the input
-            if ( !ahGetStreamFormat ( vInputStreamIDList[0], CurDevStreamFormat ) || // pgScorpio: this one fails !
-                 !StreamformatOk ( CurDevStreamFormat ) )
-            {
-                strErrorList.append ( tr ( "The stream format on the current input device isn't compatible with %1." ).arg ( APP_NAME ) );
-                ok = inputDeviceOk = false;
-            }
-
-            if ( !ahGetStreamFormat ( vOutputStreamIDList[0], CurDevStreamFormat ) || !StreamformatOk ( CurDevStreamFormat ) )
-            {
-                strErrorList.append ( tr ( "The stream format on the current output device isn't compatible with %1." ).arg ( APP_NAME ) );
-                ok = outputDeviceOk = false;
-            }
-        }
-    }
-
-    return ok;
+    return newDeviceCapabilities.Ok();
 }
 
 //============================================================================
@@ -1259,7 +1223,20 @@ bool CSound::checkDeviceChange ( CSoundBase::tDeviceChangeCheck mode, int iDrive
     switch ( mode )
     {
     case CSoundBase::tDeviceChangeCheck::CheckOpen:
-        return device[iDriverIndex].IsValid();
+        if ( device[iDriverIndex].IsValid() )
+        {
+            Float64 sampleRate;
+            if ( !ahGetDeviceSampleRate ( device[iDriverIndex].InputDeviceId, sampleRate ) )
+            {
+                return false;
+            }
+            if ( !ahGetDeviceSampleRate ( device[iDriverIndex].OutputDeviceId, sampleRate ) )
+            {
+                return false;
+            }
+            return true;
+        }
+        return false;
 
     case CSoundBase::tDeviceChangeCheck::CheckCapabilities:
         return CheckDeviceCapabilities ( device[iDriverIndex] );

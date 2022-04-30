@@ -204,6 +204,50 @@ public:
     // (Make sure to also set defaults and/or set values in CSound constructor)
 };
 
+//============================================================================
+// CSoundCapabilities:
+//============================================================================
+
+class CSoundCapabilities
+{
+public:
+    CSoundCapabilities() { Clear(); }
+
+    void Clear()
+    {
+        bCanSetSystemSampleRate = false;
+        bCanSystemSampleRate    = false;
+        bHasMinNumInputs        = false;
+        bHasMinNumOutputs       = false;
+        bInputSampleFormatOk    = false;
+        bOutputSampleFormatOk   = false;
+    }
+
+    void SetAllOk()
+    {
+        bCanSetSystemSampleRate = true;
+        bCanSystemSampleRate    = true;
+        bHasMinNumInputs        = true;
+        bHasMinNumOutputs       = true;
+        bInputSampleFormatOk    = true;
+        bOutputSampleFormatOk   = true;
+    }
+
+    bool Ok() const
+    {
+        return ( bCanSetSystemSampleRate && bCanSystemSampleRate && bHasMinNumInputs && bHasMinNumOutputs && bInputSampleFormatOk &&
+                 bOutputSampleFormatOk );
+    }
+
+public:
+    bool bCanSetSystemSampleRate;
+    bool bCanSystemSampleRate;
+    bool bHasMinNumInputs;
+    bool bHasMinNumOutputs;
+    bool bInputSampleFormatOk;
+    bool bOutputSampleFormatOk;
+};
+
 //=======================================================================================
 // CSoundBase class:
 //=======================================================================================
@@ -255,7 +299,6 @@ protected:
 protected:
     QString strDriverTechniqueName;
     QString strClientName;
-    bool    bAutoConnect;
 
 private:
     bool bStarted; // Set by _onStart, reset by _onStop
@@ -499,11 +542,15 @@ public:
 protected:
     typedef enum class TDEVICECHANGECHECK
     {
-        Abort = -1,
-        CheckOpen,
-        CheckCapabilities,
-        Activate,
+        Abort = -1,        // Should close the new device. (CSoundBase will try a next device or Revert to previous device..)
+        CheckOpen,         // Should open the new device
+        CheckCapabilities, // Should set all flags in CSoundBase::newDeviceCapabilities according to the new device capabilities
+        Activate,          // Should set the new device as current device
     } tDeviceChangeCheck;
+
+    CSoundCapabilities newDeviceCapabilities;
+
+    void getDeviceCapabilityErrors ( const CSoundCapabilities newDeviceCapabilities );
 
     //========================================================================
     // pgScorpio: For clarity always list all virtual functions in separate

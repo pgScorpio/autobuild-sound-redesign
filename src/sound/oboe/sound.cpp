@@ -424,7 +424,9 @@ bool CSound::checkCapabilities()
 {
     // TODO ???
     //  For now anything is OK
-    return true;
+    newDeviceCapabilities.SetAllOk();
+
+    return newDeviceCapabilities.Ok();
 }
 
 //============================================================================
