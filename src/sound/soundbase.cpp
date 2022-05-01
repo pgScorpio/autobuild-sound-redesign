@@ -143,7 +143,8 @@ CSoundProperties::CSoundProperties() :
     bHasSetupDialog ( false ),
     bHasInputChannelSelection ( true ),
     bHasOutputChannelSelection ( true ),
-    bHasInputGainSelection ( true )
+    bHasInputGainSelection ( true ),
+    bHasInputMuteSelection ( bHasInputGainSelection )
 {
     setDefaultTexts();
 }
@@ -185,8 +186,7 @@ CSoundBase::CSoundBase ( const QString& systemDriverTechniqueName,
     }
 
     clearDeviceInfo();
-    resetInputChannelsGain();
-    resetInputChannelsMute();
+    resetInputChannelsGainAndMute();
     resetChannelMapping();
 
     // setup timers
@@ -255,6 +255,18 @@ void CSoundBase::resetInputChannelsGain()
     {
         inputChannelsGainSetting[i] = 1;
         inputChannelsGain[i]        = inputChannelsMuteSetting[i] ? 0 : 1;
+    }
+}
+
+void CSoundBase::resetInputChannelsGainAndMute()
+{
+    QMutexLocker locker ( &mutexAudioProcessCallback );
+
+    for ( unsigned int i = 0; i < PROT_NUM_IN_CHANNELS; i++ )
+    {
+        inputChannelsMuteSetting[i] = false;
+        inputChannelsGainSetting[i] = 1;
+        inputChannelsGain[i]        = 1;
     }
 }
 
@@ -552,6 +564,8 @@ bool CSoundBase::SetLeftInputMute ( bool bMute )
     {
         inputChannelsGain[0] = inputChannelsGainSetting[0];
     }
+
+    return bMute;
 }
 
 bool CSoundBase::SetRightInputMute ( bool bMute )
@@ -574,6 +588,8 @@ bool CSoundBase::SetRightInputMute ( bool bMute )
     {
         inputChannelsGain[1] = inputChannelsGainSetting[1];
     }
+
+    return bMute;
 }
 
 int CSoundBase::SetLeftInputGain ( int iGain )

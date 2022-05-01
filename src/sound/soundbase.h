@@ -119,9 +119,6 @@
 
 #define DRV_MAX_INPUT_GAIN 10
 
-// TODO better solution with enum definition
-// problem: in signals it seems not to work to use CSoundBase::ESndCrdResetType
-
 typedef enum TSNDCRDRESETTYPE
 {
     RS_ONLY_RESTART = 1,
@@ -176,7 +173,9 @@ protected:
 
     bool bHasInputChannelSelection;
     bool bHasOutputChannelSelection;
+
     bool bHasInputGainSelection;
+    bool bHasInputMuteSelection; // Only valid if also bHasInputGainSelection == true
 
     void setDefaultTexts();
 
@@ -199,6 +198,7 @@ public:
     inline bool HasInputChannelSelection() const { return bHasInputChannelSelection; }
     inline bool HasOutputChannelSelection() const { return bHasOutputChannelSelection; }
     inline bool HasInputGainSelection() const { return bHasInputGainSelection; }
+    inline bool HasInputMuteSelection() const { return bHasInputMuteSelection && bHasInputGainSelection; }
 
     // Add more ui texts here if needed...
     // (Make sure to also set defaults and/or set values in CSound constructor)
@@ -369,9 +369,10 @@ protected:
     int selectedInputChannels[PROT_NUM_IN_CHANNELS];   // Array with indexes of selected input channels
     int selectedOutputChannels[PROT_NUM_OUT_CHANNELS]; // Array with indexes of selected output channels
 
-    void resetInputChannelsMute(); // Unmutes all InputChannels
-    void resetInputChannelsGain(); // Sets all protocol InputChannel gains to 1
-    void resetChannelMapping();    // Sets default input/output channel selection (first available channels)
+    void resetInputChannelsMute();        // Unmutes all InputChannels
+    void resetInputChannelsGain();        // Sets all InputChannel gains to 1
+    void resetInputChannelsGainAndMute(); // Unmutes all InputChannels and set Gain to 1
+    void resetChannelMapping();           // Sets default input/output channel selection (first available channels)
 
 protected:
     static long getNumInputChannelsToAdd ( long lNumInChan );
