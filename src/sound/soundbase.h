@@ -359,12 +359,17 @@ protected:
 
     void clearDeviceInfo();
 
+private:
+    bool inputChannelsMuteSetting[PROT_NUM_IN_CHANNELS]; // Array with mute settings
+    int  inputChannelsGainSetting[PROT_NUM_IN_CHANNELS]; // Array with gain factor setting for input channels
+
 protected:
     // Channel selection:
     int inputChannelsGain[PROT_NUM_IN_CHANNELS];       // Array with gain factor for input channels
     int selectedInputChannels[PROT_NUM_IN_CHANNELS];   // Array with indexes of selected input channels
     int selectedOutputChannels[PROT_NUM_OUT_CHANNELS]; // Array with indexes of selected output channels
 
+    void resetInputChannelsMute(); // Unmutes all InputChannels
     void resetInputChannelsGain(); // Sets all protocol InputChannel gains to 1
     void resetChannelMapping();    // Sets default input/output channel selection (first available channels)
 
@@ -471,11 +476,17 @@ public:
     void       SetRightOutputChannel ( const int iNewChan );
     inline int GetRightOutputChannel() const { return selectedOutputChannels[1]; }
 
+    bool GetLeftInputMute() const { return inputChannelsMuteSetting[0]; };
+    bool SetLeftInputMute ( bool bMute );
+
+    bool GetRightInputMute() const { return inputChannelsMuteSetting[1]; };
+    bool SetRightInputMute ( bool bMute );
+
     int        SetLeftInputGain ( int iGain );
-    inline int GetLeftInputGain() const { return inputChannelsGain[0]; };
+    inline int GetLeftInputGain() const { return inputChannelsGainSetting[0]; };
 
     int        SetRightInputGain ( int iGain );
-    inline int GetRightInputGain() const { return inputChannelsGain[1]; };
+    inline int GetRightInputGain() const { return inputChannelsGainSetting[1]; };
 
     inline float GetInOutLatencyMs() const { return fInOutLatencyMs; }
 

@@ -186,6 +186,7 @@ CSoundBase::CSoundBase ( const QString& systemDriverTechniqueName,
 
     clearDeviceInfo();
     resetInputChannelsGain();
+    resetInputChannelsMute();
     resetChannelMapping();
 
     // setup timers
@@ -235,13 +236,25 @@ void CSoundBase::clearDeviceInfo()
     fInOutLatencyMs = 0.0;
 }
 
+void CSoundBase::resetInputChannelsMute()
+{
+    QMutexLocker locker ( &mutexAudioProcessCallback );
+
+    for ( unsigned int i = 0; i < PROT_NUM_IN_CHANNELS; i++ )
+    {
+        inputChannelsMuteSetting[i] = false;
+        inputChannelsGain[i]        = inputChannelsGainSetting[i];
+    }
+}
+
 void CSoundBase::resetInputChannelsGain()
 {
     QMutexLocker locker ( &mutexAudioProcessCallback );
 
     for ( unsigned int i = 0; i < PROT_NUM_IN_CHANNELS; i++ )
     {
-        inputChannelsGain[i] = 1;
+        inputChannelsGainSetting[i] = 1;
+        inputChannelsGain[i]        = inputChannelsMuteSetting[i] ? 0 : 1;
     }
 }
 
@@ -519,14 +532,59 @@ void CSoundBase::SetRightOutputChannel ( const int iNewChan )
     }
 }
 
-int CSoundBase::SetLeftInputGain ( int iGain )
+bool CSoundBase::SetLeftInputMute ( bool bMute )
 {
+    QMutexLocker locker ( &mutexAudioProcessCallback ); // get mutex lock
+
     if ( !soundProperties.bHasInputGainSelection )
     {
-        return 1;
+        bMute                       = false;
+        inputChannelsGainSetting[0] = 1;
     }
 
+    inputChannelsMuteSetting[0] = bMute;
+
+    if ( inputChannelsMuteSetting[0] )
+    {
+        inputChannelsGain[0] = 0;
+    }
+    else
+    {
+        inputChannelsGain[0] = inputChannelsGainSetting[0];
+    }
+}
+
+bool CSoundBase::SetRightInputMute ( bool bMute )
+{
     QMutexLocker locker ( &mutexAudioProcessCallback ); // get mutex lock
+
+    if ( !soundProperties.bHasInputGainSelection )
+    {
+        bMute                       = false;
+        inputChannelsGainSetting[1] = 1;
+    }
+
+    inputChannelsMuteSetting[1] = bMute;
+
+    if ( inputChannelsMuteSetting[1] )
+    {
+        inputChannelsGain[1] = 0;
+    }
+    else
+    {
+        inputChannelsGain[1] = inputChannelsGainSetting[1];
+    }
+}
+
+int CSoundBase::SetLeftInputGain ( int iGain )
+{
+    QMutexLocker locker ( &mutexAudioProcessCallback ); // get mutex lock
+
+    if ( !soundProperties.bHasInputGainSelection )
+    {
+        iGain                       = 1;
+        inputChannelsMuteSetting[0] = false;
+    }
 
     if ( iGain < 1 )
     {
@@ -537,19 +595,29 @@ int CSoundBase::SetLeftInputGain ( int iGain )
         iGain = DRV_MAX_INPUT_GAIN;
     }
 
-    inputChannelsGain[0] = iGain;
+    inputChannelsGainSetting[0] = iGain;
+
+    if ( inputChannelsMuteSetting[0] )
+    {
+        inputChannelsGain[0] = 0;
+    }
+    else
+    {
+        inputChannelsGain[0] = inputChannelsGainSetting[0];
+    }
 
     return iGain;
 }
 
 int CSoundBase::SetRightInputGain ( int iGain )
 {
+    QMutexLocker locker ( &mutexAudioProcessCallback ); // get mutex lock
+
     if ( !soundProperties.bHasInputGainSelection )
     {
-        return 1;
+        iGain                       = 1;
+        inputChannelsMuteSetting[1] = false;
     }
-
-    QMutexLocker locker ( &mutexAudioProcessCallback ); // get mutex lock
 
     if ( iGain < 1 )
     {
@@ -560,7 +628,16 @@ int CSoundBase::SetRightInputGain ( int iGain )
         iGain = DRV_MAX_INPUT_GAIN;
     }
 
-    inputChannelsGain[1] = iGain;
+    inputChannelsGainSetting[1] = iGain;
+
+    if ( inputChannelsMuteSetting[1] )
+    {
+        inputChannelsGain[1] = 0;
+    }
+    else
+    {
+        inputChannelsGain[1] = inputChannelsGainSetting[1];
+    }
 
     return iGain;
 }
