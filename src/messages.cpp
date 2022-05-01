@@ -23,7 +23,10 @@
 \******************************************************************************/
 
 #include "messages.h"
-#include <QTextEdit>
+
+#ifndef HEADLESS
+#    include <QTextEdit>
+#endif
 
 tMainform* CMessages::pMainForm = NULL;
 QString    CMessages::strMainFormName;
@@ -32,18 +35,27 @@ QString CMessages::ToUtf8Printable ( const QString& text )
 {
     QString plainText;
 
+#ifndef HEADLESS
     {
         QTextEdit textEdit;
 
         textEdit.setText ( text );          // Text can be html...
         plainText = textEdit.toPlainText(); // Text will be plain Text !
     }
+#else
+    plainText = text;
+    // Remove htmlBold
+    plainText.replace ( "<b>", "" );
+    plainText.replace ( "</b>", "" );
+    // Translate htmlNewLine
+    plainText.replace ( "<br>", "\n" );
 
     // no multiple newlines
     while ( plainText.contains ( "\n\n" ) )
     {
         plainText.replace ( "\n\n", "\n" );
     }
+#endif
 
 #ifdef _WIN32
     // LF to CRLF
@@ -81,5 +93,98 @@ void CMessages::ShowInfo ( QString strInfo )
     QMessageBox::information ( pMainForm, strMainFormName + ": " + QObject::tr ( "Information" ), strInfo, QObject::tr ( "Ok" ), nullptr );
 #else
     qInfo().noquote() << "Info: " << ToUtf8Printable ( strInfo );
+#endif
+}
+
+bool CMessages::ShowErrorWait ( QString strError, const QString strActionButtonText, const QString strAbortButtonText, bool bDefault )
+{
+#ifndef HEADLESS
+    QMessageBox  msgBox ( pMainForm );
+    QPushButton* actionButton = msgBox.addButton ( strActionButtonText, QMessageBox::ActionRole );
+    QPushButton* abortButton  = NULL;
+    if ( !strAbortButtonText.isEmpty() )
+    {
+        abortButton = msgBox.addButton ( strAbortButtonText, QMessageBox::ActionRole );
+        if ( bDefault )
+        {
+            msgBox.setDefaultButton ( actionButton );
+        }
+        else
+        {
+            msgBox.setDefaultButton ( abortButton );
+        }
+    }
+
+    msgBox.setIcon ( QMessageBox::Icon::Critical );
+    msgBox.setWindowTitle ( strMainFormName + ": " + QObject::tr ( "Error" ) );
+    msgBox.setText ( strError );
+    return ( msgBox.exec() == 0 );
+#else
+    Q_UNUSED ( strActionButtonText )
+    Q_UNUSED ( strAbortButtonText )
+    qCritical().noquote() << "Error: " << ToUtf8Printable ( strError );
+    return bDefault;
+#endif
+}
+
+bool CMessages::ShowWarningWait ( QString strWarning, const QString strActionButtonText, const QString strAbortButtonText, bool bDefault )
+{
+#ifndef HEADLESS
+    QMessageBox  msgBox ( pMainForm );
+    QPushButton* actionButton = msgBox.addButton ( strActionButtonText, QMessageBox::ActionRole );
+    QPushButton* abortButton  = NULL;
+    if ( !strAbortButtonText.isEmpty() )
+    {
+        abortButton = msgBox.addButton ( strAbortButtonText, QMessageBox::ActionRole );
+        if ( bDefault )
+        {
+            msgBox.setDefaultButton ( actionButton );
+        }
+        else
+        {
+            msgBox.setDefaultButton ( abortButton );
+        }
+    }
+
+    msgBox.setIcon ( QMessageBox::Icon::Warning );
+    msgBox.setWindowTitle ( strMainFormName + ": " + QObject::tr ( "Warning" ) );
+    msgBox.setText ( strWarning );
+    return ( msgBox.exec() == 0 );
+#else
+    Q_UNUSED ( strActionButtonText )
+    Q_UNUSED ( strAbortButtonText )
+    qWarning().noquote() << "Warning: " << ToUtf8Printable ( strWarning );
+    return bDefault;
+#endif
+}
+
+bool CMessages::ShowInfoWait ( QString strInfo, const QString strActionButtonText, const QString strAbortButtonText, bool bDefault )
+{
+#ifndef HEADLESS
+    QMessageBox  msgBox ( pMainForm );
+    QPushButton* actionButton = msgBox.addButton ( strActionButtonText, QMessageBox::ActionRole );
+    QPushButton* abortButton  = NULL;
+    if ( !strAbortButtonText.isEmpty() )
+    {
+        abortButton = msgBox.addButton ( strAbortButtonText, QMessageBox::ActionRole );
+        if ( bDefault )
+        {
+            msgBox.setDefaultButton ( actionButton );
+        }
+        else
+        {
+            msgBox.setDefaultButton ( abortButton );
+        }
+    }
+
+    msgBox.setIcon ( QMessageBox::Icon::Warning );
+    msgBox.setWindowTitle ( strMainFormName + ": " + QObject::tr ( "Info" ) );
+    msgBox.setText ( strInfo );
+    return ( msgBox.exec() == 0 );
+#else
+    Q_UNUSED ( strActionButtonText )
+    Q_UNUSED ( strAbortButtonText )
+    qInfo().noquote() << "Info: " << ToUtf8Printable ( strInfo );
+    return bDefault;
 #endif
 }
