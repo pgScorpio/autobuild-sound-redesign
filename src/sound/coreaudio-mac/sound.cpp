@@ -1042,7 +1042,8 @@ bool CSound::CheckDeviceCapabilities ( cDeviceInfo& deviceSelection )
         newDeviceCapabilities.bCanSystemSampleRate = false;
 
         // try to change the sample rate
-        if ( ahSetDeviceSampleRate ( deviceSelection.InputDeviceId, fSystemSampleRate ) && ahSetDeviceSampleRate ( deviceSelection.OutputDeviceId, fSystemSampleRate )
+        if ( ahSetDeviceSampleRate ( deviceSelection.InputDeviceId, fSystemSampleRate ) &&
+             ahSetDeviceSampleRate ( deviceSelection.OutputDeviceId, fSystemSampleRate ) )
         {
             newDeviceCapabilities.bCanSystemSampleRate = true;
         }
