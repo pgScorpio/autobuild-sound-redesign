@@ -242,6 +242,10 @@ CServer::CServer ( CServerSettings& cSettings ) :
     bDisconnectAllClientsOnQuit ( cSettings.CommandlineOptions.discononquit.IsSet() ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
+    // First emit a queued event to myself so OnStartup will be called as soon as the application starts running.
+    QObject::connect ( this, &CServer::Startup, this, &CServer::OnStartup, Qt::ConnectionType::QueuedConnection );
+    emit Startup();
+
     int iOpusError;
     int i;
 
@@ -484,6 +488,8 @@ CServer::CServer ( CServerSettings& cSettings ) :
     // initializations and connections)
     Socket.Start();
 }
+
+void CServer::OnStartup() { ApplySettings(); }
 
 void CServer::ApplySettings()
 {

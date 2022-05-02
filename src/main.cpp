@@ -205,14 +205,14 @@ int main ( int argc, char** argv )
 #ifdef SERVER_ONLY
         if ( bIsClient )
         {
-            throw CErrorExit ( "Only --server mode is supported in this build." );
+            throw CErrorExit ( "Coding Error: bIsClient set in SERVER_ONLY build." );
         }
 #endif
 
 #ifdef HEADLESS
         if ( bUseGUI )
         {
-            throw CErrorExit ( "Only --nogui mode is supported in this build." );
+            throw CErrorExit ( "Coding Error: bUseGUI set in HEADLESS build." );
         }
 #endif;
 
@@ -366,7 +366,6 @@ int main ( int argc, char** argv )
                 // show dialog
                 ClientDlg.show();
 
-                Client.ApplySettings();
                 exit_code = pApplication->exec();
             }
             else
@@ -378,7 +377,6 @@ int main ( int argc, char** argv )
                 // initialise message boxes
                 CMessages::init ( NULL, GetAppName() );
 
-                Client.ApplySettings();
                 exit_code = pCoreApplication->exec();
             }
         }
@@ -440,7 +438,6 @@ int main ( int argc, char** argv )
                     ServerDlg.show();
                 }
 
-                Server.ApplySettings();
                 exit_code = pApplication->exec();
             }
             else
@@ -448,8 +445,6 @@ int main ( int argc, char** argv )
             {
                 // only start application without using the GUI
                 qInfo() << qUtf8Printable ( GetVersionAndNameStr ( false ) );
-
-                Server.ApplySettings();
 
                 if ( commandlineOptions.directoryserver.Value().isEmpty() )
                 {

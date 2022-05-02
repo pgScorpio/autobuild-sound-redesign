@@ -104,8 +104,6 @@ public:
 
     virtual ~CClient();
 
-    void ApplySettings();
-
     bool IsRunning() { return Sound.IsRunning(); }
     bool IsCallbackEntered() const { return Sound.IsCallbackEntered(); }
 
@@ -122,6 +120,8 @@ public:
     void SetRemoteChanPan ( const int iId, const float fPan ) { Channel.SetRemoteChanPan ( iId, fPan ); }
 
 protected:
+    void ApplySettings();
+
     bool SetServerAddr ( QString strNAddr );
 
 public:
@@ -294,6 +294,8 @@ protected:
     CSignalHandler* pSignalHandler;
 
 protected slots:
+    void OnStartup();
+
     void OnHandledSignal ( int sigNum );
     void OnSendProtMessage ( CVector<uint8_t> vecMessage );
     void OnInvalidPacketReceived ( CHostAddress RecHostAddr );
@@ -369,6 +371,8 @@ public slots:
     }
 
 signals:
+    void Startup();
+
     void ConClientListMesReceived ( CVector<CChannelInfo> vecChanInfo );
     void ChatTextReceived ( QString strChatText );
     void ClientIDReceived ( int iChanID );

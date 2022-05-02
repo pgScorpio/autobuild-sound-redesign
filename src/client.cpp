@@ -58,6 +58,10 @@ CClient::CClient ( CClientSettings& cSettings ) :
     bMuteMeInPersonalMix ( cSettings.CommandlineOptions.mutemyown.IsSet() ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
+    // First emit a queued event to myself so OnStartup will be called as soon as the application starts running.
+    QObject::connect ( this, &CClient::Startup, this, &CClient::OnStartup, Qt::ConnectionType::QueuedConnection );
+    emit Startup();
+
     Settings.SetClientName ( cSettings.CommandlineOptions.clientname.Value() );
 
     int iOpusError;
@@ -195,6 +199,8 @@ CClient::~CClient()
     opus_custom_mode_destroy ( OpusMode );
     opus_custom_mode_destroy ( Opus64Mode );
 }
+
+void CClient::OnStartup() { ApplySettings(); }
 
 void CClient::ApplySettings()
 {

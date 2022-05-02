@@ -25,9 +25,12 @@
 #include "global.h"
 #include "cmdlnoptions.h"
 #include "messages.h"
-#include <vector>
+
+//Translations: 
+// note that translation is probably not yet initialized anyway when loading the commandline options.
 
 #ifdef HEADLESS
+// Do NOT translate in headless mode !
 #    define TR( s ) QString ( s )
 #else
 #    define TR( s ) QObject::tr ( s )
@@ -36,6 +39,27 @@
 /******************************************************************************
  CCmdlnOptBase: base class for all commandline option classes
  ******************************************************************************/
+
+void CCmdlnOptBase::Set()
+{
+    if ( bDepricated )
+    {
+        if ( pReplacedBy )
+        {
+            // if pReplacedBy is set *pReplacedBy should already be set instead !
+            bSet = !pReplacedBy->bSet;
+        }
+
+        if ( !strDepricated.isEmpty() )
+        {
+            CMessages::ShowWarningWait ( strDepricated );
+        }
+    }
+    else
+    {
+        bSet = true;
+    }
+}
 
 ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
                                               int               argc,
@@ -255,8 +279,8 @@ ECmdlnOptCheckResult CCmndlnUIntOption::check ( ECmdlnOptDestType destType, int 
  ******************************************************************************/
 
 CCommandlineOptions::CCommandlineOptions() :
-    // NOTE: help, version are handled in main !
-    //       they do not belong in this list, since CCommandlineOptions is never instantiated when they are on the commandline
+    // NOTE: help and version are handled in main so they do not need to be in this list,
+    //       since when they are on the commandline, main will exit and CCommandlineOptions is never used
 
     // Common options:
     inifile ( ECmdlnOptDestType::Common, CMDLN_INIFILE ),
@@ -280,10 +304,9 @@ CCommandlineOptions::CCommandlineOptions() :
     showanalyzerconsole ( ECmdlnOptDestType::Client, CMDLN_SHOWANALYZERCONSOLE ),
 
     // Server Only options:
-    // note that the server option is already checked in main
-    // and commandline options should be read as type Server if --server is on the commandline
-    // so here server is only valid in Server mode
-    server ( ECmdlnOptDestType::Server, CMDLN_SERVER ),
+    // NOTE: server desttype is set to common here since it may be overidden in main
+    //       if overidden by main a message will be shown.
+    server ( ECmdlnOptDestType::Common, CMDLN_SERVER ),
     discononquit ( ECmdlnOptDestType::Server, CMDLN_DISCONONQUIT ),
     directoryserver ( ECmdlnOptDestType::Server, CMDLN_DIRECTORYSERVER ),
     directoryfile ( ECmdlnOptDestType::Server, CMDLN_DIRECTORYFILE ),
@@ -311,13 +334,13 @@ CCommandlineOptions::CCommandlineOptions() :
     centralserver.SetDepricated ( "--centralserver is depricated, please use --directoryserver instead", &directoryserver );
 }
 
-bool CCommandlineOptions::check ( ECmdlnOptDestType eDestType,
-                                  const QString&    unknowOptions,
-                                  const QString&    invalidDests,
-                                  const QString&    invalidParams,
-                                  const QString&    depricatedParams )
+bool CCommandlineOptions::showErrorMessage ( ECmdlnOptDestType eDestType,
+                                             const QString&    unknowOptions,
+                                             const QString&    invalidDests,
+                                             const QString&    invalidParams )
 {
-    bool ok = !( unknowOptions.size() || invalidDests.size() || invalidParams.size() || unknowOptions.size() );
+    bool    ok      = !( unknowOptions.size() || invalidDests.size() || invalidParams.size() || unknowOptions.size() );
+    QString msgHelp = QString ( htmlNewLine() htmlNewLine() ) + TR ( "Run %1 %2 for the valid commandline parameters." ).arg ( APP_NAME, "--help" );
 
     if ( !ok )
     {
@@ -327,38 +350,31 @@ bool CCommandlineOptions::check ( ECmdlnOptDestType eDestType,
         {
             if ( eDestType == ECmdlnOptDestType::Client )
             {
-                message = TR ( "The folowing option(s) are not valid for %1 mode" ).arg ( TR ( "Client" ) );
+                message = TR ( "These commandline option(s) are not valid for %1 mode" ).arg ( TR ( "Client" ) );
             }
             else if ( eDestType == ECmdlnOptDestType::Server )
             {
-                message = TR ( "The folowing option(s) are not valid for %1 mode" ).arg ( TR ( "Server" ) );
+                message = TR ( "These commandline option(s) are not valid for %1 mode" ).arg ( TR ( "Server" ) );
             }
             else
             {
-                message = TR ( "Invalid option(s) on commandline" );
+                message = TR ( "Invalid commandline option(s)" );
             }
-            CMessages::ShowError ( message + ":" + invalidDests );
+            CMessages::ShowErrorWait ( htmlBold ( message + ":" ) htmlNewLine() + invalidDests + msgHelp );
         }
         else if ( invalidParams.size() )
         {
-            message = TR ( "Option(s) with invalid values" );
-            CMessages::ShowError ( message + ":" + invalidParams );
+            message = TR ( "Commandline option(s) with invalid values" );
+            CMessages::ShowErrorWait ( htmlBold ( message + ":" ) htmlNewLine() + invalidParams );
         }
         else if ( unknowOptions.size() )
         {
-            message = TR ( "Unknown option(s) on commandline" );
-            CMessages::ShowError ( message + ":" + unknowOptions );
+            message = TR ( "Unknown commandline option(s)" );
+            CMessages::ShowErrorWait ( htmlBold ( message + ":" ) htmlNewLine() + unknowOptions + msgHelp );
         }
     }
-    else if ( depricatedParams.size() )
-    {
-        QString message;
-        message = htmlBold ( TR ( "Depricated option(s) on the commandline:" ) ) + htmlNewLine();
-        CMessages::ShowWarning ( message + depricatedParams + htmlNewLine() + htmlNewLine() +
-                                 TR ( "run %1 %2 to see the valid options." ).arg ( APP_NAME, "--help" ) );
-    }
 
-    return ok;
+    return !ok;
 }
 
 bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** argv )
@@ -415,7 +431,6 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** 
     QString unknowOptions;
     QString invalidDests;
     QString invalidParams;
-    QString depricatedParams;
 
     for ( int i = 1; i < argc; i++ )
     {
@@ -455,11 +470,6 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** 
 
             if ( optionFound )
             {
-                if ( cmdLineOption[option]->IsDepricated() )
-                {
-                    depricatedParams += " " + strParam;
-                }
-
                 break;
             }
         }
@@ -473,30 +483,30 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** 
         }
     }
 
-    if ( check ( eDestType, unknowOptions, invalidDests, invalidParams, depricatedParams ) )
+    if ( !showErrorMessage ( eDestType, unknowOptions, invalidDests, invalidParams ) )
     {
-        QString message ( "- Forcing %1 mode due to application version." );
+        QString message ( TR( "Forcing %1 mode due to application version." ) );
 
         if ( bIsClient && server.IsSet() )
         {
             server.Unset();
-            qWarning() << qUtf8Printable ( message.arg ( "Client" ) );
+            CMessages::ShowWarningWait ( message.arg ( TR("Client") ) );
         }
         else if ( !bIsClient && !server.IsSet() )
         {
             server.Set();
-            qWarning() << qUtf8Printable ( message.arg ( "Server" ) );
+            CMessages::ShowWarningWait ( message.arg ( TR("Server") ) );
         }
 
         if ( bUseGUI && nogui.IsSet() )
         {
             nogui.Unset();
-            qWarning() << qUtf8Printable ( message.arg ( "GUI" ) );
+            CMessages::ShowWarningWait ( message.arg ( TR("GUI") ) );
         }
         else if ( !bUseGUI && !nogui.IsSet() )
         {
             nogui.Set();
-            qWarning() << qUtf8Printable ( message.arg ( "HEADLESS" ) );
+            CMessages::ShowWarningWait ( message.arg ( TR("HEADLESS") ) );
         }
 
         return true;

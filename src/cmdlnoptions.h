@@ -125,27 +125,7 @@ protected:
         bDepricated   = true;
     }
 
-    void Set()
-    {
-        if ( bDepricated )
-        {
-            if ( pReplacedBy )
-            {
-                // if pReplacedBy is set *pReplacedBy should already be set instead !
-                bSet = !pReplacedBy->bSet;
-            }
-
-            if ( !strDepricated.isEmpty() )
-            {
-                qWarning() << qUtf8Printable ( strDepricated );
-            }
-        }
-        else
-        {
-            bSet = true;
-        }
-    }
-
+    void Set();
     void Unset() { bSet = false; }
 
 public:
@@ -460,11 +440,10 @@ public:
 protected:
     // check: Called from Load
     //        Checks the Load result and shows any errors.
-    bool CCommandlineOptions::check ( ECmdlnOptDestType eDestType,
+    bool CCommandlineOptions::showErrorMessage ( ECmdlnOptDestType eDestType,
                                       const QString&    unknowOptions,
                                       const QString&    invalidDests,
-                                      const QString&    invalidParams,
-                                      const QString&    depricatedParams );
+                                      const QString&    invalidParams );
 
 public:
     // NOTE: when adding commandline options:

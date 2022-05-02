@@ -156,8 +156,6 @@ public:
 
     virtual ~CServer();
 
-    void ApplySettings();
-
     void Start();
     void Stop();
     bool IsRunning() { return HighPrecisionTimer.isActive(); }
@@ -234,6 +232,8 @@ public:
     bool IsDelayPanningEnabled() { return Settings.GetDelayPan(); }
 
 protected:
+    void ApplySettings();
+
     // access functions for actual channels
     bool IsConnected ( const int iChanNum ) { return vecChannels[iChanNum].IsConnected(); }
 
@@ -365,6 +365,8 @@ protected:
     std::unique_ptr<CThreadPool> pThreadPool;
 
 signals:
+    void Startup();
+
     void Started();
     void Stopped();
     void ClientDisconnected ( const int iChID );
@@ -383,8 +385,12 @@ signals:
     void RecordingSessionStarted ( QString sessionDir );
     void EndRecorderThread();
 
-public slots:
+protected slots:
+    void OnStartup();
+
     void OnTimer();
+
+public slots:
 
     void OnNewConnection ( int iChID, int iTotChans, CHostAddress RecHostAddr );
 
