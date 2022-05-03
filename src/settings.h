@@ -48,17 +48,24 @@ class CSettings : public QObject
     Q_OBJECT
 
 public:
-    CSettings ( CCommandlineOptions& cmdlnOptions ) :
-        CommandlineOptions ( cmdlnOptions ),
+    CSettings ( bool bIsClient, bool bUseGUI ) :
+        CommandlineOptions(),
         vecWindowPosMain(), // empty array
         strLanguage(),
         strFileName()
-    {}
+    {
+        if ( !CommandlineOptions.Load ( bIsClient, bUseGUI ) )
+        {
+#ifdef HEADLESS
+            throw CErrorExit ( "Parameter Error(s), Exiting" );
+#endif
+        }
+    }
 
     inline bool HaveGui() const { return !CommandlineOptions.nogui.IsSet(); }
 
 public: // common settings
-    CCommandlineOptions& CommandlineOptions;
+    CCommandlineOptions CommandlineOptions;
 
     QByteArray vecWindowPosMain;
     QString    strLanguage;
@@ -144,8 +151,8 @@ class CClientSettings : public CSettings
     Q_OBJECT
 
 public:
-    CClientSettings ( CCommandlineOptions& cmdlnOptions ) :
-        CSettings ( cmdlnOptions ),
+    CClientSettings ( bool bUseGUI ) :
+        CSettings ( true, bUseGUI ),
         cAudioDevice(),
         vecStoredFaderTags ( MAX_NUM_STORED_FADER_SETTINGS, "" ),
         vecStoredFaderLevels ( MAX_NUM_STORED_FADER_SETTINGS, AUD_MIX_FADER_MAX ),
@@ -191,7 +198,7 @@ public:
         bConnectionEnabled ( false ),
         bConnected ( false )
     {
-        SetFileName ( cmdlnOptions.inifile.Value(), DEFAULT_INI_FILE_NAME );
+        SetFileName ( CommandlineOptions.inifile.Value(), DEFAULT_INI_FILE_NAME );
         Load();
         // SelectSoundCard ( strCurrentAudioDevice );
     }
@@ -319,19 +326,17 @@ signals:
     void DisconnectRequested();
 
 public:
-    inline const QString& GetClientName() const { return strClientName; }
-    // TODO: needs to be set from commandline !
-    void SetClientName ( const QString& strName ) { strClientName = strName; }
+    inline const QString& GetClientName() const { return CommandlineOptions.clientname.Value(); }
 
     inline const QString GetWindowTitle()
     {
-        if ( strClientName.isEmpty() )
+        if ( GetClientName().isEmpty() )
         {
             return QString ( APP_NAME );
         }
         else
         {
-            return QString ( APP_NAME ) + " - " + strClientName;
+            return QString ( APP_NAME ) + " - " + GetClientName();
         }
     }
 
@@ -724,9 +729,6 @@ public:
         void StoreSoundCard ( CSoundCardSettings& sndCardSettings );
     */
 
-protected:                 // Unsaved settings:
-    QString strClientName; // Though this one actually should be saved, especially when --inifile is given !
-
 public: // Unsaved settings, needed by CClientSettingsDlg
     //### TODO: BEGIN ###//
     // these could be set by CSound on device selection or included in SoundProperties !
@@ -864,8 +866,8 @@ protected:
 class CServerSettings : public CSettings
 {
 public:
-    CServerSettings ( CCommandlineOptions& cmdlnOptions ) :
-        CSettings ( cmdlnOptions ),
+    CServerSettings ( bool bUseGUI ) :
+        CSettings ( false, bUseGUI ),
         strServerName ( "" ),
         strServerCity ( "" ),
         eServerCountry ( QLocale::Country::UnitedStates ),
@@ -878,7 +880,7 @@ public:
         bAutoRunMinimized ( false ),
         bDelayPan ( false )
     {
-        SetFileName ( cmdlnOptions.inifile.Value(), DEFAULT_INI_FILE_NAME_SERVER );
+        SetFileName ( CommandlineOptions.inifile.Value(), DEFAULT_INI_FILE_NAME_SERVER );
         Load();
     }
 

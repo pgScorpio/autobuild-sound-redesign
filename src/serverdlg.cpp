@@ -25,10 +25,10 @@
 #include "serverdlg.h"
 
 /* Implementation *************************************************************/
-CServerDlg::CServerDlg ( CServer* server, CServerSettings* settings, QWidget* parent ) :
+CServerDlg::CServerDlg ( CServer& cServer, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Window ), // use Qt::Window to get min/max window buttons
-    pServer ( server ),
-    pSettings ( settings ),
+    Server ( cServer ),
+    Settings ( cServer.Settings ),
     BitmapSystemTrayInactive ( QString::fromUtf8 ( ":/png/main/res/servertrayiconinactive.png" ) ),
     BitmapSystemTrayActive ( QString::fromUtf8 ( ":/png/main/res/servertrayiconactive.png" ) )
 {
@@ -255,7 +255,7 @@ CServerDlg::CServerDlg ( CServer* server, CServerSettings* settings, QWidget* pa
 
     // act on "start minimized" flag (note, this has to be done after setting
     // and acting on the correct value for the system tray icon availablility)
-    if ( pSettings->CommandlineOptions.startminimized.IsSet() )
+    if ( Settings.CommandlineOptions.startminimized.IsSet() )
     {
         showMinimized();
     }
@@ -333,7 +333,7 @@ lvwClients->setMinimumHeight ( 140 );
     tedWelcomeMessage->setPlaceholderText ( tr ( "Type a message here. If no message is set, the server welcome is disabled." ) );
 
     // language combo box (corrects the setting if language not found)
-    cbxLanguage->Init ( pSettings->strLanguage );
+    cbxLanguage->Init ( Settings.strLanguage );
 
     // recorder options
     pbtRecordingDir->setAutoDefault ( false );
@@ -347,7 +347,7 @@ lvwClients->setMinimumHeight ( 140 );
 #ifndef _WIN32
     chbStartOnOSStart->setVisible ( false );
 #else
-    const bool bCurAutoStartMinState = pServer->GetAutoRunMinimized();
+    const bool bCurAutoStartMinState = Server.GetAutoRunMinimized();
 
     if ( bCurAutoStartMinState )
     {
@@ -364,7 +364,7 @@ lvwClients->setMinimumHeight ( 140 );
 #endif
 
     // update delay panning check box
-    if ( pServer->IsDelayPanningEnabled() )
+    if ( Server.IsDelayPanningEnabled() )
     {
         chbEnableDelayPanning->setCheckState ( Qt::Checked );
     }
@@ -399,9 +399,9 @@ lvwClients->setMinimumHeight ( 140 );
 
     // Window positions --------------------------------------------------------
     // main window
-    if ( !pSettings->vecWindowPosMain.isEmpty() && !pSettings->vecWindowPosMain.isNull() )
+    if ( !Settings.vecWindowPosMain.isEmpty() && !Settings.vecWindowPosMain.isNull() )
     {
-        restoreGeometry ( pSettings->vecWindowPosMain );
+        restoreGeometry ( Settings.vecWindowPosMain );
     }
 
     // Connections -------------------------------------------------------------
@@ -450,17 +450,17 @@ lvwClients->setMinimumHeight ( 140 );
     // other
     QObject::connect ( tedWelcomeMessage, &QTextEdit::textChanged, this, &CServerDlg::OnWelcomeMessageChanged );
 
-    QObject::connect ( pServer, &CServer::Started, this, &CServerDlg::OnServerStarted );
+    QObject::connect ( &Server, &CServer::Started, this, &CServerDlg::OnServerStarted );
 
-    QObject::connect ( pServer, &CServer::Stopped, this, &CServerDlg::OnServerStopped );
+    QObject::connect ( &Server, &CServer::Stopped, this, &CServerDlg::OnServerStopped );
 
-    QObject::connect ( pServer, &CServer::SvrRegStatusChanged, this, &CServerDlg::OnSvrRegStatusChanged );
+    QObject::connect ( &Server, &CServer::SvrRegStatusChanged, this, &CServerDlg::OnSvrRegStatusChanged );
 
-    QObject::connect ( pServer, &CServer::RecordingSessionStarted, this, &CServerDlg::OnRecordingSessionStarted );
+    QObject::connect ( &Server, &CServer::RecordingSessionStarted, this, &CServerDlg::OnRecordingSessionStarted );
 
-    QObject::connect ( pServer, &CServer::StopRecorder, this, &CServerDlg::OnStopRecorder );
+    QObject::connect ( &Server, &CServer::StopRecorder, this, &CServerDlg::OnStopRecorder );
 
-    QObject::connect ( pServer, &CServer::CLVersionAndOSReceived, this, &CServerDlg::OnCLVersionAndOSReceived );
+    QObject::connect ( &Server, &CServer::CLVersionAndOSReceived, this, &CServerDlg::OnCLVersionAndOSReceived );
 
     QObject::connect ( &SystemTrayIcon, &QSystemTrayIcon::activated, this, &CServerDlg::OnSysTrayActivated );
 
@@ -477,21 +477,21 @@ lvwClients->setMinimumHeight ( 140 );
     // Send the request to two servers for redundancy if either or both of them
     // has a higher release version number, the reply will trigger the notification.
 
-    if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK1_ADDRESS, UpdateServerHostAddress, pServer->IsIPv6Enabled() ) )
+    if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK1_ADDRESS, UpdateServerHostAddress, Server.IsIPv6Enabled() ) )
     {
-        pServer->CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
+        Server.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
     }
 
-    if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK2_ADDRESS, UpdateServerHostAddress, pServer->IsIPv6Enabled() ) )
+    if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK2_ADDRESS, UpdateServerHostAddress, Server.IsIPv6Enabled() ) )
     {
-        pServer->CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
+        Server.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
     }
 }
 
 void CServerDlg::closeEvent ( QCloseEvent* Event )
 {
     // store window positions
-    pSettings->vecWindowPosMain = saveGeometry();
+    Settings.vecWindowPosMain = saveGeometry();
 
     // default implementation of this event handler routine
     Event->accept();
@@ -502,7 +502,7 @@ void CServerDlg::OnStartOnOSStartStateChanged ( int value )
     const bool bCurAutoStartMinState = ( value == Qt::Checked );
 
     // update registry and server setting (for ini file)
-    pServer->SetAutoRunMinimized ( bCurAutoStartMinState );
+    Server.SetAutoRunMinimized ( bCurAutoStartMinState );
     ModifyAutoStartEntry ( bCurAutoStartMinState );
 }
 
@@ -514,7 +514,7 @@ void CServerDlg::OnServerNameEditingFinished()
     if ( strNewName.length() <= MAX_LEN_SERVER_NAME )
     {
         // apply new setting to the server and update it
-        pServer->SetServerName ( strNewName );
+        Server.SetServerName ( strNewName );
     }
     else
     {
@@ -531,7 +531,7 @@ void CServerDlg::OnLocationCityEditingFinished()
     if ( strNewCity.length() <= MAX_LEN_SERVER_CITY )
     {
         // apply new setting to the server and update it
-        pServer->SetServerCity ( strNewCity );
+        Server.SetServerCity ( strNewCity );
     }
     else
     {
@@ -543,7 +543,7 @@ void CServerDlg::OnLocationCityEditingFinished()
 void CServerDlg::OnCustomDirectoryEditingFinished()
 {
     // apply new setting to the server and update it
-    pServer->SetDirectoryAddress ( edtCustomDirectory->text() );
+    Server.SetDirectoryAddress ( edtCustomDirectory->text() );
 
     // update GUI dependencies
     UpdateGUIDependencies();
@@ -552,13 +552,13 @@ void CServerDlg::OnCustomDirectoryEditingFinished()
 void CServerDlg::OnLocationCountryCurrentIndexChanged ( int iCntryListItem )
 {
     // apply new setting to the server and update it
-    pServer->SetServerCountry ( static_cast<QLocale::Country> ( cbxLocationCountry->itemData ( iCntryListItem ).toInt() ) );
+    Server.SetServerCountry ( static_cast<QLocale::Country> ( cbxLocationCountry->itemData ( iCntryListItem ).toInt() ) );
 }
 
 void CServerDlg::OnDirectoryTypeCurrentIndexChanged ( int iTypeIdx )
 {
     // apply new setting to the server and update it
-    pServer->SetDirectoryType ( static_cast<EDirectoryType> ( iTypeIdx - 1 ) );
+    Server.SetDirectoryType ( static_cast<EDirectoryType> ( iTypeIdx - 1 ) );
 
     // update GUI dependencies
     UpdateGUIDependencies();
@@ -579,21 +579,21 @@ void CServerDlg::OnServerStopped()
 void CServerDlg::OnStopRecorder()
 {
     UpdateRecorderStatus ( QString() );
-    if ( pServer->GetRecorderErrMsg() != QString() )
+    if ( Server.GetRecorderErrMsg() != QString() )
     {
         QMessageBox::warning ( this,
                                APP_NAME,
                                tr ( "Recorder failed to start. "
                                     "Please check available disk space and permissions and try again. "
                                     "Error: " ) +
-                                   pServer->GetRecorderErrMsg() );
+                                   Server.GetRecorderErrMsg() );
     }
 }
 
 void CServerDlg::OnRecordingDirClicked()
 {
     // get the current value from pServer
-    QString currentValue    = pServer->GetRecordingDir();
+    QString currentValue    = Server.GetRecordingDir();
     QString newRecordingDir = QFileDialog::getExistingDirectory ( this,
                                                                   tr ( "Select Main Recording Directory" ),
                                                                   currentValue,
@@ -601,16 +601,16 @@ void CServerDlg::OnRecordingDirClicked()
 
     if ( newRecordingDir != currentValue )
     {
-        pServer->SetRecordingDir ( newRecordingDir );
+        Server.SetRecordingDir ( newRecordingDir );
         UpdateRecorderStatus ( QString() );
     }
 }
 
 void CServerDlg::OnClearRecordingDirClicked()
 {
-    if ( pServer->GetRecorderErrMsg() != QString() || pServer->GetRecordingDir() != "" )
+    if ( Server.GetRecorderErrMsg() != QString() || Server.GetRecordingDir() != "" )
     {
-        pServer->SetRecordingDir ( "" );
+        Server.SetRecordingDir ( "" );
         UpdateRecorderStatus ( QString() );
     }
 }
@@ -618,7 +618,7 @@ void CServerDlg::OnClearRecordingDirClicked()
 void CServerDlg::OnServerListPersistenceClicked()
 {
     // get the current value from pServer
-    QString     currentValue = pServer->GetServerListFileName();
+    QString     currentValue = Server.GetServerListFileName();
     QFileDialog fileDialog;
     fileDialog.setAcceptMode ( QFileDialog::AcceptSave );
     fileDialog.setOptions ( QFileDialog::DontUseNativeDialog | QFileDialog::HideNameFilterDetails );
@@ -629,7 +629,7 @@ void CServerDlg::OnServerListPersistenceClicked()
 
         if ( newFileName != currentValue )
         {
-            pServer->SetServerListFileName ( newFileName );
+            Server.SetServerListFileName ( newFileName );
             UpdateGUIDependencies();
         }
     }
@@ -637,9 +637,9 @@ void CServerDlg::OnServerListPersistenceClicked()
 
 void CServerDlg::OnClearServerListPersistenceClicked()
 {
-    if ( pServer->GetServerListFileName() != "" )
+    if ( Server.GetServerListFileName() != "" )
     {
-        pServer->SetServerListFileName ( "" );
+        Server.SetServerListFileName ( "" );
         UpdateGUIDependencies();
     }
 }
@@ -685,7 +685,7 @@ void CServerDlg::OnTimer()
 
     ListViewMutex.lock();
     {
-        pServer->GetConCliParam ( vecHostAddresses, vecsName, veciJitBufNumFrames, veciNetwFrameSizeFact );
+        Server.GetConCliParam ( vecHostAddresses, vecsName, veciJitBufNumFrames, veciNetwFrameSizeFact );
 
         // we assume that all vectors have the same length
         const int iNumChannels = vecHostAddresses.Size();
@@ -705,7 +705,7 @@ void CServerDlg::OnTimer()
                 vecpListViewItems[i]->setText ( 2, QString().setNum ( veciJitBufNumFrames[i] ) );
 
                 // show num of audio channels
-                int iNumAudioChs = pServer->GetClientNumAudioChannels ( i );
+                int iNumAudioChs = Server.GetClientNumAudioChannels ( i );
                 vecpListViewItems[i]->setText ( 3, QString().setNum ( iNumAudioChs ) );
 
                 vecpListViewItems[i]->setHidden ( false );
@@ -721,14 +721,14 @@ void CServerDlg::OnTimer()
 
 void CServerDlg::UpdateGUIDependencies()
 {
-    const EDirectoryType directoryType = pServer->GetDirectoryType();
+    const EDirectoryType directoryType = Server.GetDirectoryType();
     cbxDirectoryType->setCurrentIndex ( static_cast<int> ( directoryType ) + 1 );
 
-    const ESvrRegStatus eSvrRegStatus = pServer->GetSvrRegStatus();
+    const ESvrRegStatus eSvrRegStatus = Server.GetSvrRegStatus();
     QString             strStatus     = svrRegStatusToString ( eSvrRegStatus );
     QString             strFontColour = "darkGreen";
 
-    if ( pServer->IsDirectoryServer() )
+    if ( Server.IsDirectoryServer() )
     {
         strStatus = tr ( "Now a directory server" );
     }
@@ -758,15 +758,15 @@ void CServerDlg::UpdateGUIDependencies()
         lblRegSvrStatus->setText ( "<font color=\"" + strFontColour + "\"><b>" + strStatus + "</b></font>" );
     }
 
-    edtServerName->setText ( pServer->GetServerName() );
-    edtLocationCity->setText ( pServer->GetServerCity() );
-    cbxLocationCountry->setCurrentIndex ( cbxLocationCountry->findData ( static_cast<int> ( pServer->GetServerCountry() ) ) );
+    edtServerName->setText ( Server.GetServerName() );
+    edtLocationCity->setText ( Server.GetServerCity() );
+    cbxLocationCountry->setCurrentIndex ( cbxLocationCountry->findData ( static_cast<int> ( Server.GetServerCountry() ) ) );
 
-    tedWelcomeMessage->setText ( pServer->GetWelcomeMessage() );
+    tedWelcomeMessage->setText ( Server.GetWelcomeMessage() );
 
-    edtCustomDirectory->setText ( pServer->GetDirectoryAddress() );
+    edtCustomDirectory->setText ( Server.GetDirectoryAddress() );
 
-    edtServerListPersistence->setText ( pServer->GetServerListFileName() );
+    edtServerListPersistence->setText ( Server.GetServerListFileName() );
 }
 
 void CServerDlg::UpdateSystemTrayIcon ( const bool bIsActive )
@@ -824,19 +824,19 @@ void CServerDlg::ModifyAutoStartEntry ( const bool bDoAutoStart )
 void CServerDlg::UpdateRecorderStatus ( QString sessionDir )
 {
     QString currentSessionDir = edtCurrentSessionDir->text();
-    QString errMsg            = pServer->GetRecorderErrMsg();
+    QString errMsg            = Server.GetRecorderErrMsg();
     bool    bIsRecording      = false;
     QString strRecorderStatus;
     QString strRecordingDir;
 
-    if ( pServer->GetRecorderInitialised() )
+    if ( Server.GetRecorderInitialised() )
     {
-        strRecordingDir = pServer->GetRecordingDir();
+        strRecordingDir = Server.GetRecordingDir();
         chbEnableRecorder->setEnabled ( true );
 
-        if ( pServer->GetRecordingEnabled() )
+        if ( Server.GetRecordingEnabled() )
         {
-            if ( pServer->IsRunning() )
+            if ( Server.IsRunning() )
             {
                 edtCurrentSessionDir->setText ( sessionDir != QString() ? sessionDir : "" );
 
@@ -855,11 +855,11 @@ void CServerDlg::UpdateRecorderStatus ( QString sessionDir )
     }
     else
     {
-        strRecordingDir = pServer->GetRecorderErrMsg();
+        strRecordingDir = Server.GetRecorderErrMsg();
 
         if ( strRecordingDir == QString() )
         {
-            strRecordingDir = pServer->GetRecordingDir();
+            strRecordingDir = Server.GetRecordingDir();
         }
         else
         {

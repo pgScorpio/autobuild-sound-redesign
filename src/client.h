@@ -29,11 +29,14 @@
 #include <QString>
 #include <QDateTime>
 #include <QMutex>
+#include <QScopedPointer>
+
 #ifdef USE_OPUS_SHARED_LIB
 #    include "opus/opus_custom.h"
 #else
 #    include "opus_custom.h"
 #endif
+
 #include "global.h"
 #include "socket.h"
 #include "channel.h"
@@ -41,6 +44,7 @@
 #include "buffer.h"
 #include "signalhandler.h"
 #include "settings.h"
+#include "clientrpc.h"
 
 #if defined( _WIN32 ) && !defined( JACK_ON_WINDOWS )
 #    include "../windows/sound.h"
@@ -100,10 +104,21 @@ class CClient : public QObject
     Q_OBJECT
 
 public:
-    CClient ( CClientSettings& cSettings );
+    CClient ( bool bUseGUI );
 
     virtual ~CClient();
 
+public:
+    CClientSettings            Settings;
+    QScopedPointer<CRpcServer> pRpcServer;
+    QScopedPointer<CClientRpc> pClientRpc;
+
+protected:
+    void ApplySettings();
+
+    bool SetServerAddr ( QString strNAddr );
+
+public:
     bool IsRunning() { return Sound.IsRunning(); }
     bool IsCallbackEntered() const { return Sound.IsCallbackEntered(); }
 
@@ -112,19 +127,9 @@ public:
 
     bool IsConnected() { return Channel.IsConnected(); }
 
-public:
-    // settings
-    CClientSettings& Settings;
-
     void SetRemoteChanGain ( const int iId, const float fGain, const bool bIsMyOwnFader );
     void SetRemoteChanPan ( const int iId, const float fPan ) { Channel.SetRemoteChanPan ( iId, fPan ); }
 
-protected:
-    void ApplySettings();
-
-    bool SetServerAddr ( QString strNAddr );
-
-public:
     bool GetAndResetbJitterBufferOKFlag();
     int  GetUploadRateKbps() { return Channel.GetUploadRateKbps(); }
     int  GetClientSockBufNumFrames()

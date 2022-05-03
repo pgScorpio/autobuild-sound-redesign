@@ -23,6 +23,7 @@
  *
  \******************************************************************************/
 
+#include "client.h"
 #include "clientrpc.h"
 
 CClientRpc::CClientRpc ( CClient* pClient, CRpcServer* pRpcServer, QObject* parent ) : QObject ( parent )

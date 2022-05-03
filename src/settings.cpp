@@ -34,6 +34,12 @@ void CSettings::Load()
 
     // read the settings from the given XML file
     ReadSettingsFromXML ( IniXMLDocument );
+
+    // load translation
+    if ( !CommandlineOptions.nogui.IsSet() && !CommandlineOptions.notranslation.IsSet() )
+    {
+        CLocale::LoadTranslation ( strLanguage, QApplication::instance() );
+    }
 }
 
 void CSettings::Save()

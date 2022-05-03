@@ -24,9 +24,11 @@
 
 #include "client.h"
 
+extern void SetClientAppName ( QString strClientname );
+
 /* Implementation *************************************************************/
-CClient::CClient ( CClientSettings& cSettings ) :
-    Settings ( cSettings ),
+CClient::CClient ( bool bUseGUI ) :
+    Settings ( bUseGUI ),
     Channel ( false ), /* we need a client channel -> "false" */
     CurOpusEncoder ( nullptr ),
     CurOpusDecoder ( nullptr ),
@@ -37,32 +39,80 @@ CClient::CClient ( CClientSettings& cSettings ) :
     bIsInitializationPhase ( true ),
     fMuteOutStreamGain ( 1.0f ),
     Socket ( &Channel,
-             cSettings.CommandlineOptions.port.Value(),
-             cSettings.CommandlineOptions.qos.Value(),
+             Settings.CommandlineOptions.port.Value(),
+             Settings.CommandlineOptions.qos.Value(),
              "",
-             cSettings.CommandlineOptions.enableipv6.IsSet() ),
-    //### TODO: BEGIN//
-    // pass Settings to CCsound too
-    Sound ( AudioCallback,
-            this,
-            cSettings.CommandlineOptions.ctrlmidich.Value(),
-            cSettings.CommandlineOptions.nojackconnect.IsSet(),
-            cSettings.CommandlineOptions.clientname.Value() ),
-    //### TODO: END//
+             Settings.CommandlineOptions.enableipv6.IsSet() ),
     iSndCrdPrefFrameSizeFactor ( FRAME_SIZE_FACTOR_DEFAULT ),
     iSndCrdFrameSizeFactor ( FRAME_SIZE_FACTOR_DEFAULT ),
     bSndCrdConversionBufferRequired ( false ),
     iSndCardMonoBlockSizeSamConvBuff ( 0 ),
     bJitterBufferOK ( true ),
-    bEnableIPv6 ( cSettings.CommandlineOptions.enableipv6.IsSet() ),
-    bMuteMeInPersonalMix ( cSettings.CommandlineOptions.mutemyown.IsSet() ),
-    pSignalHandler ( CSignalHandler::getSingletonP() )
+    bEnableIPv6 ( Settings.CommandlineOptions.enableipv6.IsSet() ),
+    bMuteMeInPersonalMix ( Settings.CommandlineOptions.mutemyown.IsSet() ),
+    pSignalHandler ( CSignalHandler::getSingletonP() ),
+    //### TODO: BEGIN//
+    // pass Settings to CCsound too
+    Sound ( AudioCallback,
+            this,
+            Settings.CommandlineOptions.ctrlmidich.Value(),
+            Settings.CommandlineOptions.nojackconnect.IsSet(),
+            Settings.CommandlineOptions.clientname.Value() )
+//### TODO: END//
 {
     // First emit a queued event to myself so OnStartup will be called as soon as the application starts running.
     QObject::connect ( this, &CClient::Startup, this, &CClient::OnStartup, Qt::ConnectionType::QueuedConnection );
     emit Startup();
 
-    Settings.SetClientName ( cSettings.CommandlineOptions.clientname.Value() );
+    SetClientAppName ( Settings.GetClientName() );
+
+    if ( bUseGUI && !Settings.CommandlineOptions.notranslation.IsSet() )
+    {
+        CInstPictures::UpdateTableOnLanguageChange();
+    }
+
+    // JSON-RPC ------------------------------------------------------------
+
+    if ( Settings.CommandlineOptions.jsonrpcport.IsSet() )
+    {
+        if ( !Settings.CommandlineOptions.jsonrpcsecretfile.IsSet() )
+        {
+            throw CErrorExit ( qUtf8Printable ( QString ( "- JSON-RPC: --jsonrpcsecretfile is required. Exiting." ) ) );
+        }
+
+        QFile qfJsonRpcSecretFile ( Settings.CommandlineOptions.jsonrpcsecretfile.Value() );
+        if ( !qfJsonRpcSecretFile.open ( QFile::OpenModeFlag::ReadOnly ) )
+        {
+            throw CErrorExit (
+                QString ( "- JSON-RPC: Unable to open secret file %1. Exiting." ).arg ( Settings.CommandlineOptions.jsonrpcsecretfile.Value() ) );
+        }
+
+        QTextStream qtsJsonRpcSecretStream ( &qfJsonRpcSecretFile );
+        QString     strJsonRpcSecret = qtsJsonRpcSecretStream.readLine();
+        if ( strJsonRpcSecret.length() < JSON_RPC_MINIMUM_SECRET_LENGTH )
+        {
+            throw CErrorExit ( QString ( "JSON-RPC: Refusing to run with secret of length %1 (required: %2). Exiting." )
+                                   .arg ( strJsonRpcSecret.length() )
+                                   .arg ( JSON_RPC_MINIMUM_SECRET_LENGTH ) );
+        }
+
+        qWarning() << "- JSON-RPC: This interface is experimental and is subject to breaking changes even on patch versions "
+                      "(not subject to semantic versioning) during the initial phase.";
+
+        pRpcServer.reset ( new CRpcServer ( QCoreApplication::instance(), Settings.CommandlineOptions.jsonrpcport.Value(), strJsonRpcSecret ) );
+
+        if ( pRpcServer.data() )
+        {
+            if ( !pRpcServer->Start() )
+            {
+                throw CErrorExit ( QString ( "- JSON-RPC: Server failed to start. Exiting." ) );
+            }
+            else
+            {
+                pClientRpc.reset ( new CClientRpc ( this, pRpcServer.data(), pRpcServer.data() ) );
+            }
+        }
+    }
 
     int iOpusError;
 
@@ -202,6 +252,14 @@ CClient::~CClient()
 
 void CClient::OnStartup() { ApplySettings(); }
 
+void CClient::OnAboutToQuit()
+{
+    if ( pRpcServer.data() )
+    {
+        pRpcServer->disconnect();
+    }
+}
+
 void CClient::ApplySettings()
 {
     Channel.SetDoAutoSockBufSize ( Settings.GetAutoSockBufSize() );
@@ -225,8 +283,6 @@ void CClient::ApplySettings()
     Init();
     emit SoundDeviceChanged ( strError );
 }
-
-void CClient::OnAboutToQuit() {}
 
 void CClient::OnSendProtMessage ( CVector<uint8_t> vecMessage )
 {

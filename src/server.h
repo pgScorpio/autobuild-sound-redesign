@@ -30,11 +30,13 @@
 #include <QHostAddress>
 #include <QFileInfo>
 #include <algorithm>
+
 #ifdef USE_OPUS_SHARED_LIB
 #    include "opus/opus_custom.h"
 #else
 #    include "opus_custom.h"
 #endif
+
 #include "global.h"
 #include "buffer.h"
 #include "signalhandler.h"
@@ -45,6 +47,7 @@
 #include "serverlist.h"
 #include "recorder/jamcontroller.h"
 #include "settings.h"
+#include "serverrpc.h"
 
 #include "threadpool.h"
 
@@ -152,10 +155,16 @@ class CServer : public QObject, public CServerSlots<MAX_NUM_CHANNELS>
     Q_OBJECT
 
 public:
-    CServer ( CServerSettings& cSettings );
+    CServer ( bool bUseGUI );
 
     virtual ~CServer();
 
+public:
+    CServerSettings            Settings;
+    QScopedPointer<CRpcServer> pRpcServer;
+    QScopedPointer<CServerRpc> pServerRpc;
+
+public:
     void Start();
     void Stop();
     bool IsRunning() { return HighPrecisionTimer.isActive(); }
@@ -173,8 +182,6 @@ public:
 
     // IPv6 Enabled
     bool IsIPv6Enabled() { return bEnableIPv6; }
-
-    CServerSettings& Settings;
 
     // GUI settings ------------------------------------------------------------
     int GetClientNumAudioChannels ( const int iChanNum ) { return vecChannels[iChanNum].GetNumAudioChannels(); }

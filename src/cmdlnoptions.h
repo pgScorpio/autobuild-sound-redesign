@@ -435,15 +435,15 @@ public:
     CCommandlineOptions();
 
     // Load: Parses commandline and sets all given options.
-    bool Load ( bool bIsClient, bool bUseGUI, int argc, char** argv );
+    bool Load ( bool bIsClient, bool bUseGUI );
 
 protected:
     // check: Called from Load
     //        Checks the Load result and shows any errors.
     bool CCommandlineOptions::showErrorMessage ( ECmdlnOptDestType eDestType,
-                                      const QString&    unknowOptions,
-                                      const QString&    invalidDests,
-                                      const QString&    invalidParams );
+                                                 const QString&    unknowOptions,
+                                                 const QString&    invalidDests,
+                                                 const QString&    invalidParams );
 
 public:
     // NOTE: when adding commandline options:

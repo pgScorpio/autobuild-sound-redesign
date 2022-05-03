@@ -73,7 +73,7 @@ class CClientDlg : public CBaseDlg, private Ui_CClientDlgBase
     Q_OBJECT
 
 public:
-    CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* parent = nullptr );
+    CClientDlg ( CClient& cClient, QWidget* parent = nullptr );
 
 protected:
     void SetGUIDesign ( const EGUIDesign eNewDesign );

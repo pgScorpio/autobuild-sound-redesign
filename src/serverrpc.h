@@ -25,8 +25,10 @@
 
 #pragma once
 
-#include "server.h"
 #include "rpcserver.h"
+#include "util.h"
+
+class CServer;
 
 /* Classes ********************************************************************/
 class CServerRpc : public QObject

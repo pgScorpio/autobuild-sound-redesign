@@ -61,7 +61,7 @@ class CServerDlg : public CBaseDlg, private Ui_CServerDlgBase
     Q_OBJECT
 
 public:
-    CServerDlg ( CServer* server, CServerSettings* settings, QWidget* parent = nullptr );
+    CServerDlg ( CServer& cServer, QWidget* parent = nullptr );
 
 protected:
     virtual void changeEvent ( QEvent* pEvent );
@@ -79,8 +79,8 @@ protected:
     void UpdateRecorderStatus ( QString sessionDir );
 
     QTimer           Timer;
-    CServer*         pServer;
-    CServerSettings* pSettings;
+    CServer&         Server;
+    CServerSettings& Settings;
 
     CVector<QTreeWidgetItem*> vecpListViewItems;
     QMutex                    ListViewMutex;
@@ -99,18 +99,18 @@ public slots:
     void OnServerNameEditingFinished();
     void OnLocationCityEditingFinished();
     void OnLocationCountryCurrentIndexChanged ( int iCntryListItem );
-    void OnEnableRecorderStateChanged ( int value ) { pServer->SetEnableRecording ( Qt::CheckState::Checked == value ); }
-    void OnNewRecordingClicked() { pServer->RequestNewRecording(); }
-    void OnWelcomeMessageChanged() { pServer->SetWelcomeMessage ( tedWelcomeMessage->toPlainText() ); }
+    void OnEnableRecorderStateChanged ( int value ) { Server.SetEnableRecording ( Qt::CheckState::Checked == value ); }
+    void OnNewRecordingClicked() { Server.RequestNewRecording(); }
+    void OnWelcomeMessageChanged() { Server.SetWelcomeMessage ( tedWelcomeMessage->toPlainText() ); }
 
-    void OnLanguageChanged ( QString strLanguage ) { pSettings->strLanguage = strLanguage; }
+    void OnLanguageChanged ( QString strLanguage ) { Settings.strLanguage = strLanguage; }
     void OnCustomDirectoryEditingFinished();
     void OnRecordingDirClicked();
     void OnClearRecordingDirClicked();
     void OnServerListPersistenceClicked();
     void OnClearServerListPersistenceClicked();
     void OnStartOnOSStartStateChanged ( int value );
-    void OnEnableDelayPanningStateChanged ( int value ) { pServer->SetEnableDelayPanning ( Qt::CheckState::Checked == value ); }
+    void OnEnableDelayPanningStateChanged ( int value ) { Server.SetEnableDelayPanning ( Qt::CheckState::Checked == value ); }
 
     void OnSysTrayMenuOpen() { ShowWindowInForeground(); }
     void OnSysTrayMenuHide() { hide(); }

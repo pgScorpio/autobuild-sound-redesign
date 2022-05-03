@@ -23,6 +23,7 @@
  *
  \******************************************************************************/
 
+#include "server.h"
 #include "serverrpc.h"
 
 CServerRpc::CServerRpc ( CServer* pServer, CRpcServer* pRpcServer, QObject* parent ) : QObject ( parent )

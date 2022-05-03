@@ -23,6 +23,7 @@
 \******************************************************************************/
 
 #include "server.h"
+extern void SetServerAppName ( QString strClientname );
 
 // CHighPrecisionTimer implementation ******************************************
 #ifdef _WIN32
@@ -212,42 +213,84 @@ void CHighPrecisionTimer::run()
 #endif
 
 // CServer implementation ******************************************************
-CServer::CServer ( CServerSettings& cSettings ) :
-    Settings ( cSettings ),
-    bUseDoubleSystemFrameSize ( !cSettings.CommandlineOptions.fastupdate.IsSet() ),
-    bUseMultithreading ( cSettings.CommandlineOptions.multithreading.IsSet() ),
-    iMaxNumChannels ( cSettings.CommandlineOptions.numchannels.Value() ),
+CServer::CServer ( bool bUseGUI ) :
+    Settings ( bUseGUI ),
+    bUseDoubleSystemFrameSize ( !Settings.CommandlineOptions.fastupdate.IsSet() ),
+    bUseMultithreading ( Settings.CommandlineOptions.multithreading.IsSet() ),
+    iMaxNumChannels ( Settings.CommandlineOptions.numchannels.Value() ),
     iCurNumChannels ( 0 ),
     Socket ( this,
-             cSettings.CommandlineOptions.port.Value(),
-             cSettings.CommandlineOptions.qos.Value(),
-             cSettings.CommandlineOptions.serverbindip.Value(),
-             cSettings.CommandlineOptions.enableipv6.IsSet() ),
+             Settings.CommandlineOptions.port.Value(),
+             Settings.CommandlineOptions.qos.Value(),
+             Settings.CommandlineOptions.serverbindip.Value(),
+             Settings.CommandlineOptions.enableipv6.IsSet() ),
     Logging(),
     iFrameCount ( 0 ),
     bWriteStatusHTMLFile ( false ),
-    strServerHTMLFileListName ( cSettings.CommandlineOptions.htmlstatus.Value() ),
-    HighPrecisionTimer ( !cSettings.CommandlineOptions.fastupdate.IsSet() ),
-    ServerListManager ( cSettings.CommandlineOptions.port.Value(),
-                        cSettings.CommandlineOptions.directoryserver.Value(),
-                        cSettings.CommandlineOptions.directoryfile.Value(),
-                        cSettings.CommandlineOptions.serverinfo.Value(),
-                        cSettings.CommandlineOptions.serverpublicip.Value(),
-                        cSettings.CommandlineOptions.listfilter.Value(),
-                        cSettings.CommandlineOptions.numchannels.Value(),
-                        cSettings.CommandlineOptions.enableipv6.IsSet(),
+    strServerHTMLFileListName ( Settings.CommandlineOptions.htmlstatus.Value() ),
+    HighPrecisionTimer ( !Settings.CommandlineOptions.fastupdate.IsSet() ),
+    ServerListManager ( Settings.CommandlineOptions.port.Value(),
+                        Settings.CommandlineOptions.directoryserver.Value(),
+                        Settings.CommandlineOptions.directoryfile.Value(),
+                        Settings.CommandlineOptions.serverinfo.Value(),
+                        Settings.CommandlineOptions.serverpublicip.Value(),
+                        Settings.CommandlineOptions.listfilter.Value(),
+                        Settings.CommandlineOptions.numchannels.Value(),
+                        Settings.CommandlineOptions.enableipv6.IsSet(),
                         &ConnLessProtocol ),
     JamController ( this ),
-    eLicenceType ( cSettings.CommandlineOptions.licence.IsSet() ? LT_CREATIVECOMMONS : LT_NO_LICENCE ),
-    bDisconnectAllClientsOnQuit ( cSettings.CommandlineOptions.discononquit.IsSet() ),
+    eLicenceType ( Settings.CommandlineOptions.licence.IsSet() ? LT_CREATIVECOMMONS : LT_NO_LICENCE ),
+    bDisconnectAllClientsOnQuit ( Settings.CommandlineOptions.discononquit.IsSet() ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
     // First emit a queued event to myself so OnStartup will be called as soon as the application starts running.
     QObject::connect ( this, &CServer::Startup, this, &CServer::OnStartup, Qt::ConnectionType::QueuedConnection );
     emit Startup();
 
-    int iOpusError;
-    int i;
+    SetServerAppName ( Settings.GetServerName() );
+
+#ifdef HEADLESS
+    if ( Settings.CommandlineOptions.directoryserver.Value().isEmpty() )
+    {
+        SetDirectoryType ( AT_CUSTOM );
+    }
+#endif
+
+    // JSON-RPC ------------------------------------------------------------
+
+    if ( Settings.CommandlineOptions.jsonrpcport.IsSet() )
+    {
+        if ( !Settings.CommandlineOptions.jsonrpcsecretfile.IsSet() )
+        {
+            throw CErrorExit ( qUtf8Printable ( QString ( "- JSON-RPC: --jsonrpcsecretfile is required. Exiting." ) ) );
+        }
+
+        QFile qfJsonRpcSecretFile ( Settings.CommandlineOptions.jsonrpcsecretfile.Value() );
+        if ( !qfJsonRpcSecretFile.open ( QFile::OpenModeFlag::ReadOnly ) )
+        {
+            throw CErrorExit (
+                QString ( "- JSON-RPC: Unable to open secret file %1. Exiting." ).arg ( Settings.CommandlineOptions.jsonrpcsecretfile.Value() ) );
+        }
+
+        QTextStream qtsJsonRpcSecretStream ( &qfJsonRpcSecretFile );
+        QString     strJsonRpcSecret = qtsJsonRpcSecretStream.readLine();
+        if ( strJsonRpcSecret.length() < JSON_RPC_MINIMUM_SECRET_LENGTH )
+        {
+            throw CErrorExit ( QString ( "JSON-RPC: Refusing to run with secret of length %1 (required: %2). Exiting." )
+                                   .arg ( strJsonRpcSecret.length() )
+                                   .arg ( JSON_RPC_MINIMUM_SECRET_LENGTH ) );
+        }
+
+        qWarning() << "- JSON-RPC: This interface is experimental and is subject to breaking changes even on patch versions "
+                      "(not subject to semantic versioning) during the initial phase.";
+
+        pRpcServer.reset ( new CRpcServer ( QCoreApplication::instance(), Settings.CommandlineOptions.jsonrpcport.Value(), strJsonRpcSecret ) );
+
+        if ( !pRpcServer->Start() )
+        {
+            throw CErrorExit ( qUtf8Printable ( QString ( "- JSON-RPC: Server failed to start. Exiting." ) ) );
+        }
+    }
 
     if ( Settings.CommandlineOptions.norecord.IsSet() )
     {
@@ -258,6 +301,14 @@ CServer::CServer ( CServerSettings& cSettings ) :
     {
         Settings.SetDelayPan ( false );
     }
+
+    if ( Settings.CommandlineOptions.licence.IsSet() )
+    {
+        qInfo() << "- licence required";
+    }
+
+    int iOpusError;
+    int i;
 
     // create OPUS encoder/decoder for each channel (must be done before
     // enabling the channels), create a mono and stereo encoder/decoder

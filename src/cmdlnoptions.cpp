@@ -26,8 +26,8 @@
 #include "cmdlnoptions.h"
 #include "messages.h"
 
-//Translations: 
-// note that translation is probably not yet initialized anyway when loading the commandline options.
+// Translations:
+//  note that translation is probably not yet initialized anyway when loading the commandline options.
 
 #ifdef HEADLESS
 // Do NOT translate in headless mode !
@@ -377,7 +377,7 @@ bool CCommandlineOptions::showErrorMessage ( ECmdlnOptDestType eDestType,
     return !ok;
 }
 
-bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** argv )
+bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI )
 {
     ECmdlnOptDestType eDestType = bIsClient ? ECmdlnOptDestType::Client : ECmdlnOptDestType::Server;
 
@@ -424,6 +424,8 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** 
                                        &special };
 
     const int optionsCount = ( sizeof ( cmdLineOption ) / sizeof ( cmdLineOption[0] ) );
+    const int argc         = CCommandline::argc;
+    char**    argv         = CCommandline::argv;
 
     QString strParam;
     QString strValue;
@@ -485,28 +487,28 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, int argc, char** 
 
     if ( !showErrorMessage ( eDestType, unknowOptions, invalidDests, invalidParams ) )
     {
-        QString message ( TR( "Forcing %1 mode due to application version." ) );
+        QString message ( TR ( "Forcing %1 mode due to application version." ) );
 
         if ( bIsClient && server.IsSet() )
         {
             server.Unset();
-            CMessages::ShowWarningWait ( message.arg ( TR("Client") ) );
+            CMessages::ShowWarningWait ( message.arg ( TR ( "Client" ) ) );
         }
         else if ( !bIsClient && !server.IsSet() )
         {
             server.Set();
-            CMessages::ShowWarningWait ( message.arg ( TR("Server") ) );
+            CMessages::ShowWarningWait ( message.arg ( TR ( "Server" ) ) );
         }
 
         if ( bUseGUI && nogui.IsSet() )
         {
             nogui.Unset();
-            CMessages::ShowWarningWait ( message.arg ( TR("GUI") ) );
+            CMessages::ShowWarningWait ( message.arg ( TR ( "GUI" ) ) );
         }
         else if ( !bUseGUI && !nogui.IsSet() )
         {
             nogui.Set();
-            CMessages::ShowWarningWait ( message.arg ( TR("HEADLESS") ) );
+            CMessages::ShowWarningWait ( message.arg ( TR ( "HEADLESS" ) ) );
         }
 
         return true;

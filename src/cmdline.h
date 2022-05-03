@@ -41,6 +41,7 @@ public:
 
 private:
     friend int main ( int argc, char** argv );
+    friend class CCommandlineOptions;
 
     /************************************************
      Statics to be assigned in main ()

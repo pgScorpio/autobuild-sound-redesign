@@ -25,18 +25,18 @@
 #include "clientdlg.h"
 
 /* Implementation *************************************************************/
-CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* parent ) :
+CClientDlg::CClientDlg ( CClient& cClient, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Window ), // use Qt::Window to get min/max window buttons
     Client ( cClient ),
-    Settings ( cSettings ),
+    Settings ( cClient.Settings ),
     bConnectDlgWasShown ( false ),
-    bMIDICtrlUsed ( !cSettings.CommandlineOptions.ctrlmidich.Value().isEmpty() ),
+    bMIDICtrlUsed ( !Settings.CommandlineOptions.ctrlmidich.Value().isEmpty() ),
     bDetectFeedback ( false ),
     eLastRecorderState ( RS_UNDEFINED ), // for SetMixerBoardDeco
     eLastDesign ( GD_ORIGINAL ),         //          "
-    ClientSettingsDlg ( Client, cSettings, parent ),
+    ClientSettingsDlg ( Client, Settings, parent ),
     ChatDlg ( parent ),
-    ConnectDlg ( cSettings, parent ),
+    ConnectDlg ( Settings, parent ),
     AnalyzerConsole ( &cClient, parent )
 {
     setupUi ( this );
@@ -353,7 +353,7 @@ CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* 
     pViewMenu->addAction ( tr ( "C&hat..." ), this, SLOT ( OnOpenChatDialog() ), QKeySequence ( Qt::CTRL + Qt::Key_H ) );
 
     // optionally show analyzer console entry
-    if ( cSettings.CommandlineOptions.showanalyzerconsole.IsSet() )
+    if ( Settings.CommandlineOptions.showanalyzerconsole.IsSet() )
     {
         pViewMenu->addAction ( tr ( "&Analyzer Console..." ), this, SLOT ( OnOpenAnalyzerConsole() ) );
     }
@@ -498,7 +498,7 @@ CClientDlg::CClientDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* 
     TimerStatus.start ( LED_BAR_UPDATE_TIME_MS );
 
     // mute stream on startup (must be done after the signal connections)
-    if ( cSettings.CommandlineOptions.mutestream.IsSet() )
+    if ( Settings.CommandlineOptions.mutestream.IsSet() )
     {
         chbLocalMute->setCheckState ( Qt::Checked );
     }
@@ -545,17 +545,16 @@ void CClientDlg::closeEvent ( QCloseEvent* Event )
     Settings.bWindowWasShownChat     = ChatDlg.isVisible();
     Settings.bWindowWasShownConnect  = ConnectDlg.isVisible();
 
+    Settings.bConnectDlgShowAllMusicians = ConnectDlg.GetShowAllMusicians();
+
     // if settings/connect dialog or chat dialog is open, close it
     ClientSettingsDlg.close();
     ChatDlg.close();
     ConnectDlg.close();
     AnalyzerConsole.close();
 
-    // make sure all current fader settings are applied to the settings struct
     MainMixerBoard->StoreAllFaderSettings();
-
-    Settings.bConnectDlgShowAllMusicians = ConnectDlg.GetShowAllMusicians();
-    Settings.eChannelSortType            = MainMixerBoard->GetFaderSorting();
+    Settings.eChannelSortType = MainMixerBoard->GetFaderSorting();
     Settings.SetNumMixerPanelRows ( MainMixerBoard->GetNumMixerPanelRows() );
 
     // default implementation of this event handler routine
@@ -1134,10 +1133,13 @@ void CClientDlg::OnConnecting()
     lblConnectToServer->hide();
     // change connect button text to "disconnect"
     butConnect->setText ( tr ( "&Disconnect" ) );
-    butConnect->setEnabled ( false );
+    //  butConnect->setEnabled ( false );
 }
 
-void CClientDlg::OnDisconnecting() { butConnect->setEnabled ( false ); }
+void CClientDlg::OnDisconnecting()
+{
+    // butConnect->setEnabled ( false );
+}
 
 void CClientDlg::OnConnected()
 {
