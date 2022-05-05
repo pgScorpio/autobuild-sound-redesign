@@ -69,6 +69,18 @@ QString CCommandline::Commandline()
     return cmdline;
 }
 
+int CCommandline::GetArgumentList ( QStringList& argumentList )
+{
+    argumentList.clear();
+
+    for ( int i = 1; i < argc; i++ )
+    {
+        argumentList.append ( argv[i] );
+    }
+
+    return argumentList.size();
+}
+
 QString CCommandline::Argument ( int i ) // i = 1..ArgumentCount()
 {
     if ( ( i >= 0 ) && ( i < argc ) )

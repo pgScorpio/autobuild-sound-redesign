@@ -106,8 +106,7 @@ protected:
 
 protected:
     ECmdlnOptCheckResult doCheck ( ECmdlnOptDestType destType,
-                                   int               argc,
-                                   char**            argv,
+                                   QStringList&      arguments,
                                    int&              i,
                                    QString&          strParam,
                                    QString&          strValue,
@@ -130,8 +129,9 @@ protected:
 
 public:
     inline bool IsSet() const { return bSet; }
+    inline bool IsOption ( const QString& argument ) const { return ( ( argument == strShortName ) || ( argument == strLongName ) ); }
 
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue ) = 0;
+    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) = 0;
 };
 
 /******************************************************************************
@@ -154,7 +154,7 @@ protected:
     }
 
 public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue ) override;
+    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
 };
 
 /******************************************************************************
@@ -220,7 +220,7 @@ protected:
     }
 
 public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue ) override;
+    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
 };
 
 /******************************************************************************
@@ -289,7 +289,7 @@ protected:
     }
 
 public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue ) override;
+    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
 };
 
 /******************************************************************************
@@ -358,7 +358,7 @@ protected:
     }
 
 public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue ) override;
+    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
 };
 
 /******************************************************************************
@@ -426,7 +426,7 @@ protected:
     }
 
 public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue ) override;
+    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
 };
 
 class CCommandlineOptions
@@ -435,7 +435,9 @@ public:
     CCommandlineOptions();
 
     // Load: Parses commandline and sets all given options.
-    bool Load ( bool bIsClient, bool bUseGUI );
+    //       if bIsStored == false we are parsing the real commandline and arguments will contain the arguments to store on return
+    //       if bIsStored == true we are parsing the stored commandline arguments and arguments will be unchanged on return
+    bool Load ( bool bIsClient, bool bUseGUI, QStringList& arguments, bool bIsStored );
 
 protected:
     // check: Called from Load
@@ -505,5 +507,7 @@ public:
     CCmndlnStringOption welcomemessage;
     CCmndlnFlagOption   startminimized;
 
+    // Special options:
     CCmndlnFlagOption special;
+    CCmndlnFlagOption store;
 };

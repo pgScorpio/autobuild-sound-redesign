@@ -59,6 +59,7 @@ public:
     static QString Argument ( int i );                      // i = 1..ArgumentCount()
 
     static QString Commandline();
+    static int     GetArgumentList ( QStringList& argumentList );
 
 public:
     // sequencial parse functions using the argument index:

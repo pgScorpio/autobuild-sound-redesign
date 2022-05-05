@@ -29,6 +29,7 @@
 #include <QDateTime>
 #include <QHostAddress>
 #include <QFileInfo>
+#include <QScopedPointer>
 #include <algorithm>
 
 #ifdef USE_OPUS_SHARED_LIB
@@ -150,13 +151,149 @@ template<>
 class CServerSlots<0>
 {};
 
+// CServerSettings *************************************************************
+
+class CServerSettings : public CSettings
+{
+public:
+    CServerSettings ( bool bUseGUI );
+    ~CServerSettings();
+
+protected:
+    QString          strServerName;
+    QString          strServerCity;
+    QLocale::Country eServerCountry;
+    bool             bEnableRecording;
+    QString          strWelcomeMessage;
+    QString          strRecordingDir;
+    QString          strDirectoryAddress;
+    EDirectoryType   eDirectoryType;
+    QString          strServerListFileName;
+    bool             bAutoRunMinimized;
+    bool             bDelayPan;
+
+public:
+    const QString    GetServerName() const { return strServerName; }
+    const QString    GetServerCity() const { return strServerCity; }
+    QLocale::Country GetServerCountry() const { return eServerCountry; }
+
+    bool GetEnableRecording() const { return CommandlineOptions.norecord.IsSet() ? false : bEnableRecording; }
+    void SetEnableRecording ( bool newEnableRecording )
+    {
+        CommandlineOptions.norecord.Unset();
+
+        if ( bEnableRecording != newEnableRecording )
+        {
+            bEnableRecording = newEnableRecording;
+            // todo: emit Changed
+        }
+    }
+
+    const QString GetWelcomeMessage() const
+    {
+        return CommandlineOptions.welcomemessage.IsSet() ? CommandlineOptions.welcomemessage.Value() : strWelcomeMessage;
+    }
+    void SetWelcomeMessage ( const QString& newWelcomeMessage )
+    {
+        CommandlineOptions.welcomemessage.Unset();
+
+        if ( strWelcomeMessage != newWelcomeMessage )
+        {
+            strWelcomeMessage = newWelcomeMessage;
+            // todo: emit Changed
+        }
+    }
+
+    const QString GetRecordingDir() const { return CommandlineOptions.recording.IsSet() ? CommandlineOptions.recording.Value() : strRecordingDir; }
+    void          SetRecordingDir ( const QString& newRecordingDir )
+    {
+        CommandlineOptions.recording.Unset();
+
+        if ( strRecordingDir != newRecordingDir )
+        {
+            strRecordingDir != newRecordingDir;
+            // todo: emit Changed
+        }
+    }
+
+    const QString GetDirectoryAddress() const
+    {
+        return CommandlineOptions.directoryserver.IsSet() ? CommandlineOptions.directoryserver.Value() : strDirectoryAddress;
+    }
+
+    void SetDirectoryAddress ( const QString& strNewAddress )
+    {
+        CommandlineOptions.directoryserver.Unset();
+
+        if ( strDirectoryAddress != strNewAddress )
+        {
+            strDirectoryAddress = strNewAddress;
+            // todo: emit Changed
+        }
+    }
+
+    EDirectoryType GetDirectoryType() const { return eDirectoryType; }
+    void           SetDirectoryType ( EDirectoryType newDirectoryType )
+    {
+        if ( eDirectoryType != newDirectoryType )
+        {
+            eDirectoryType = newDirectoryType;
+            // todo: emit Changed
+        }
+    }
+
+    const QString GetServerListFileName() const
+    {
+        return CommandlineOptions.directoryfile.IsSet() ? CommandlineOptions.directoryfile.Value() : strServerListFileName;
+    }
+    void SetServerListFileName ( const QString& strNewServerListFileName )
+    {
+        CommandlineOptions.directoryfile.Unset();
+
+        if ( strServerListFileName != strNewServerListFileName )
+        {
+            strServerListFileName = strNewServerListFileName;
+            // todo: emit Changed
+        }
+    }
+    bool GetAutoRunMinimized() const { return CommandlineOptions.startminimized.IsSet() ? true : bAutoRunMinimized; }
+    void SetAutoRunMinimized ( bool newAutoRunMinimized )
+    {
+        CommandlineOptions.startminimized.Unset();
+
+        if ( bAutoRunMinimized != newAutoRunMinimized )
+        {
+            bAutoRunMinimized = newAutoRunMinimized;
+            // todo: emit Changed
+        }
+    }
+
+    bool GetDelayPan() const { return CommandlineOptions.delaypan.IsSet() ? true : bDelayPan; }
+    void SetDelayPan ( bool newDelayPan )
+    {
+        CommandlineOptions.delaypan.Unset();
+
+        if ( bDelayPan != newDelayPan )
+        {
+            bDelayPan = newDelayPan;
+            // todo: emit Changed
+        }
+    }
+    //### TODO: END ###//
+
+protected:
+    virtual bool ReadSettingsFromXML ( const QDomNode& root ) override;
+    virtual void WriteSettingsToXML ( QDomNode& root ) override;
+};
+
+// CServer *********************************************************************
+
 class CServer : public QObject, public CServerSlots<MAX_NUM_CHANNELS>
 {
     Q_OBJECT
 
 public:
     CServer ( bool bUseGUI );
-
     virtual ~CServer();
 
 public:
@@ -372,7 +509,7 @@ protected:
     std::unique_ptr<CThreadPool> pThreadPool;
 
 signals:
-    void Startup();
+    void ApplicationStartup();
 
     void Started();
     void Stopped();
@@ -393,7 +530,7 @@ signals:
     void EndRecorderThread();
 
 protected slots:
-    void OnStartup();
+    void OnApplicationStartup();
 
     void OnTimer();
 

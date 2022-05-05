@@ -58,11 +58,8 @@
 
 /* Definitions ****************************************************************/
 // update time for GUI controls
-#define LEVELMETER_UPDATE_TIME_MS  100  // ms
-#define BUFFER_LED_UPDATE_TIME_MS  300  // ms
-#define LED_BAR_UPDATE_TIME_MS     1000 // ms
-#define CHECK_AUDIO_DEV_OK_TIME_MS 5000 // ms
-#define DETECT_FEEDBACK_TIME_MS    3000 // ms
+#define BUFFER_LED_UPDATE_TIME_MS 300  // ms
+#define LED_BAR_UPDATE_TIME_MS    1000 // ms
 
 // number of ping times > upper bound until error message is shown
 #define NUM_HIGH_PINGS_UNTIL_ERROR 5
@@ -92,25 +89,20 @@ protected:
 
     CClient&         Client;
     CClientSettings& Settings;
+    CClientStatus&   Status;
 
     bool bConnectDlgWasShown;
-    bool bMIDICtrlUsed;
 
-    bool           bDetectFeedback;
     ERecorderState eLastRecorderState;
     EGUIDesign     eLastDesign;
-    QTimer         TimerSigMet;
     QTimer         TimerBuffersLED;
     QTimer         TimerStatus;
-    QTimer         TimerPing;
-    QTimer         TimerCheckAudioDeviceOk;
-    QTimer         TimerDetectFeedback;
 
     virtual void showEvent ( QShowEvent* );
     virtual void closeEvent ( QCloseEvent* Event );
     virtual void dragEnterEvent ( QDragEnterEvent* Event ) { ManageDragNDrop ( Event, true ); }
     virtual void dropEvent ( QDropEvent* Event ) { ManageDragNDrop ( Event, false ); }
-    void         UpdateDisplay();
+    void         UpdateWindowCheckboxes();
 
     CClientSettingsDlg ClientSettingsDlg;
     CChatDlg           ChatDlg;
@@ -119,15 +111,13 @@ protected:
 
 public slots:
     void OnConnectDisconBut();
-    void OnTimerSigMet();
+    void OnSignalMetersUpdate();
     void OnTimerBuffersLED();
-    void OnTimerCheckAudioDeviceOk();
-    void OnTimerDetectFeedback();
+    void OnTimerStatus() { UpdateWindowCheckboxes(); }
 
-    void OnTimerStatus() { UpdateDisplay(); }
+    void onAudioFeedbackDetected();
 
-    void OnTimerPing();
-    void OnPingTimeResult ( int iPingTime );
+    void OnClientStatusUpdate();
     void OnCLPingTimeWithNumClientsReceived ( CHostAddress InetAddr, int iPingTime, int iNumClients );
 
     void OnControllerInFaderLevel ( const int iChannelIdx, const int iValue ) { MainMixerBoard->SetFaderLevel ( iChannelIdx, iValue ); }

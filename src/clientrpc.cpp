@@ -98,7 +98,7 @@ CClientRpc::CClientRpc ( CClient* pClient, CRpcServer* pRpcServer, QObject* pare
     /// @rpc_notification jamulusclient/disconnected
     /// @brief Emitted when the client is disconnected from the server.
     /// @param {object} params - No parameters (empty object).
-    connect ( &pClient->Settings, &CClientSettings::Disconnected, [=]() {
+    connect ( &pClient->Status, &CClientStatus::Disconnected, [=]() {
         pRpcServer->BroadcastNotification ( "jamulusclient/disconnected", QJsonObject{} );
     } );
 

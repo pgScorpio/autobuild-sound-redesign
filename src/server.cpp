@@ -23,6 +23,7 @@
 \******************************************************************************/
 
 #include "server.h"
+
 extern void SetServerAppName ( QString strClientname );
 
 // CHighPrecisionTimer implementation ******************************************
@@ -243,9 +244,9 @@ CServer::CServer ( bool bUseGUI ) :
     bDisconnectAllClientsOnQuit ( Settings.CommandlineOptions.discononquit.IsSet() ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
-    // First emit a queued event to myself so OnStartup will be called as soon as the application starts running.
-    QObject::connect ( this, &CServer::Startup, this, &CServer::OnStartup, Qt::ConnectionType::QueuedConnection );
-    emit Startup();
+    // First emit a queued event to myself so OnApplicationStartup will be called as soon as the application starts running.
+    QObject::connect ( this, &CServer::ApplicationStartup, this, &CServer::OnApplicationStartup, Qt::ConnectionType::QueuedConnection );
+    emit ApplicationStartup();
 
     SetServerAppName ( Settings.GetServerName() );
 
@@ -540,7 +541,7 @@ CServer::CServer ( bool bUseGUI ) :
     Socket.Start();
 }
 
-void CServer::OnStartup() { ApplySettings(); }
+void CServer::OnApplicationStartup() { ApplySettings(); }
 
 void CServer::ApplySettings()
 {
@@ -1868,4 +1869,198 @@ bool CServer::CreateLevelsForAllConChannels ( const int                       iN
     }
 
     return bLevelsWereUpdated;
+}
+
+// Server settings -------------------------------------------------------------
+
+CServerSettings::CServerSettings ( bool bUseGUI ) :
+    CSettings ( false, bUseGUI, APP_NAME, "server" ),
+    strServerName ( "" ),
+    strServerCity ( "" ),
+    eServerCountry ( QLocale::Country::UnitedStates ),
+    bEnableRecording ( false ),
+    strWelcomeMessage ( "" ),
+    strRecordingDir(),
+    strDirectoryAddress(),
+    eDirectoryType ( AT_NONE ),
+    strServerListFileName(),
+    bAutoRunMinimized ( false ),
+    bDelayPan ( false )
+{
+    SetFileName ( CommandlineOptions.inifile.Value(), DEFAULT_INI_FILE_NAME_SERVER );
+    Load();
+}
+
+CServerSettings::~CServerSettings()
+{
+    // Save settings on exit...
+    Save();
+}
+
+bool CServerSettings::ReadSettingsFromXML ( const QDomNode& root )
+{
+    int             iValue;
+    bool            bValue;
+    const QDomNode& section = GetSectionForRead ( root, "server", false );
+
+    // language
+    strLanguage = GetIniSetting ( section, "language", CLocale::FindSysLangTransFileName ( CLocale::GetAvailableTranslations() ).first );
+
+    // window position of the main window
+    vecWindowPosMain = FromBase64ToByteArray ( GetIniSetting ( section, "winposmain_base64" ) );
+
+    // name/city/country
+    // name
+    strServerName = GetIniSetting ( section, "name" );
+
+    // city
+    strServerCity = GetIniSetting ( section, "city" );
+
+    // country
+    if ( GetNumericIniSet ( section, "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
+    {
+        eServerCountry = CLocale::WireFormatCountryCodeToQtCountry ( iValue );
+    }
+
+    // norecord flag
+    if ( GetFlagIniSet ( section, "norecord", bValue ) )
+    {
+        bEnableRecording = !bValue;
+    }
+
+    // welcome message
+    if ( CommandlineOptions.welcomemessage.IsSet() )
+    {
+        strWelcomeMessage = CommandlineOptions.welcomemessage.Value();
+    }
+    else
+    {
+        strWelcomeMessage = FromBase64ToString ( GetIniSetting ( section, "welcome" ) );
+    }
+
+    // base recording directory
+    strRecordingDir = FromBase64ToString ( GetIniSetting ( section, "recordingdir_base64" ) );
+
+    // to avoid multiple registrations, must do this after collecting serverinfo
+    // custom directory
+    // CServerListManager defaults to command line argument (or "" if not passed)
+    // Server GUI defaults to ""
+
+    strDirectoryAddress = GetIniSetting ( section, "directoryaddress", "" );
+
+    // directory type
+    // CServerListManager defaults to AT_NONE
+    // Because type could be AT_CUSTOM, it has to be set after the address to avoid multiple registrations
+    EDirectoryType directoryType = AT_NONE;
+
+    // if a command line Directory server address is set, set the Directory Type (genre) to AT_CUSTOM so it's used
+    if ( CommandlineOptions.directoryserver.IsSet() )
+    {
+        directoryType = AT_CUSTOM;
+    }
+    else
+    {
+        //### TODO: BEGIN ###//
+        // compatibility to old version < 3.4.7
+
+        if ( GetFlagIniSet ( section, "defcentservaddr", bValue ) )
+        {
+            directoryType = bValue ? AT_DEFAULT : AT_CUSTOM;
+        }
+        else
+
+            //### TODO: END ###//
+
+            // if "directorytype" itself is set, use it (note "AT_NONE", "AT_DEFAULT" and "AT_CUSTOM" are min/max directory type here)
+            //### TODO: BEGIN ###//
+            // compatibility to old version < 3.8.2
+
+            if ( GetNumericIniSet ( section, "centservaddrtype", static_cast<int> ( AT_DEFAULT ), static_cast<int> ( AT_CUSTOM ), iValue ) )
+        {
+            directoryType = static_cast<EDirectoryType> ( iValue );
+        }
+        else
+            //### TODO: END ###//
+
+            if ( GetNumericIniSet ( section, "directorytype", static_cast<int> ( AT_NONE ), static_cast<int> ( AT_CUSTOM ), iValue ) )
+        {
+            directoryType = static_cast<EDirectoryType> ( iValue );
+        }
+
+        //### TODO: BEGIN ###//
+        // compatibility to old version < 3.9.0
+        // override type to AT_NONE if servlistenabled exists and is false
+
+        if ( GetFlagIniSet ( section, "servlistenabled", bValue ) && !bValue )
+        {
+            directoryType = AT_NONE;
+        }
+
+        //### TODO: END ###//
+    }
+
+    eDirectoryType = directoryType;
+
+    // server list persistence file name
+    strServerListFileName = FromBase64ToString ( GetIniSetting ( section, "directoryfile_base64" ) );
+
+    // start minimized on OS start
+    if ( GetFlagIniSet ( section, "autostartmin", bValue ) )
+    {
+        bAutoRunMinimized = bValue;
+    }
+
+    // delay panning
+    if ( GetFlagIniSet ( section, "delaypan", bValue ) )
+    {
+        bDelayPan = bValue;
+    }
+
+    return true;
+}
+
+void CServerSettings::WriteSettingsToXML ( QDomNode& root )
+{
+    QDomNode section = GetSectionForWrite ( root, "server", false );
+
+    // window position of the main window
+    PutIniSetting ( section, "winposmain_base64", ToBase64 ( vecWindowPosMain ) );
+
+    // directory type
+    SetNumericIniSet ( section, "directorytype", static_cast<int> ( eDirectoryType ) );
+
+    // name
+    PutIniSetting ( section, "name", strServerName );
+
+    // city
+    PutIniSetting ( section, "city", strServerCity );
+
+    // country
+    SetNumericIniSet ( section, "country", CLocale::QtCountryToWireFormatCountryCode ( eServerCountry ) );
+
+    // norecord flag
+    SetFlagIniSet ( section, "norecord", !bEnableRecording );
+
+    // welcome message
+    PutIniSetting ( section, "welcome", ToBase64 ( strWelcomeMessage ) );
+
+    // language
+    PutIniSetting ( section, "language", strLanguage );
+
+    // base recording directory
+    PutIniSetting ( section, "recordingdir_base64", ToBase64 ( strRecordingDir ) );
+
+    // custom directory
+    PutIniSetting ( section, "directoryaddress", strDirectoryAddress );
+
+    // server list persistence file name
+    PutIniSetting ( section, "directoryfile_base64", ToBase64 ( strServerListFileName ) );
+
+    // start minimized on OS start
+    SetFlagIniSet ( section, "autostartmin", bAutoRunMinimized );
+
+    // delay panning
+    SetFlagIniSet ( section, "delaypan", bDelayPan );
+
+    WriteCommandlineArgumentsToXML ( section );
 }

@@ -54,7 +54,7 @@ class CClientSettingsDlg : public CBaseDlg, private Ui_CClientSettingsDlgBase
     Q_OBJECT
 
 public:
-    CClientSettingsDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* parent = nullptr );
+    CClientSettingsDlg ( CClient& cClient, QWidget* parent = nullptr );
 
     void UpdateUploadRate();
     void UpdateDisplay();
@@ -73,8 +73,10 @@ protected:
 
     CClient&         Client;
     CClientSettings& Settings;
-    QTimer           TimerStatus;
-    QButtonGroup     SndCrdBufferDelayButtonGroup;
+    CClientStatus&   Status;
+
+    QTimer       TimerStatus;
+    QButtonGroup SndCrdBufferDelayButtonGroup;
 
 public slots:
     void OnTimerStatus() { UpdateDisplay(); }

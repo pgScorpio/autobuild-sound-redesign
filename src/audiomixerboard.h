@@ -42,7 +42,7 @@
 #include "global.h"
 #include "util.h"
 #include "levelmeter.h"
-#include "settings.h"
+#include "client.h"
 
 /* Classes ********************************************************************/
 class CChannelFader : public QObject

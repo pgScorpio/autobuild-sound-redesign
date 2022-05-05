@@ -25,10 +25,11 @@
 #include "clientsettingsdlg.h"
 
 /* Implementation *************************************************************/
-CClientSettingsDlg::CClientSettingsDlg ( CClient& cClient, CClientSettings& cSettings, QWidget* parent ) :
+CClientSettingsDlg::CClientSettingsDlg ( CClient& cClient, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Window ), // use Qt::Window to get min/max window buttons
-    Client ( cClient ),
-    Settings ( cSettings )
+    Client ( cClient ),              // We need to get rid of this one!
+    Settings ( cClient.Settings ),
+    Status ( cClient.Status )
 {
     setupUi ( this );
 
@@ -724,7 +725,7 @@ CClientSettingsDlg::CClientSettingsDlg ( CClient& cClient, CClientSettings& cSet
 
     QObject::connect ( tabSettings, &QTabWidget::currentChanged, this, &CClientSettingsDlg::OnTabChanged );
 
-    QObject::connect ( &Client.Settings, &CClientSettings::AudioInputBalanceChanged, this, &CClientSettingsDlg::OnInputBalanceChanged );
+    QObject::connect ( &Settings, &CClientSettings::AudioInputBalanceChanged, this, &CClientSettingsDlg::OnInputBalanceChanged );
 
     tabSettings->setCurrentIndex ( Settings.iSettingsTab );
 
@@ -761,11 +762,12 @@ void CClientSettingsDlg::showEvent ( QShowEvent* )
 void CClientSettingsDlg::UpdateJitterBufferFrame()
 {
     // update slider value and text
-    const int iCurNumNetBuf = Client.GetClientSockBufNumFrames();
-    sldNetBuf->setValue ( iCurNumNetBuf );
-    lblNetBuf->setText ( tr ( "Size: " ) + QString::number ( iCurNumNetBuf ) );
-
+    const int iCurNumNetBufClient = Settings.GetClientSockBufNumFrames();
     const int iCurNumNetBufServer = Settings.GetServerSockBufNumFrames();
+
+    sldNetBuf->setValue ( iCurNumNetBufClient );
+    lblNetBuf->setText ( tr ( "Size: " ) + QString::number ( iCurNumNetBufClient ) );
+
     sldNetBufServer->setValue ( iCurNumNetBufServer );
     lblNetBufServer->setText ( tr ( "Size: " ) + QString::number ( iCurNumNetBufServer ) );
 
@@ -792,7 +794,7 @@ QString CClientSettingsDlg::GenSndCrdBufferDelayString ( const int iFrameSize, c
 void CClientSettingsDlg::UpdateBufferDelayFrame()
 {
     // get current actual buffer size value
-    const int iCurActualBufSize = Client.GetSndCrdActualMonoBlSize();
+    const int iCurActualBufSize = Status.GetSndCrdActualBufferSize();
 
     // check which predefined size is used (it is possible that none is used)
     const bool bPreferredChecked = ( iCurActualBufSize == SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_PREFERRED );
@@ -873,8 +875,8 @@ void CClientSettingsDlg::UpdateSoundDeviceChannelSelectionFrame()
         }
         if ( Client.GetSndCrdNumInputChannels() > 0 )
         {
-            cbxLInChan->setCurrentIndex ( Client.Settings.GetInputChannel ( 0 ) );
-            cbxRInChan->setCurrentIndex ( Client.Settings.GetInputChannel ( 1 ) );
+            cbxLInChan->setCurrentIndex ( Settings.GetInputChannel ( 0 ) );
+            cbxRInChan->setCurrentIndex ( Settings.GetInputChannel ( 1 ) );
         }
 
         // output
@@ -887,8 +889,8 @@ void CClientSettingsDlg::UpdateSoundDeviceChannelSelectionFrame()
         }
         if ( Client.GetSndCrdNumOutputChannels() > 0 )
         {
-            cbxLOutChan->setCurrentIndex ( Client.Settings.GetOutputChannel ( 0 ) );
-            cbxROutChan->setCurrentIndex ( Client.Settings.GetOutputChannel ( 1 ) );
+            cbxLOutChan->setCurrentIndex ( Settings.GetOutputChannel ( 0 ) );
+            cbxROutChan->setCurrentIndex ( Settings.GetOutputChannel ( 1 ) );
         }
     }
 #else
@@ -903,7 +905,7 @@ void CClientSettingsDlg::SetEnableFeedbackDetection ( bool enable )
     chbDetectFeedback->setCheckState ( Settings.bEnableFeedbackDetection ? Qt::Checked : Qt::Unchecked );
 }
 
-void CClientSettingsDlg::OnDriverSetupClicked() { Settings.RequestDriverSetup(); }
+void CClientSettingsDlg::OnDriverSetupClicked() { Status.RequestDriverSetup(); }
 
 void CClientSettingsDlg::OnClientJitBufSliderChanged ( int value )
 {
@@ -1042,9 +1044,9 @@ void CClientSettingsDlg::OnNumMixerPanelRowsChanged() { Settings.SetNumMixerPane
 void CClientSettingsDlg::UpdateUploadRate()
 {
     // update upstream rate information label
-    if ( Settings.GetConnected() )
+    if ( Status.GetConnected() )
     {
-        lblUpstreamValue->setText ( QString().setNum ( Client.GetUploadRateKbps() ) );
+        lblUpstreamValue->setText ( QString().setNum ( Status.GetUploadRateKbps() ) );
         lblUpstreamUnit->setText ( "kbps" );
     }
     else

@@ -62,14 +62,13 @@ void CCmdlnOptBase::Set()
 }
 
 ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
-                                              int               argc,
-                                              char**            argv,
+                                              QStringList&      arguments,
                                               int&              i,
                                               QString&          strParam,
                                               QString&          strValue,
                                               double&           dblValue )
 {
-    if ( ( i < 1 ) || ( i >= argc ) )
+    if ( ( i < 0 ) || ( i >= arguments.count() ) )
     {
         strParam.clear();
         strValue.clear();
@@ -80,10 +79,10 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
     int                  iParam = i;
     int                  iValue = ( i + 1 );
 
-    strParam = argv[iParam];
-    strValue = ( iValue < argc ) ? argv[iValue] : "";
+    strParam = arguments[iParam];
+    strValue = ( iValue < arguments.count() ) ? arguments[iValue] : "";
 
-    if ( ( strParam != strShortName ) && ( strParam != strLongName ) )
+    if ( !IsOption ( strParam ) )
     {
         return ECmdlnOptCheckResult::NoMatch;
     }
@@ -123,7 +122,7 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
         else
         {
             char* p;
-            dblValue = strtod ( argv[iValue], &p );
+            dblValue = strtod ( arguments[iValue].toLocal8Bit(), &p );
             if ( *p )
             {
                 res = ECmdlnOptCheckResult::InvalidNumber;
@@ -189,11 +188,11 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
  CCmndlnFlagOption: Defines a Flag commandline option
  ******************************************************************************/
 
-ECmdlnOptCheckResult CCmndlnFlagOption::check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue )
+ECmdlnOptCheckResult CCmndlnFlagOption::check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue )
 {
     double dblValue;
 
-    ECmdlnOptCheckResult CheckRes = doCheck ( destType, argc, argv, i, strParam, strValue, dblValue );
+    ECmdlnOptCheckResult CheckRes = doCheck ( destType, arguments, i, strParam, strValue, dblValue );
 
     if ( CheckRes == ECmdlnOptCheckResult::OkFlag )
     {
@@ -207,11 +206,11 @@ ECmdlnOptCheckResult CCmndlnFlagOption::check ( ECmdlnOptDestType destType, int 
 CCmndlnStringOption: Defines a String commandline option
 ******************************************************************************/
 
-ECmdlnOptCheckResult CCmndlnStringOption::check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue )
+ECmdlnOptCheckResult CCmndlnStringOption::check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue )
 {
     double dblValue;
 
-    ECmdlnOptCheckResult CheckRes = doCheck ( destType, argc, argv, i, strParam, strValue, dblValue );
+    ECmdlnOptCheckResult CheckRes = doCheck ( destType, arguments, i, strParam, strValue, dblValue );
 
     if ( CheckRes == ECmdlnOptCheckResult::OkString )
     {
@@ -228,11 +227,11 @@ ECmdlnOptCheckResult CCmndlnStringOption::check ( ECmdlnOptDestType destType, in
 CCmndlnIntOption: Defines an integer commandline option
 ******************************************************************************/
 
-ECmdlnOptCheckResult CCmndlnIntOption::check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue )
+ECmdlnOptCheckResult CCmndlnIntOption::check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue )
 {
     double dblValue;
 
-    ECmdlnOptCheckResult CheckRes = doCheck ( destType, argc, argv, i, strParam, strValue, dblValue );
+    ECmdlnOptCheckResult CheckRes = doCheck ( destType, arguments, i, strParam, strValue, dblValue );
 
     if ( CheckRes == ECmdlnOptCheckResult::OkNumber )
     {
@@ -249,11 +248,11 @@ ECmdlnOptCheckResult CCmndlnIntOption::check ( ECmdlnOptDestType destType, int a
  CCmndlnUIntOption: Defines a unsigned int commandline option
  ******************************************************************************/
 
-ECmdlnOptCheckResult CCmndlnUIntOption::check ( ECmdlnOptDestType destType, int argc, char** argv, int& i, QString& strParam, QString& strValue )
+ECmdlnOptCheckResult CCmndlnUIntOption::check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue )
 {
     double dblValue;
 
-    ECmdlnOptCheckResult CheckRes = doCheck ( destType, argc, argv, i, strParam, strValue, dblValue );
+    ECmdlnOptCheckResult CheckRes = doCheck ( destType, arguments, i, strParam, strValue, dblValue );
 
     if ( CheckRes == ECmdlnOptCheckResult::OkNumber )
     {
@@ -329,7 +328,8 @@ CCommandlineOptions::CCommandlineOptions() :
 
     // Special option:
     // ignore invalid options after this option
-    special ( ECmdlnOptDestType::Common, CMDLN_SPECIAL )
+    special ( ECmdlnOptDestType::Common, CMDLN_SPECIAL ),
+    store ( ECmdlnOptDestType::Common, "--store", "--store" )
 {
     centralserver.SetDepricated ( "--centralserver is depricated, please use --directoryserver instead", &directoryserver );
 }
@@ -377,55 +377,56 @@ bool CCommandlineOptions::showErrorMessage ( ECmdlnOptDestType eDestType,
     return !ok;
 }
 
-bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI )
+bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& arguments, bool bIsStored )
 {
     ECmdlnOptDestType eDestType = bIsClient ? ECmdlnOptDestType::Client : ECmdlnOptDestType::Server;
 
-    CCmdlnOptBase* cmdLineOption[] = { // Common
-                                       &inifile,
-                                       &nogui,
-                                       &port,
-                                       &jsonrpcport,
-                                       &jsonrpcsecretfile,
-                                       &qos,
-                                       &notranslation,
-                                       &enableipv6,
-                                       // Client:
-                                       &connect,
-                                       &nojackconnect,
-                                       &mutestream,
-                                       &mutemyown,
-                                       &clientname,
-                                       &ctrlmidich,
-                                       &centralserver,
-                                       &showallservers,
-                                       &showanalyzerconsole,
-                                       // Server:
-                                       &server,
-                                       &discononquit,
-                                       &directoryserver,
-                                       &directoryfile,
-                                       &listfilter,
-                                       &fastupdate,
-                                       &log,
-                                       &licence,
-                                       &htmlstatus,
-                                       &serverinfo,
-                                       &serverpublicip,
-                                       &delaypan,
-                                       &recording,
-                                       &norecord,
-                                       &serverbindip,
-                                       &multithreading,
-                                       &numchannels,
-                                       &welcomemessage,
-                                       &startminimized,
-                                       // Special
-                                       &special };
+    CCmdlnOptBase* cmdLineOption[] = // Array for sequencial checking
+
+        { // Common
+          &inifile,
+          &nogui,
+          &port,
+          &jsonrpcport,
+          &jsonrpcsecretfile,
+          &qos,
+          &notranslation,
+          &enableipv6,
+          // Client:
+          &connect,
+          &nojackconnect,
+          &mutestream,
+          &mutemyown,
+          &clientname,
+          &ctrlmidich,
+          &centralserver,
+          &showallservers,
+          &showanalyzerconsole,
+          // Server:
+          &server,
+          &discononquit,
+          &directoryserver,
+          &directoryfile,
+          &listfilter,
+          &fastupdate,
+          &log,
+          &licence,
+          &htmlstatus,
+          &serverinfo,
+          &serverpublicip,
+          &delaypan,
+          &recording,
+          &norecord,
+          &serverbindip,
+          &multithreading,
+          &numchannels,
+          &welcomemessage,
+          &startminimized,
+          // Special
+          &special,
+          &store };
 
     const int optionsCount = ( sizeof ( cmdLineOption ) / sizeof ( cmdLineOption[0] ) );
-    const int argc         = CCommandline::argc;
-    char**    argv         = CCommandline::argv;
 
     QString strParam;
     QString strValue;
@@ -434,13 +435,13 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI )
     QString invalidDests;
     QString invalidParams;
 
-    for ( int i = 1; i < argc; i++ )
+    for ( int i = 0; i < arguments.size(); i++ )
     {
         bool optionFound = false;
 
         for ( int option = 0; option < optionsCount; option++ )
         {
-            ECmdlnOptCheckResult res = cmdLineOption[option]->check ( eDestType, argc, argv, i, strParam, strValue );
+            ECmdlnOptCheckResult res = cmdLineOption[option]->check ( eDestType, arguments, i, strParam, strValue );
             optionFound              = ( res != ECmdlnOptCheckResult::NoMatch );
 
             switch ( res )
@@ -487,6 +488,41 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI )
 
     if ( !showErrorMessage ( eDestType, unknowOptions, invalidDests, invalidParams ) )
     {
+        if ( !bIsStored )
+        {
+            if ( store.IsSet() )
+            {
+                QString argument;
+
+                QStringList StoreCommandlineArguments;
+
+                for ( int i = 0; i < arguments.size(); i++ )
+                {
+                    argument = arguments[i];
+
+                    if ( inifile.IsOption ( argument ) )
+                    {
+                        // don't store inifile argument and inifile name
+                        i++;
+                    }
+                    else if ( server.IsOption ( argument ) || nogui.IsOption ( argument ) || store.IsOption ( argument ) )
+                    {
+                        // don't store these arguments
+                    }
+                    else
+                    {
+                        StoreCommandlineArguments.append ( argument );
+                    }
+                }
+
+                arguments = StoreCommandlineArguments;
+            }
+            else
+            {
+                arguments.clear();
+            }
+        }
+
         QString message ( TR ( "Forcing %1 mode due to application version." ) );
 
         if ( bIsClient && server.IsSet() )
@@ -512,6 +548,11 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI )
         }
 
         return true;
+    }
+
+    if ( !bIsStored )
+    {
+        arguments.clear();
     }
 
     return false;

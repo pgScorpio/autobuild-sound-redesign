@@ -23,6 +23,7 @@
 \******************************************************************************/
 
 #include "connectdlg.h"
+#include "client.h"
 
 /* Implementation *************************************************************/
 CConnectDlg::CConnectDlg ( CClientSettings& cSettings, QWidget* parent ) :

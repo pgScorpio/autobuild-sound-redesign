@@ -23,36 +23,170 @@
 \******************************************************************************/
 
 #include "settings.h"
+#include <QSettings>
+#include "util.h"
 
 /* Implementation *************************************************************/
-void CSettings::Load()
+
+CSettings::CSettings ( bool bIsClient, bool bUseGUI, const QString& iniRootSection, const QString& iniDataSection ) :
+    bSettingsLoaded ( false ),
+    strRootSection ( iniRootSection ),
+    strDataSection ( iniDataSection ),
+    CommandlineOptions(),
+    CommandlineArguments(),
+    vecWindowPosMain(), // empty array
+    strLanguage(),
+    strFileName()
 {
+    CCommandline::GetArgumentList ( CommandlineArguments );
+
+    if ( !CommandlineOptions.Load ( bIsClient, bUseGUI, CommandlineArguments, false ) )
+    {
+#ifdef HEADLESS
+        throw CErrorExit ( "Parameter Error(s), Exiting" );
+#endif
+    }
+}
+
+CSettings::~CSettings()
+{
+    // Somehow this one is called on an exception
+    // but descendant destuctors are not !
+}
+
+bool CSettings::Load()
+{
+    bSettingsLoaded = false;
+
     // prepare file name for loading initialization data from XML file and read
     // data from file if possible
     QDomDocument IniXMLDocument;
     ReadFromFile ( strFileName, IniXMLDocument );
+    QDomNode root = IniXMLDocument.firstChild();
 
     // read the settings from the given XML file
-    ReadSettingsFromXML ( IniXMLDocument );
+    bSettingsLoaded = ReadSettingsFromXML ( root );
+
+    if ( CommandlineOptions.store.IsSet() )
+    {
+        if ( bSettingsLoaded )
+        {
+            // Save settings with commandline options
+            // bSettingsLoaded is set to false on successfull save to Prevent Saving again from destructors !
+            bSettingsLoaded = !Save();
+
+            if ( !bSettingsLoaded )
+            {
+                // Successful save !
+                if ( CommandlineArguments.size() )
+                {
+                    throw ( CInfoExit ( QString ( "Commandline parameters stored: \n" ) + CommandlineArguments.join ( " " ) ) );
+                }
+                else
+                {
+                    throw ( CInfoExit ( "Stored Commandline parameters cleared." ) );
+                }
+            }
+        }
+
+        throw ( CErrorExit ( "Commandline parameters NOT stored. Failed to read inifile!" ) );
+    }
 
     // load translation
     if ( !CommandlineOptions.nogui.IsSet() && !CommandlineOptions.notranslation.IsSet() )
     {
         CLocale::LoadTranslation ( strLanguage, QApplication::instance() );
     }
+
+    return bSettingsLoaded;
 }
 
-void CSettings::Save()
+bool CSettings::Save()
 {
+    if ( !bSettingsLoaded )
+    {
+        // Do not save invalid settings !
+        return false;
+    }
     // create XML document for storing initialization parameters
     QDomDocument IniXMLDocument;
+    QDomNode     root;
+    QDomNode     section;
+
+    if ( strDataSection == strRootSection )
+    {
+        // New single section document
+        // data section to use is new root
+        root    = IniXMLDocument.createElement ( strRootSection );
+        section = IniXMLDocument.appendChild ( root );
+    }
+    else
+    {
+        // multi section document
+        // read file first to keep other sections...
+        ReadFromFile ( strFileName, IniXMLDocument );
+        root = IniXMLDocument.firstChild();
+        if ( root.isNull() )
+        {
+            // Empty document
+            // create new root...
+            root = IniXMLDocument.createElement ( strRootSection );
+            IniXMLDocument.appendChild ( root );
+            // use new data section under root
+            section = GetSectionForWrite ( root, strDataSection, true );
+        }
+        else if ( root.nodeName() != strRootSection )
+        {
+            // old file with a single section ??
+            // now creating a new file with multiple sections
+
+            // store old root as a new section
+            QDomDocumentFragment oldRoot = IniXMLDocument.createDocumentFragment();
+            oldRoot.appendChild ( root );
+
+            // Create new root
+            root = IniXMLDocument.createElement ( strRootSection );
+            // NOTE: This only orks thanks to a bug in Qt !!
+            //       according to the documentation it should not be possible to add a second root element !
+            IniXMLDocument.appendChild ( root );
+
+            if ( section.nodeName() != strDataSection )
+            {
+                // old root section is not mine !
+                // keep old root section as new section...
+                root.appendChild ( oldRoot );
+            }
+
+            section.clear();
+        }
+        else
+        {
+            section = root.firstChildElement ( strDataSection );
+            if ( !section.isNull() )
+            {
+                section.clear();
+            }
+        }
+
+        if ( section.isNull() )
+        {
+            section = GetSectionForWrite ( root, strDataSection, true );
+        }
+    }
+
+    if ( section.isNull() )
+    {
+        return false;
+    }
 
     // write the settings in the XML file
-    WriteSettingsToXML ( IniXMLDocument );
+    WriteSettingsToXML ( section );
 
     // prepare file name for storing initialization data in XML file and store
     // XML data in file
     WriteToFile ( strFileName, IniXMLDocument );
+
+    return true;
 }
 
 void CSettings::ReadFromFile ( const QString& strCurFileName, QDomDocument& XMLDocument )
@@ -75,6 +209,61 @@ void CSettings::WriteToFile ( const QString& strCurFileName, const QDomDocument&
         QTextStream ( &file ) << XMLDocument.toString();
         file.close();
     }
+}
+
+bool CSettings::WriteCommandlineArgumentsToXML ( QDomNode& section )
+{
+    const int argumentCount = CommandlineArguments.size();
+
+    if ( argumentCount > 0 )
+    {
+        section = GetSectionForWrite ( section, "commandline" );
+        SetNumericIniSet ( section, "argumentcount", CommandlineArguments.size() );
+        for ( int i = 1; i <= argumentCount; i++ )
+        {
+            PutIniSetting ( section, QString ( "argument%1" ).arg ( i ), CommandlineArguments[i - 1] );
+        }
+
+        return true;
+    }
+
+    return false;
+}
+
+bool CSettings::ReadCommandlineArgumentsFromXML ( const QDomNode& section )
+{
+    if ( CommandlineArguments.size() || CommandlineOptions.store.IsSet() )
+    {
+        // new commandline arguments are set,
+        // so don't read the commandline arguments from file
+        return false;
+    }
+
+    int     argumentCount = 0;
+    QString argument;
+
+    const QDomNode readSection = GetSectionForRead ( section, "commandline" );
+
+    if ( GetNumericIniSet ( readSection, "argumentcount", 0, INT_MAX, argumentCount ) )
+    {
+        for ( int i = 1; i <= argumentCount; i++ )
+        {
+            argument = GetIniSetting ( readSection, QString ( "argument%1" ).arg ( i ) );
+            if ( !argument.isEmpty() )
+            {
+                CommandlineArguments.append ( argument );
+            }
+        }
+    }
+
+    if ( CommandlineArguments.size() )
+    {
+        // process the read commandline arguments
+        CommandlineOptions.Load ( !CommandlineOptions.server.IsSet(), !CommandlineOptions.nogui.IsSet(), CommandlineArguments, true );
+        return true;
+    }
+
+    return false;
 }
 
 void CSettings::SetFileName ( const QString& sNFiName, const QString& sDefaultFileName )
@@ -100,23 +289,18 @@ void CSettings::SetFileName ( const QString& sNFiName, const QString& sDefaultFi
     }
 }
 
-void CSettings::SetNumericIniSet ( QDomDocument& xmlFile, const QString& strSection, const QString& strKey, const int iValue )
+void CSettings::SetNumericIniSet ( QDomNode& section, const QString& strKey, const int iValue )
 {
     // convert input parameter which is an integer to string and store
-    PutIniSetting ( xmlFile, strSection, strKey, QString::number ( iValue ) );
+    PutIniSetting ( section, strKey, QString::number ( iValue ) );
 }
 
-bool CSettings::GetNumericIniSet ( const QDomDocument& xmlFile,
-                                   const QString&      strSection,
-                                   const QString&      strKey,
-                                   const int           iRangeStart,
-                                   const int           iRangeStop,
-                                   int&                iValue )
+bool CSettings::GetNumericIniSet ( const QDomNode& section, const QString& strKey, const int iRangeStart, const int iRangeStop, int& iValue )
 {
     // init return value
     bool bReturn = false;
 
-    const QString strGetIni = GetIniSetting ( xmlFile, strSection, strKey );
+    const QString strGetIni = GetIniSetting ( section, strKey );
 
     // check if it is a valid parameter
     if ( !strGetIni.isEmpty() )
@@ -134,18 +318,18 @@ bool CSettings::GetNumericIniSet ( const QDomDocument& xmlFile,
     return bReturn;
 }
 
-void CSettings::SetFlagIniSet ( QDomDocument& xmlFile, const QString& strSection, const QString& strKey, const bool bValue )
+void CSettings::SetFlagIniSet ( QDomNode& section, const QString& strKey, const bool bValue )
 {
     // we encode true -> "1" and false -> "0"
-    PutIniSetting ( xmlFile, strSection, strKey, bValue ? "1" : "0" );
+    PutIniSetting ( section, strKey, bValue ? "1" : "0" );
 }
 
-bool CSettings::GetFlagIniSet ( const QDomDocument& xmlFile, const QString& strSection, const QString& strKey, bool& bValue )
+bool CSettings::GetFlagIniSet ( const QDomNode& section, const QString& strKey, bool& bValue )
 {
     // init return value
     bool bReturn = false;
 
-    const QString strGetIni = GetIniSetting ( xmlFile, strSection, strKey );
+    const QString strGetIni = GetIniSetting ( section, strKey );
 
     if ( !strGetIni.isEmpty() )
     {
@@ -157,18 +341,56 @@ bool CSettings::GetFlagIniSet ( const QDomDocument& xmlFile, const QString& strS
 }
 
 // Init-file routines using XML ***********************************************
-QString CSettings::GetIniSetting ( const QDomDocument& xmlFile, const QString& sSection, const QString& sKey, const QString& sDefaultVal )
+
+const QDomNode CSettings::GetSectionForRead ( const QDomNode& section, QString strSectionName, bool bForceChild )
+{
+    if ( !section.isNull() )
+    {
+        if ( !bForceChild && section.nodeName() == strSectionName )
+        {
+            return section;
+        }
+
+        return section.firstChildElement ( strSectionName );
+    }
+
+    return section;
+}
+
+QDomNode CSettings::GetSectionForWrite ( QDomNode& section, QString strSectionName, bool bForceChild )
+{
+    if ( !section.isNull() )
+    {
+        if ( !bForceChild && section.nodeName() == strSectionName )
+        {
+            return section;
+        }
+
+        QDomNode newSection = section.firstChildElement ( strSectionName );
+        if ( newSection.isNull() )
+        {
+            newSection = section.ownerDocument().createElement ( strSectionName );
+            if ( !newSection.isNull() )
+            {
+                section.appendChild ( newSection );
+            }
+        }
+
+        return newSection;
+    }
+
+    return section;
+}
+
+QString CSettings::GetIniSetting ( const QDomNode& section, const QString& sKey, const QString& sDefaultVal )
 {
     // init return parameter with default value
     QString sResult ( sDefaultVal );
 
-    // get section
-    QDomElement xmlSection = xmlFile.firstChildElement ( sSection );
-
-    if ( !xmlSection.isNull() )
+    if ( !section.isNull() )
     {
         // get key
-        QDomElement xmlKey = xmlSection.firstChildElement ( sKey );
+        QDomElement xmlKey = section.firstChildElement ( sKey );
 
         if ( !xmlKey.isNull() )
         {
@@ -180,798 +402,36 @@ QString CSettings::GetIniSetting ( const QDomDocument& xmlFile, const QString& s
     return sResult;
 }
 
-void CSettings::PutIniSetting ( QDomDocument& xmlFile, const QString& sSection, const QString& sKey, const QString& sValue )
+bool CSettings::PutIniSetting ( QDomNode& section, const QString& sKey, const QString& sValue )
 {
-    // check if section is already there, if not then create it
-    QDomElement xmlSection = xmlFile.firstChildElement ( sSection );
-
-    if ( xmlSection.isNull() )
+    if ( section.isNull() )
     {
-        // create new root element and add to document
-        xmlSection = xmlFile.createElement ( sSection );
-        xmlFile.appendChild ( xmlSection );
+        return false;
     }
 
     // check if key is already there, if not then create it
-    QDomElement xmlKey = xmlSection.firstChildElement ( sKey );
+    QDomElement xmlKey = section.firstChildElement ( sKey );
 
     if ( xmlKey.isNull() )
     {
-        xmlKey = xmlFile.createElement ( sKey );
-        xmlSection.appendChild ( xmlKey );
-    }
+        // Add a new text key
+        xmlKey = section.ownerDocument().createElement ( sKey );
+        if ( section.appendChild ( xmlKey ).isNull() )
+        {
+            return false;
+        }
 
-    // add actual data to the key
-    QDomText currentValue = xmlFile.createTextNode ( sValue );
-    xmlKey.appendChild ( currentValue );
-}
-
-#ifndef SERVER_ONLY
-// Client settings -------------------------------------------------------------
-void CClientSettings::LoadFaderSettings ( const QString& strCurFileName )
-{
-    // prepare file name for loading initialization data from XML file and read
-    // data from file if possible
-    QDomDocument IniXMLDocument;
-    ReadFromFile ( strCurFileName, IniXMLDocument );
-
-    // read the settings from the given XML file
-    ReadFaderSettingsFromXML ( IniXMLDocument );
-}
-
-void CClientSettings::SaveFaderSettings ( const QString& strCurFileName )
-{
-    // create XML document for storing initialization parameters
-    QDomDocument IniXMLDocument;
-
-    // write the settings in the XML file
-    WriteFaderSettingsToXML ( IniXMLDocument );
-
-    // prepare file name for storing initialization data in XML file and store
-    // XML data in file
-    WriteToFile ( strCurFileName, IniXMLDocument );
-}
-
-void CClientSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
-{
-    int  iIdx;
-    int  iValue;
-    bool bValue;
-
-    // IP addresses
-    for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
-    {
-        vstrIPAddress[iIdx] = GetIniSetting ( IniXMLDocument, "client", QString ( "ipaddress%1" ).arg ( iIdx ), "" );
-    }
-
-    // new client level
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "newclientlevel", 0, 100, iValue ) )
-    {
-        iNewClientFaderLevel = iValue;
-    }
-
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "enablefeedbackdetection", bValue ) )
-    {
-        bEnableFeedbackDetection = bValue;
-    }
-
-    // connect dialog show all musicians
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "connectdlgshowallmusicians", bValue ) )
-    {
-        bConnectDlgShowAllMusicians = bValue;
-    }
-
-    // language
-    strLanguage =
-        GetIniSetting ( IniXMLDocument, "client", "language", CLocale::FindSysLangTransFileName ( CLocale::GetAvailableTranslations() ).first );
-
-    // fader channel sorting
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "channelsort", 0, 4 /* ST_BY_CITY */, iValue ) )
-    {
-        eChannelSortType = static_cast<EChSortType> ( iValue );
-    }
-
-    // own fader first sorting
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "ownfaderfirst", bValue ) )
-    {
-        bOwnFaderFirst = bValue;
-    }
-
-    // number of mixer panel rows
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "numrowsmixpan", 1, 8, iValue ) )
-    {
-        iNumMixerPanelRows = iValue;
-    }
-
-    // name
-    ChannelInfo.strName = FromBase64ToString (
-        GetIniSetting ( IniXMLDocument, "client", "name_base64", ToBase64 ( QCoreApplication::translate ( "CMusProfDlg", "No Name" ) ) ) );
-
-    // instrument
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "instrument", 0, CInstPictures::GetNumAvailableInst() - 1, iValue ) )
-    {
-        ChannelInfo.iInstrument = iValue;
-    }
-
-    // country
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
-    {
-        ChannelInfo.eCountry = static_cast<QLocale::Country> ( iValue );
+        // add text data to the key
+        QDomText textValue;
+        textValue = section.ownerDocument().createTextNode ( sValue );
+        return ( !xmlKey.appendChild ( textValue ).isNull() );
     }
     else
     {
-        // if no country is given, use the one from the operating system
-        ChannelInfo.eCountry = QLocale::system().country();
+        // Child should be a text node !
+        xmlKey.firstChild().setNodeValue ( sValue );
+        return true;
     }
 
-    // city
-    ChannelInfo.strCity = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "client", "city_base64" ) );
-
-    // skill level
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "skill", 0, 3 /* SL_PROFESSIONAL */, iValue ) )
-    {
-        ChannelInfo.eSkillLevel = static_cast<ESkillLevel> ( iValue );
-    }
-
-    // audio fader
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "audfad", AUD_FADER_IN_MIN, AUD_FADER_IN_MAX, iValue ) )
-    {
-        iAudioInputBalance = iValue;
-    }
-
-    // reverberation level
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "revlev", 0, AUD_REVERB_MAX, iValue ) )
-    {
-        iReverbLevel = iValue;
-    }
-
-    // reverberation channel assignment
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "reverblchan", bValue ) )
-    {
-        bReverbOnLeftChan = bValue;
-    }
-
-    // sound card selection
-    cAudioDevice.strName = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "client", "auddev_base64", "" ) );
-
-    //### TODO: BEGIN ###//
-    // sound card channel mapping settings: make sure these settings are
-    // set AFTER the sound card device is set, otherwise the settings are
-    // overwritten by the defaults
-    //
-    // sound card left input channel mapping
-    // Soundcard settings should be stored per AudioDevice
-
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdinlch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
-    {
-        cAudioDevice.iLeftInputChannel = iValue;
-    }
-
-    // sound card right input channel mapping
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdinrch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
-    {
-        cAudioDevice.iRightInputChannel = iValue;
-    }
-
-    // sound card left output channel mapping
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutlch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
-    {
-        cAudioDevice.iLeftOutputChannel = iValue;
-    }
-
-    // sound card right output channel mapping
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutrch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
-    {
-        cAudioDevice.iRightOutputChannel = iValue;
-    }
-
-    // input boost
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "inputboost", 1, 10, iValue ) )
-    {
-        cAudioDevice.iInputBoost = iValue;
-    }
-
-    //### TODO:END ###//
-
-    // sound card preferred buffer size index
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "prefsndcrdbufidx", FRAME_SIZE_FACTOR_PREFERRED, FRAME_SIZE_FACTOR_SAFE, iValue ) )
-    {
-        // additional check required since only a subset of factors are
-        // defined
-        if ( ( iValue == FRAME_SIZE_FACTOR_PREFERRED ) || ( iValue == FRAME_SIZE_FACTOR_DEFAULT ) || ( iValue == FRAME_SIZE_FACTOR_SAFE ) )
-        {
-            cAudioDevice.iPrefFrameSizeFactor = iValue;
-        }
-    }
-
-    // automatic network jitter buffer size setting
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "autojitbuf", bValue ) )
-    {
-        bAutoSockBufSize = bValue;
-    }
-
-    // network jitter buffer size
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "jitbuf", MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL, iValue ) )
-    {
-        iClientSockBufNumFrames = iValue;
-    }
-
-    // network jitter buffer size for server
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "jitbufserver", MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL, iValue ) )
-    {
-        iServerSockBufNumFrames = iValue;
-    }
-
-    // enable OPUS64 setting
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "enableopussmall", bValue ) )
-    {
-        bEnableOPUS64 = bValue;
-    }
-
-    // GUI design
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "guidesign", 0, 2 /* GD_SLIMFADER */, iValue ) )
-    {
-        eGUIDesign = static_cast<EGUIDesign> ( iValue );
-    }
-
-    // MeterStyle
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "meterstyle", 0, 4 /* MT_LED_ROUND_BIG */, iValue ) )
-    {
-        eMeterStyle = static_cast<EMeterStyle> ( iValue );
-    }
-    else
-    {
-        // if MeterStyle is not found in the ini, set it based on the GUI design
-        if ( GetNumericIniSet ( IniXMLDocument, "client", "guidesign", 0, 2 /* GD_SLIMFADER */, iValue ) )
-        {
-            switch ( iValue )
-            {
-            case GD_STANDARD:
-                eMeterStyle = MT_BAR_WIDE;
-                break;
-
-            case GD_ORIGINAL:
-                eMeterStyle = MT_LED_STRIPE;
-                break;
-
-            case GD_SLIMFADER:
-                eMeterStyle = MT_BAR_NARROW;
-                break;
-
-            default:
-                eMeterStyle = MT_LED_STRIPE;
-                break;
-            }
-        }
-    }
-
-    // audio channels
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "audiochannels", 0, 2 /* CC_STEREO */, iValue ) )
-    {
-        eAudioChannelConfig = static_cast<EAudChanConf> ( iValue );
-    }
-
-    // audio quality
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "audioquality", 0, 2 /* AQ_HIGH */, iValue ) )
-    {
-        eAudioQuality = static_cast<EAudioQuality> ( iValue );
-    }
-
-    // custom directories
-    //
-    //### TODO: BEGIN ###//
-    // TODO compatibility to old version (< 3.6.1)
-
-    QString strDirectoryAddress = GetIniSetting ( IniXMLDocument, "client", "centralservaddr", "" );
-
-    //### TODO: END ###//
-
-    for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
-    {
-        //### TODO: BEGIN ###//
-        // compatibility to old version (< 3.8.2)
-
-        strDirectoryAddress = GetIniSetting ( IniXMLDocument, "client", QString ( "centralservaddr%1" ).arg ( iIdx ), strDirectoryAddress );
-
-        //### TODO: END ###//
-
-        vstrDirectoryAddress[iIdx] = GetIniSetting ( IniXMLDocument, "client", QString ( "directoryaddress%1" ).arg ( iIdx ), strDirectoryAddress );
-        strDirectoryAddress        = "";
-    }
-
-    // directory type
-    //
-    //### TODO: BEGIN ###//
-    // compatibility to old version (<3.4.7)
-    // only the case that "centralservaddr" was set in old ini must be considered
-
-    if ( !vstrDirectoryAddress[0].isEmpty() && GetFlagIniSet ( IniXMLDocument, "client", "defcentservaddr", bValue ) && !bValue )
-    {
-        eDirectoryType = AT_CUSTOM;
-    }
-    else if ( GetNumericIniSet ( IniXMLDocument, "client", "centservaddrtype", 0, static_cast<int> ( AT_CUSTOM ), iValue ) )
-    {
-        eDirectoryType = static_cast<EDirectoryType> ( iValue );
-    }
-
-    //### TODO: END ###//
-
-    else if ( GetNumericIniSet ( IniXMLDocument, "client", "directorytype", 0, static_cast<int> ( AT_CUSTOM ), iValue ) )
-    {
-        eDirectoryType = static_cast<EDirectoryType> ( iValue );
-    }
-    else
-    {
-        // if no address type is given, choose one from the operating system locale
-        eDirectoryType = AT_DEFAULT;
-    }
-
-    // custom directory index
-    if ( ( eDirectoryType == AT_CUSTOM ) &&
-         GetNumericIniSet ( IniXMLDocument, "client", "customdirectoryindex", 0, MAX_NUM_SERVER_ADDR_ITEMS, iValue ) )
-    {
-        iCustomDirectoryIndex = iValue;
-    }
-    else
-    {
-        // if directory is not set to custom, or if no custom directory index is found in the settings .ini file, then initialize to zero
-        iCustomDirectoryIndex = 0;
-    }
-
-    // window position of the main window
-    vecWindowPosMain = FromBase64ToByteArray ( GetIniSetting ( IniXMLDocument, "client", "winposmain_base64" ) );
-
-    // window position of the settings window
-    vecWindowPosSettings = FromBase64ToByteArray ( GetIniSetting ( IniXMLDocument, "client", "winposset_base64" ) );
-
-    // window position of the chat window
-    vecWindowPosChat = FromBase64ToByteArray ( GetIniSetting ( IniXMLDocument, "client", "winposchat_base64" ) );
-
-    // window position of the connect window
-    vecWindowPosConnect = FromBase64ToByteArray ( GetIniSetting ( IniXMLDocument, "client", "winposcon_base64" ) );
-
-    // visibility state of the settings window
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "winvisset", bValue ) )
-    {
-        bWindowWasShownSettings = bValue;
-    }
-
-    // visibility state of the chat window
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "winvischat", bValue ) )
-    {
-        bWindowWasShownChat = bValue;
-    }
-
-    // visibility state of the connect window
-    if ( GetFlagIniSet ( IniXMLDocument, "client", "winviscon", bValue ) )
-    {
-        bWindowWasShownConnect = bValue;
-    }
-
-    // selected Settings Tab
-    if ( GetNumericIniSet ( IniXMLDocument, "client", "settingstab", 0, 2, iValue ) )
-    {
-        iSettingsTab = iValue;
-    }
-
-    // fader settings
-    ReadFaderSettingsFromXML ( IniXMLDocument );
-
-    //### TODO: BEGIN ###//
-    /*
-    if ( CommandlineOptions.store.IsSet() )
-    {
-        store applicable CommandlineOptions values in settings
-        and Unset those CommandlineOptions...
-    }
-    */
-    //### TODO: END ###//
-}
-
-void CClientSettings::ReadFaderSettingsFromXML ( const QDomDocument& IniXMLDocument )
-{
-    int  iIdx;
-    int  iValue;
-    bool bValue;
-
-    for ( iIdx = 0; iIdx < MAX_NUM_STORED_FADER_SETTINGS; iIdx++ )
-    {
-        // stored fader tags
-        vecStoredFaderTags[iIdx] =
-            FromBase64ToString ( GetIniSetting ( IniXMLDocument, "client", QString ( "storedfadertag%1_base64" ).arg ( iIdx ), "" ) );
-
-        // stored fader levels
-        if ( GetNumericIniSet ( IniXMLDocument, "client", QString ( "storedfaderlevel%1" ).arg ( iIdx ), 0, AUD_MIX_FADER_MAX, iValue ) )
-        {
-            vecStoredFaderLevels[iIdx] = iValue;
-        }
-
-        // stored pan values
-        if ( GetNumericIniSet ( IniXMLDocument, "client", QString ( "storedpanvalue%1" ).arg ( iIdx ), 0, AUD_MIX_PAN_MAX, iValue ) )
-        {
-            vecStoredPanValues[iIdx] = iValue;
-        }
-
-        // stored fader solo state
-        if ( GetFlagIniSet ( IniXMLDocument, "client", QString ( "storedfaderissolo%1" ).arg ( iIdx ), bValue ) )
-        {
-            vecStoredFaderIsSolo[iIdx] = bValue;
-        }
-
-        // stored fader muted state
-        if ( GetFlagIniSet ( IniXMLDocument, "client", QString ( "storedfaderismute%1" ).arg ( iIdx ), bValue ) )
-        {
-            vecStoredFaderIsMute[iIdx] = bValue;
-        }
-
-        // stored fader group ID
-        if ( GetNumericIniSet ( IniXMLDocument,
-                                "client",
-                                QString ( "storedgroupid%1" ).arg ( iIdx ),
-                                INVALID_INDEX,
-                                MAX_NUM_FADER_GROUPS - 1,
-                                iValue ) )
-        {
-            vecStoredFaderGroupID[iIdx] = iValue;
-        }
-    }
-}
-
-void CClientSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )
-{
-    int iIdx;
-
-    // IP addresses
-    for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
-    {
-        PutIniSetting ( IniXMLDocument, "client", QString ( "ipaddress%1" ).arg ( iIdx ), vstrIPAddress[iIdx] );
-    }
-
-    // new client level
-    SetNumericIniSet ( IniXMLDocument, "client", "newclientlevel", iNewClientFaderLevel );
-
-    // feedback detection
-    SetFlagIniSet ( IniXMLDocument, "client", "enablefeedbackdetection", bEnableFeedbackDetection );
-
-    // connect dialog show all musicians
-    SetFlagIniSet ( IniXMLDocument, "client", "connectdlgshowallmusicians", bConnectDlgShowAllMusicians );
-
-    // language
-    PutIniSetting ( IniXMLDocument, "client", "language", strLanguage );
-
-    // fader channel sorting
-    SetNumericIniSet ( IniXMLDocument, "client", "channelsort", static_cast<int> ( eChannelSortType ) );
-
-    // own fader first sorting
-    SetFlagIniSet ( IniXMLDocument, "client", "ownfaderfirst", bOwnFaderFirst );
-
-    // number of mixer panel rows
-    SetNumericIniSet ( IniXMLDocument, "client", "numrowsmixpan", iNumMixerPanelRows );
-
-    // name
-    PutIniSetting ( IniXMLDocument, "client", "name_base64", ToBase64 ( ChannelInfo.strName ) );
-
-    // instrument
-    SetNumericIniSet ( IniXMLDocument, "client", "instrument", ChannelInfo.iInstrument );
-
-    // country
-    SetNumericIniSet ( IniXMLDocument, "client", "country", CLocale::QtCountryToWireFormatCountryCode ( ChannelInfo.eCountry ) );
-
-    // city
-    PutIniSetting ( IniXMLDocument, "client", "city_base64", ToBase64 ( ChannelInfo.strCity ) );
-
-    // skill level
-    SetNumericIniSet ( IniXMLDocument, "client", "skill", static_cast<int> ( ChannelInfo.eSkillLevel ) );
-
-    // audio fader
-    SetNumericIniSet ( IniXMLDocument, "client", "audfad", iAudioInputBalance );
-
-    // reverberation level
-    SetNumericIniSet ( IniXMLDocument, "client", "revlev", iReverbLevel );
-
-    // reverberation channel assignment
-    SetFlagIniSet ( IniXMLDocument, "client", "reverblchan", bReverbOnLeftChan );
-
-    //### TODO: BEGIN ###//
-    // Soundcard settings should be stored per Audio device.
-
-    // sound card selection
-    PutIniSetting ( IniXMLDocument, "client", "auddev_base64", ToBase64 ( cAudioDevice.strName ) );
-
-    // sound card left input channel mapping
-    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdinlch", cAudioDevice.iLeftInputChannel );
-
-    // sound card right input channel mapping
-    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdinrch", cAudioDevice.iRightInputChannel );
-
-    // sound card left output channel mapping
-    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutlch", cAudioDevice.iLeftOutputChannel );
-
-    // sound card right output channel mapping
-    SetNumericIniSet ( IniXMLDocument, "client", "sndcrdoutrch", cAudioDevice.iRightOutputChannel );
-
-    // sound card input boost
-    SetNumericIniSet ( IniXMLDocument, "client", "inputboost", cAudioDevice.iInputBoost );
-
-    // sound card preferred buffer size index
-    SetNumericIniSet ( IniXMLDocument, "client", "prefsndcrdbufidx", cAudioDevice.iPrefFrameSizeFactor );
-
-    //### TODO: END ###//
-
-    // automatic network jitter buffer size setting
-    SetFlagIniSet ( IniXMLDocument, "client", "autojitbuf", bAutoSockBufSize );
-
-    // network jitter buffer size
-    SetNumericIniSet ( IniXMLDocument, "client", "jitbuf", iClientSockBufNumFrames );
-
-    // network jitter buffer size for server
-    SetNumericIniSet ( IniXMLDocument, "client", "jitbufserver", iServerSockBufNumFrames );
-
-    // enable OPUS64 setting
-    SetFlagIniSet ( IniXMLDocument, "client", "enableopussmall", bEnableOPUS64 );
-
-    // GUI design
-    SetNumericIniSet ( IniXMLDocument, "client", "guidesign", static_cast<int> ( eGUIDesign ) );
-
-    // MeterStyle
-    SetNumericIniSet ( IniXMLDocument, "client", "meterstyle", static_cast<int> ( eMeterStyle ) );
-
-    // audio channels
-    SetNumericIniSet ( IniXMLDocument, "client", "audiochannels", static_cast<int> ( eAudioChannelConfig ) );
-
-    // audio quality
-    SetNumericIniSet ( IniXMLDocument, "client", "audioquality", static_cast<int> ( eAudioQuality ) );
-
-    // custom directories
-    for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
-    {
-        PutIniSetting ( IniXMLDocument, "client", QString ( "directoryaddress%1" ).arg ( iIdx ), vstrDirectoryAddress[iIdx] );
-    }
-
-    // directory type
-    SetNumericIniSet ( IniXMLDocument, "client", "directorytype", static_cast<int> ( eDirectoryType ) );
-
-    // custom directory index
-    SetNumericIniSet ( IniXMLDocument, "client", "customdirectoryindex", iCustomDirectoryIndex );
-
-    // window position of the main window
-    PutIniSetting ( IniXMLDocument, "client", "winposmain_base64", ToBase64 ( vecWindowPosMain ) );
-
-    // window position of the settings window
-    PutIniSetting ( IniXMLDocument, "client", "winposset_base64", ToBase64 ( vecWindowPosSettings ) );
-
-    // window position of the chat window
-    PutIniSetting ( IniXMLDocument, "client", "winposchat_base64", ToBase64 ( vecWindowPosChat ) );
-
-    // window position of the connect window
-    PutIniSetting ( IniXMLDocument, "client", "winposcon_base64", ToBase64 ( vecWindowPosConnect ) );
-
-    // visibility state of the settings window
-    SetFlagIniSet ( IniXMLDocument, "client", "winvisset", bWindowWasShownSettings );
-
-    // visibility state of the chat window
-    SetFlagIniSet ( IniXMLDocument, "client", "winvischat", bWindowWasShownChat );
-
-    // visibility state of the connect window
-    SetFlagIniSet ( IniXMLDocument, "client", "winviscon", bWindowWasShownConnect );
-
-    // Settings Tab
-    SetNumericIniSet ( IniXMLDocument, "client", "settingstab", iSettingsTab );
-
-    // fader settings
-    WriteFaderSettingsToXML ( IniXMLDocument );
-}
-
-void CClientSettings::WriteFaderSettingsToXML ( QDomDocument& IniXMLDocument )
-{
-    int iIdx;
-
-    for ( iIdx = 0; iIdx < MAX_NUM_STORED_FADER_SETTINGS; iIdx++ )
-    {
-        // stored fader tags
-        PutIniSetting ( IniXMLDocument, "client", QString ( "storedfadertag%1_base64" ).arg ( iIdx ), ToBase64 ( vecStoredFaderTags[iIdx] ) );
-
-        // stored fader levels
-        SetNumericIniSet ( IniXMLDocument, "client", QString ( "storedfaderlevel%1" ).arg ( iIdx ), vecStoredFaderLevels[iIdx] );
-
-        // stored pan values
-        SetNumericIniSet ( IniXMLDocument, "client", QString ( "storedpanvalue%1" ).arg ( iIdx ), vecStoredPanValues[iIdx] );
-
-        // stored fader solo states
-        SetFlagIniSet ( IniXMLDocument, "client", QString ( "storedfaderissolo%1" ).arg ( iIdx ), vecStoredFaderIsSolo[iIdx] != 0 );
-
-        // stored fader muted states
-        SetFlagIniSet ( IniXMLDocument, "client", QString ( "storedfaderismute%1" ).arg ( iIdx ), vecStoredFaderIsMute[iIdx] != 0 );
-
-        // stored fader group ID
-        SetNumericIniSet ( IniXMLDocument, "client", QString ( "storedgroupid%1" ).arg ( iIdx ), vecStoredFaderGroupID[iIdx] );
-    }
-}
-#endif
-
-// Server settings -------------------------------------------------------------
-
-void CServerSettings::ReadSettingsFromXML ( const QDomDocument& IniXMLDocument )
-{
-    int  iValue;
-    bool bValue;
-
-    // language
-    strLanguage =
-        GetIniSetting ( IniXMLDocument, "server", "language", CLocale::FindSysLangTransFileName ( CLocale::GetAvailableTranslations() ).first );
-
-    // window position of the main window
-    vecWindowPosMain = FromBase64ToByteArray ( GetIniSetting ( IniXMLDocument, "server", "winposmain_base64" ) );
-
-    // name/city/country
-    // name
-    strServerName = GetIniSetting ( IniXMLDocument, "server", "name" );
-
-    // city
-    strServerCity = GetIniSetting ( IniXMLDocument, "server", "city" );
-
-    // country
-    if ( GetNumericIniSet ( IniXMLDocument, "server", "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
-    {
-        eServerCountry = CLocale::WireFormatCountryCodeToQtCountry ( iValue );
-    }
-
-    // norecord flag
-    if ( GetFlagIniSet ( IniXMLDocument, "server", "norecord", bValue ) )
-    {
-        bEnableRecording = !bValue;
-    }
-
-    // welcome message
-    strWelcomeMessage = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "welcome" ) );
-
-    // base recording directory
-    strRecordingDir = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "recordingdir_base64" ) );
-
-    // to avoid multiple registrations, must do this after collecting serverinfo
-    // custom directory
-    // CServerListManager defaults to command line argument (or "" if not passed)
-    // Server GUI defaults to ""
-
-    strDirectoryAddress = GetIniSetting ( IniXMLDocument, "server", "directoryaddress", "" );
-
-    // directory type
-    // CServerListManager defaults to AT_NONE
-    // Because type could be AT_CUSTOM, it has to be set after the address to avoid multiple registrations
-    EDirectoryType directoryType = AT_NONE;
-
-    // if a command line Directory server address is set, set the Directory Type (genre) to AT_CUSTOM so it's used
-    if ( CommandlineOptions.directoryserver.IsSet() )
-    {
-        directoryType = AT_CUSTOM;
-    }
-    else
-    {
-        //### TODO: BEGIN ###//
-        // compatibility to old version < 3.4.7
-
-        if ( GetFlagIniSet ( IniXMLDocument, "server", "defcentservaddr", bValue ) )
-        {
-            directoryType = bValue ? AT_DEFAULT : AT_CUSTOM;
-        }
-        else
-
-            //### TODO: END ###//
-
-            // if "directorytype" itself is set, use it (note "AT_NONE", "AT_DEFAULT" and "AT_CUSTOM" are min/max directory type here)
-            //### TODO: BEGIN ###//
-            // compatibility to old version < 3.8.2
-
-            if ( GetNumericIniSet ( IniXMLDocument,
-                                    "server",
-                                    "centservaddrtype",
-                                    static_cast<int> ( AT_DEFAULT ),
-                                    static_cast<int> ( AT_CUSTOM ),
-                                    iValue ) )
-        {
-            directoryType = static_cast<EDirectoryType> ( iValue );
-        }
-        else
-            //### TODO: END ###//
-
-            if ( GetNumericIniSet ( IniXMLDocument,
-                                    "server",
-                                    "directorytype",
-                                    static_cast<int> ( AT_NONE ),
-                                    static_cast<int> ( AT_CUSTOM ),
-                                    iValue ) )
-        {
-            directoryType = static_cast<EDirectoryType> ( iValue );
-        }
-
-        //### TODO: BEGIN ###//
-        // compatibility to old version < 3.9.0
-        // override type to AT_NONE if servlistenabled exists and is false
-
-        if ( GetFlagIniSet ( IniXMLDocument, "server", "servlistenabled", bValue ) && !bValue )
-        {
-            directoryType = AT_NONE;
-        }
-
-        //### TODO: END ###//
-    }
-
-    eDirectoryType = directoryType;
-
-    // server list persistence file name
-    strServerListFileName = FromBase64ToString ( GetIniSetting ( IniXMLDocument, "server", "directoryfile_base64" ) );
-
-    // start minimized on OS start
-    if ( GetFlagIniSet ( IniXMLDocument, "server", "autostartmin", bValue ) )
-    {
-        bAutoRunMinimized = bValue;
-    }
-
-    // delay panning
-    if ( GetFlagIniSet ( IniXMLDocument, "server", "delaypan", bValue ) )
-    {
-        bDelayPan = bValue;
-    }
-
-    //### TODO: BEGIN ###//
-    /*
-    if ( CommandlineOptions.store.IsSet() )
-    {
-        store applicable CommandlineOptions values in settings
-        and Unset those CommandlineOptions...
-    }
-    */
-    //### TODO: END ###//
-}
-
-void CServerSettings::WriteSettingsToXML ( QDomDocument& IniXMLDocument )
-{
-    // window position of the main window
-    PutIniSetting ( IniXMLDocument, "server", "winposmain_base64", ToBase64 ( vecWindowPosMain ) );
-
-    // directory type
-    SetNumericIniSet ( IniXMLDocument, "server", "directorytype", static_cast<int> ( eDirectoryType ) );
-
-    // name
-    PutIniSetting ( IniXMLDocument, "server", "name", strServerName );
-
-    // city
-    PutIniSetting ( IniXMLDocument, "server", "city", strServerCity );
-
-    // country
-    SetNumericIniSet ( IniXMLDocument, "server", "country", CLocale::QtCountryToWireFormatCountryCode ( eServerCountry ) );
-
-    // norecord flag
-    SetFlagIniSet ( IniXMLDocument, "server", "norecord", !bEnableRecording );
-
-    // welcome message
-    PutIniSetting ( IniXMLDocument, "server", "welcome", ToBase64 ( strWelcomeMessage ) );
-
-    // language
-    PutIniSetting ( IniXMLDocument, "server", "language", strLanguage );
-
-    // base recording directory
-    PutIniSetting ( IniXMLDocument, "server", "recordingdir_base64", ToBase64 ( strRecordingDir ) );
-
-    // custom directory
-    PutIniSetting ( IniXMLDocument, "server", "directoryaddress", strDirectoryAddress );
-
-    // server list persistence file name
-    PutIniSetting ( IniXMLDocument, "server", "directoryfile_base64", ToBase64 ( strServerListFileName ) );
-
-    // start minimized on OS start
-    SetFlagIniSet ( IniXMLDocument, "server", "autostartmin", bAutoRunMinimized );
-
-    // delay panning
-    SetFlagIniSet ( IniXMLDocument, "server", "delaypan", bDelayPan );
-
-    //### TODO: BEGIN ###//
-    // Check if this is really needed,
-    // Save now called by destructor !
-    // if so, where to do it ?
-    // CServer::OnAboutToQuit() ?
-
-    // we MUST do this after saving the value and Save() is only called OnAboutToQuit()
-    // pServer->SetDirectoryType ( AT_NONE );
-    //### TODO: END ###//
+    return false;
 }

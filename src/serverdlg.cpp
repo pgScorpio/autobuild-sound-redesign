@@ -32,10 +32,10 @@ CServerDlg::CServerDlg ( CServer& cServer, QWidget* parent ) :
     BitmapSystemTrayInactive ( QString::fromUtf8 ( ":/png/main/res/servertrayiconinactive.png" ) ),
     BitmapSystemTrayActive ( QString::fromUtf8 ( ":/png/main/res/servertrayiconactive.png" ) )
 {
+    setupUi ( this );
+
     // check if system tray icon can be used
     bSystemTrayIconAvailable = SystemTrayIcon.isSystemTrayAvailable();
-
-    setupUi ( this );
 
     // set window title
     setWindowTitle ( tr ( "%1 Server", "%1 is the name of the main application" ).arg ( APP_NAME ) );

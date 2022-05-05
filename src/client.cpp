@@ -23,13 +23,15 @@
 \******************************************************************************/
 
 #include "client.h"
+#include "messages.h"
 
 extern void SetClientAppName ( QString strClientname );
 
 /* Implementation *************************************************************/
 CClient::CClient ( bool bUseGUI ) :
     Settings ( bUseGUI ),
-    Channel ( false ), /* we need a client channel -> "false" */
+    Status(),
+    Channel ( false ), // "false" == client channel
     CurOpusEncoder ( nullptr ),
     CurOpusDecoder ( nullptr ),
     eAudioCompressionType ( CT_OPUS ),
@@ -38,19 +40,15 @@ CClient::CClient ( bool bUseGUI ) :
     iNumAudioChannels ( 1 ),
     bIsInitializationPhase ( true ),
     fMuteOutStreamGain ( 1.0f ),
+    iSndCrdPrefFrameSizeFactor ( FRAME_SIZE_FACTOR_DEFAULT ),
+    iSndCrdFrameSizeFactor ( FRAME_SIZE_FACTOR_DEFAULT ),
+    bJitterBufferOK ( true ),
+    pSignalHandler ( CSignalHandler::getSingletonP() ),
     Socket ( &Channel,
              Settings.CommandlineOptions.port.Value(),
              Settings.CommandlineOptions.qos.Value(),
              "",
              Settings.CommandlineOptions.enableipv6.IsSet() ),
-    iSndCrdPrefFrameSizeFactor ( FRAME_SIZE_FACTOR_DEFAULT ),
-    iSndCrdFrameSizeFactor ( FRAME_SIZE_FACTOR_DEFAULT ),
-    bSndCrdConversionBufferRequired ( false ),
-    iSndCardMonoBlockSizeSamConvBuff ( 0 ),
-    bJitterBufferOK ( true ),
-    bEnableIPv6 ( Settings.CommandlineOptions.enableipv6.IsSet() ),
-    bMuteMeInPersonalMix ( Settings.CommandlineOptions.mutemyown.IsSet() ),
-    pSignalHandler ( CSignalHandler::getSingletonP() ),
     //### TODO: BEGIN//
     // pass Settings to CCsound too
     Sound ( AudioCallback,
@@ -60,9 +58,9 @@ CClient::CClient ( bool bUseGUI ) :
             Settings.CommandlineOptions.clientname.Value() )
 //### TODO: END//
 {
-    // First emit a queued event to myself so OnStartup will be called as soon as the application starts running.
-    QObject::connect ( this, &CClient::Startup, this, &CClient::OnStartup, Qt::ConnectionType::QueuedConnection );
-    emit Startup();
+    // First emit a queued event to myself so OnApplicationStartup will be called as soon as the application starts running.
+    QObject::connect ( this, &CClient::ApplicationStartup, this, &CClient::OnApplicationStartup, Qt::ConnectionType::QueuedConnection );
+    emit ApplicationStartup();
 
     SetClientAppName ( Settings.GetClientName() );
 
@@ -151,6 +149,7 @@ CClient::CClient ( bool bUseGUI ) :
     opus_custom_encoder_ctl ( OpusEncoderStereo, OPUS_SET_COMPLEXITY ( 1 ) );
 
     // Connections -------------------------------------------------------------
+
     // connections for the protocol mechanism
     QObject::connect ( &Channel, &CChannel::MessReadyForSending, this, &CClient::OnSendProtMessage );
     QObject::connect ( &Channel, &CChannel::DetectedCLMessage, this, &CClient::OnDetectedCLMessage );
@@ -185,14 +184,14 @@ CClient::CClient ( bool bUseGUI ) :
     QObject::connect ( &Sound, &CSound::ControllerInFaderIsMute, this, &CClient::OnControllerInFaderIsMute );
     QObject::connect ( &Sound, &CSound::ControllerInMuteMyself, this, &CClient::OnControllerInMuteMyself );
 
-    QObject::connect ( &Settings, &CClientSettings::ConnectRequested, this, &CClient::OnConnectRequest, Qt::ConnectionType::QueuedConnection );
-    QObject::connect ( &Settings, &CClientSettings::DisconnectRequested, this, &CClient::OnDisconnectRequest, Qt::ConnectionType::QueuedConnection );
+    QObject::connect ( &Status, &CClientStatus::ConnectRequested, this, &CClient::OnConnectRequest, Qt::ConnectionType::QueuedConnection );
+    QObject::connect ( &Status, &CClientStatus::DisconnectRequested, this, &CClient::OnDisconnectRequest, Qt::ConnectionType::QueuedConnection );
+    QObject::connect ( &Status, &CClientStatus::OpenDriverSetup, this, &CClient::OnDriverSetup );
 
     QObject::connect ( &Settings, &CClientSettings::AudioDeviceChanged, this, &CClient::OnAudioDeviceChanged );
     QObject::connect ( &Settings, &CClientSettings::InputChannelChanged, this, &CClient::OnInputChannelChanged );
     QObject::connect ( &Settings, &CClientSettings::OutputChannelChanged, this, &CClient::OnOutputChannelChanged );
     QObject::connect ( &Settings, &CClientSettings::PrefFrameSizeFactorChanged, this, &CClient::OnPrefFrameSizeFactorChanged );
-    QObject::connect ( &Settings, &CClientSettings::OpenDriverSetup, this, &CClient::OnDriverSetup );
     QObject::connect ( &Settings, &CClientSettings::AudioChannelConfigChanged, this, &CClient::OnReInitRequest );
     QObject::connect ( &Settings, &CClientSettings::AudioQualityChanged, this, &CClient::OnReInitRequest );
     QObject::connect ( &Settings, &CClientSettings::EnableOPUS64Changed, this, &CClient::OnReInitRequest );
@@ -211,10 +210,15 @@ CClient::CClient ( bool bUseGUI ) :
     // start timer so that elapsed time works
     PreciseTime.start();
 
-    // set gain delay timer to single-shot and connect handler function
+    // setup timers
     TimerGain.setSingleShot ( true );
+    TimerCheckAudioDeviceOk.setSingleShot ( true );
+    TimerDetectFeedback.setSingleShot ( true );
 
     QObject::connect ( &TimerGain, &QTimer::timeout, this, &CClient::OnTimerRemoteChanGain );
+    QObject::connect ( &TimerStatus, &QTimer::timeout, this, &CClient::OnTimerUpdateStatus );
+    QObject::connect ( &TimerSigMet, &QTimer::timeout, this, &CClient::OnTimerSigMet );
+    QObject::connect ( &TimerCheckAudioDeviceOk, &QTimer::timeout, this, &CClient::OnTimerCheckAudioDeviceOk );
 
     // start the socket (it is important to start the socket after all
     // initializations and connections)
@@ -223,7 +227,7 @@ CClient::CClient ( bool bUseGUI ) :
     // do an immediate start if a server address is given
     if ( !Settings.CommandlineOptions.connect.Value().isEmpty() )
     {
-        Settings.StartConnection ( Settings.CommandlineOptions.connect.Value(), "" );
+        Status.StartConnection ( Settings.CommandlineOptions.connect.Value(), "" );
     }
 }
 
@@ -250,7 +254,7 @@ CClient::~CClient()
     opus_custom_mode_destroy ( Opus64Mode );
 }
 
-void CClient::OnStartup() { ApplySettings(); }
+void CClient::OnApplicationStartup() { ApplySettings(); }
 
 void CClient::OnAboutToQuit()
 {
@@ -355,9 +359,9 @@ void CClient::OnCLPingReceived ( CHostAddress InetAddr, int iMs )
         const int iCurDiff = EvaluatePingMessage ( iMs );
         if ( iCurDiff >= 0 )
         {
-            iCurPingTime = iCurDiff; // store for use by gain message sending
-
-            emit PingTimeReceived ( iCurDiff );
+            Status.iCurPingTimeMs   = iCurDiff; // store for use by gain message sending
+            Status.iCurTotalDelayMs = EstimatedOverallDelay();
+            emit PingTimeReceived();
         }
     }
 }
@@ -467,20 +471,20 @@ void CClient::StartDelayTimer()
     // start timer to delay sending further updates
     // use longer delay when connected to server with higher ping time,
     // double the ping time in order to allow a bit of overhead for other messages
-    if ( iCurPingTime < DEFAULT_GAIN_DELAY_PERIOD_MS / 2 )
+    if ( Status.GetPingTimeMs() < DEFAULT_GAIN_DELAY_PERIOD_MS / 2 )
     {
         TimerGain.start ( DEFAULT_GAIN_DELAY_PERIOD_MS );
     }
     else
     {
-        TimerGain.start ( iCurPingTime * 2 );
+        TimerGain.start ( Status.GetPingTimeMs() * 2 );
     }
 }
 
 bool CClient::SetServerAddr ( QString strNAddr )
 {
     CHostAddress HostAddress;
-    if ( NetworkUtil().ParseNetworkAddress ( strNAddr, HostAddress, bEnableIPv6 ) )
+    if ( NetworkUtil().ParseNetworkAddress ( strNAddr, HostAddress, Settings.CommandlineOptions.enableipv6.IsSet() ) )
     {
         // apply address to the channel
         Channel.SetAddress ( HostAddress );
@@ -491,29 +495,6 @@ bool CClient::SetServerAddr ( QString strNAddr )
     {
         return false; // invalid address
     }
-}
-
-bool CClient::GetAndResetbJitterBufferOKFlag()
-{
-    // get the socket buffer put status flag and reset it
-    const bool bSocketJitBufOKFlag = Socket.GetAndResetbJitterBufferOKFlag();
-
-    if ( !bJitterBufferOK )
-    {
-        // our jitter buffer get status is not OK so the overall status of the
-        // jitter buffer is also not OK (we do not have to consider the status
-        // of the socket buffer put status flag)
-
-        // reset flag before returning the function
-        bJitterBufferOK = true;
-        return false;
-    }
-
-    // the jitter buffer get (our own status flag) is OK, the final status
-    // now depends on the jitter buffer put status flag from the socket
-    // since per definition the jitter buffer status is OK if both the
-    // put and get status are OK
-    return bSocketJitBufOKFlag;
 }
 
 void CClient::OnReInitRequest()
@@ -576,6 +557,18 @@ void CClient::OnAudioDeviceChanged()
     }
 
     emit SoundDeviceChanged ( strError );
+
+    // if the check audio device timer is running, it must be restarted on a device change
+    if ( TimerCheckAudioDeviceOk.isActive() )
+    {
+        TimerCheckAudioDeviceOk.start ( CHECK_AUDIO_DEV_OK_TIME_MS );
+    }
+
+    if ( Settings.bEnableFeedbackDetection && TimerDetectFeedback.isActive() )
+    {
+        TimerDetectFeedback.start ( DETECT_FEEDBACK_TIME_MS );
+    }
+
     //### TODO: END ###//
 }
 
@@ -815,7 +808,7 @@ void CClient::OnClientIDReceived ( int iChanID )
     // for headless mode we support to mute our own signal in the personal mix
     // (note that the check for headless is done in the main.cpp and must not
     // be checked here)
-    if ( bMuteMeInPersonalMix )
+    if ( Settings.CommandlineOptions.mutemyown.IsSet() )
     {
         SetRemoteChanGain ( iChanID, 0, false );
     }
@@ -831,9 +824,9 @@ void CClient::OnConnectRequest()
         Init();
 
         // enable channel
-        if ( SetServerAddr ( Settings.GetServerAddress() ) )
+        if ( SetServerAddr ( Status.GetServerAddress() ) )
         {
-            Settings.AckConnecting ( true );
+            Status.AckConnecting ( true );
             Channel.SetEnable ( true );
 
             // start audio interface
@@ -843,14 +836,14 @@ void CClient::OnConnectRequest()
         }
     }
 
-    Settings.AckConnecting ( false );
+    Status.AckConnecting ( false );
 }
 
 void CClient::OnDisconnectRequest()
 {
     if ( Channel.IsEnabled() )
     {
-        Settings.AckDisconnecting ( true );
+        Status.AckDisconnecting ( true );
 
         // Send disconnect message to server
         ConnLessProtocol.CreateCLDisconnection ( Channel.GetAddress() );
@@ -860,7 +853,7 @@ void CClient::OnDisconnectRequest()
 
         // wait some time for disconnection
         QTime DieTime = QTime::currentTime().addMSecs ( 250 );
-        while ( QTime::currentTime() < DieTime && Settings.GetConnected() )
+        while ( QTime::currentTime() < DieTime && Status.GetConnected() )
         {
             // exclude user input events because if we use AllEvents, it happens
             // that if the user initiates a connection and disconnection quickly
@@ -870,12 +863,12 @@ void CClient::OnDisconnectRequest()
         }
 
         // Check if we timed out !
-        if ( Settings.GetConnected() )
+        if ( Status.GetConnected() )
         {
             // Send disconnect message to server again
             ConnLessProtocol.CreateCLDisconnection ( Channel.GetAddress() );
             // and force disconnected state
-            Settings.SetConnected ( false );
+            Status.SetConnected ( false );
         }
 
         Sound.Stop();
@@ -883,7 +876,7 @@ void CClient::OnDisconnectRequest()
     }
     else
     {
-        Settings.AckDisconnecting ( false );
+        Status.AckDisconnecting ( false );
     }
 
     // reset current signal level and LEDs
@@ -911,15 +904,92 @@ void CClient::OnConnected()
 Channel.CreateReqChannelLevelListMes();
     // clang-format on
 
-    Settings.SetConnected ( true );
+    Status.SetConnected ( true );
+    TimerStatus.start ( PING_UPDATE_TIME_MS );
+    TimerSigMet.start ( LEVELMETER_UPDATE_TIME_MS );
+    TimerCheckAudioDeviceOk.start ( CHECK_AUDIO_DEV_OK_TIME_MS ); // is single shot timer
+    // audio feedback detection
+    if ( Settings.bEnableFeedbackDetection )
+    {
+        TimerDetectFeedback.start ( DETECT_FEEDBACK_TIME_MS ); // single shot timer
+    }
 }
 
 void CClient::OnDisconnected()
 {
+    TimerStatus.stop();
+    TimerSigMet.stop();
+    TimerCheckAudioDeviceOk.stop();
+    TimerDetectFeedback.stop();
     Sound.Stop();
     Channel.SetEnable ( false );
-    Settings.EndConnection();
-    Settings.SetConnected ( false );
+    Status.EndConnection();
+    Status.SetConnected ( false );
+}
+
+void CClient::OnTimerUpdateStatus()
+{
+    CreateCLPingMes();
+
+    if ( Settings.GetAutoSockBufSize() )
+    {
+        Settings.SetClientSockBufNumFrames ( Channel.GetSockBufNumFrames() );
+    }
+
+    Status.iCurTotalDelayMs = EstimatedOverallDelay();
+
+    Status.iUploadRateKbps = Channel.GetUploadRateKbps();
+
+    Status.bServerJitBufOKFlag = Socket.GetAndResetbJitterBufferOKFlag();
+    Status.bClientJitBufOKFlag = bJitterBufferOK;
+    bJitterBufferOK            = true;
+
+    emit StatusUpdated();
+}
+
+void CClient::OnTimerSigMet()
+{
+    Status.dSignalLeveldBLeft  = SignalLevelMeter.GetLevelForMeterdBLeftOrMono();
+    Status.dSignalLeveldBRight = SignalLevelMeter.GetLevelForMeterdBRight();
+    emit SignalLeveldbUpdated();
+
+    if ( TimerDetectFeedback.isActive() &&
+         ( Status.dSignalLeveldBLeft > NUM_STEPS_LED_BAR - 0.5 || Status.dSignalLeveldBLeft > NUM_STEPS_LED_BAR - 0.5 ) )
+    {
+        // mute locally and mute channel
+        emit AudioFeedbackDetected();
+
+        // show message box about feedback issue
+        QCheckBox* chb = new QCheckBox ( tr ( "Enable feedback detection" ) );
+        chb->setCheckState ( Settings.bEnableFeedbackDetection ? Qt::Checked : Qt::Unchecked );
+        QMessageBox msgbox ( CMessages::MainForm() );
+        msgbox.setIcon ( QMessageBox::Icon::Warning );
+        msgbox.setWindowTitle ( CMessages::MainFormName() + ": " + tr ( "Feedback Warning" ) );
+        msgbox.setText ( tr ( "Audio feedback or loud signal detected.\n\n"
+                              "We muted your channel and activated 'Mute Myself'. Please solve "
+                              "the feedback issue first and unmute yourself afterwards." ) );
+        msgbox.addButton ( QMessageBox::Ok );
+        msgbox.setDefaultButton ( QMessageBox::Ok );
+        msgbox.setCheckBox ( chb );
+
+        QObject::connect ( chb, &QCheckBox::stateChanged, this, &CClient::AudioFeedbackStateChange );
+
+        msgbox.exec();
+    }
+}
+
+void CClient::OnTimerCheckAudioDeviceOk()
+{
+    // check if the audio device entered the audio callback after a pre-defined
+    // timeout to check if a valid device is selected and if we do not have
+    // fundamental settings errors (in which case the GUI would only show that
+    // it is trying to connect the server which does not help to solve the problem (#129))
+    if ( !Sound.IsCallbackEntered() )
+    {
+        CMessages::ShowWarning ( tr ( "Your sound card is not working correctly. "
+                                      "Please open the settings dialog and check the device selection and the driver settings." ) );
+        Status.EndConnection();
+    }
 }
 
 void CClient::Init()
@@ -951,20 +1021,20 @@ void CClient::Init()
     //      iMonoBlockSizeSam = Sound.Init ( iPrefMonoFrameSize );
     // Problem is legitimate setting changes (buffer size for example).
     // so the condition should be something like "if ( Sound.isInitialized and APP_IS_INIALIZING)"
-    iMonoBlockSizeSam = Sound.Init ( iPrefMonoFrameSize );
+    Status.iMonoBlockSizeSam = Sound.Init ( iPrefMonoFrameSize );
 
     // Calculate the current sound card frame size factor. In case
     // the current mono block size is not a multiple of the system
     // frame size, we have to use a sound card conversion buffer.
-    if ( ( ( iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_PREFERRED ) ) && Settings.GetEnableOPUS64() ) ||
-         ( iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_DEFAULT ) ) ||
-         ( iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_SAFE ) ) )
+    if ( ( ( Status.iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_PREFERRED ) ) && Settings.GetEnableOPUS64() ) ||
+         ( Status.iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_DEFAULT ) ) ||
+         ( Status.iMonoBlockSizeSam == ( SYSTEM_FRAME_SIZE_SAMPLES * FRAME_SIZE_FACTOR_SAFE ) ) )
     {
         // regular case: one of our predefined buffer sizes is available
-        iSndCrdFrameSizeFactor = iMonoBlockSizeSam / SYSTEM_FRAME_SIZE_SAMPLES;
+        iSndCrdFrameSizeFactor = Status.iMonoBlockSizeSam / SYSTEM_FRAME_SIZE_SAMPLES;
 
         // no sound card conversion buffer required
-        bSndCrdConversionBufferRequired = false;
+        Status.bSndCrdConversionBufferRequired = false;
     }
     else
     {
@@ -973,30 +1043,30 @@ void CClient::Init()
         // size as the current frame size.
 
         // store actual sound card buffer size (stereo)
-        bSndCrdConversionBufferRequired  = true;
-        iSndCardMonoBlockSizeSamConvBuff = iMonoBlockSizeSam;
+        Status.bSndCrdConversionBufferRequired  = true;
+        Status.iSndCardMonoBlockSizeSamConvBuff = Status.iMonoBlockSizeSam;
 
         // overwrite block size factor by using one frame
         iSndCrdFrameSizeFactor = 1;
     }
 
     // select the OPUS frame size mode depending on current mono block size samples
-    if ( bSndCrdConversionBufferRequired )
+    if ( Status.bSndCrdConversionBufferRequired )
     {
-        if ( ( iSndCardMonoBlockSizeSamConvBuff < DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES ) && Settings.GetEnableOPUS64() )
+        if ( ( Status.iSndCardMonoBlockSizeSamConvBuff < DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES ) && Settings.GetEnableOPUS64() )
         {
-            iMonoBlockSizeSam     = SYSTEM_FRAME_SIZE_SAMPLES;
-            eAudioCompressionType = CT_OPUS64;
+            Status.iMonoBlockSizeSam = SYSTEM_FRAME_SIZE_SAMPLES;
+            eAudioCompressionType    = CT_OPUS64;
         }
         else
         {
-            iMonoBlockSizeSam     = DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES;
-            eAudioCompressionType = CT_OPUS;
+            Status.iMonoBlockSizeSam = DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES;
+            eAudioCompressionType    = CT_OPUS;
         }
     }
     else
     {
-        if ( iMonoBlockSizeSam < DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES )
+        if ( Status.iMonoBlockSizeSam < DOUBLE_SYSTEM_FRAME_SIZE_SAMPLES )
         {
             eAudioCompressionType = CT_OPUS64;
         }
@@ -1097,7 +1167,7 @@ void CClient::Init()
     }
 
     // calculate stereo (two channels) buffer size
-    iStereoBlockSizeSam = 2 * iMonoBlockSizeSam;
+    iStereoBlockSizeSam = 2 * Status.iMonoBlockSizeSam;
 
     vecCeltData.Init ( iCeltNumCodedBytes );
     vecZeros.Init ( iStereoBlockSizeSam, 0 );
@@ -1116,11 +1186,11 @@ void CClient::Init()
     AudioReverb.Init ( Settings.GetAudioChannelConfig(), iStereoBlockSizeSam, SYSTEM_SAMPLE_RATE_HZ );
 
     // init the sound card conversion buffers
-    if ( bSndCrdConversionBufferRequired )
+    if ( Status.bSndCrdConversionBufferRequired )
     {
         // inits for conversion buffer (the size of the conversion buffer must
         // be the sum of input/output sizes which is the worst case fill level)
-        const int iSndCardStereoBlockSizeSamConvBuff = 2 * iSndCardMonoBlockSizeSamConvBuff;
+        const int iSndCardStereoBlockSizeSamConvBuff = 2 * Status.iSndCardMonoBlockSizeSamConvBuff;
         const int iConBufSize                        = iStereoBlockSizeSam + iSndCardStereoBlockSizeSamConvBuff;
 
         SndCrdConversionBufferIn.Init ( iConBufSize );
@@ -1157,7 +1227,7 @@ JitterMeas.Measure();
 void CClient::ProcessSndCrdAudioData ( CVector<int16_t>& vecsStereoSndCrd )
 {
     // check if a conversion buffer is required or not
-    if ( bSndCrdConversionBufferRequired )
+    if ( Status.bSndCrdConversionBufferRequired )
     {
         // add new sound card block in conversion buffer
         SndCrdConversionBufferIn.Put ( vecsStereoSndCrd, vecsStereoSndCrd.Size() );
@@ -1188,6 +1258,7 @@ void CClient::ProcessSndCrdAudioData ( CVector<int16_t>& vecsStereoSndCrd )
 void CClient::ProcessAudioDataIntern ( CVector<int16_t>& vecsStereoSndCrd )
 {
     int            i, j, iUnused;
+    int            iMonoBlockSizeSam = Status.iMonoBlockSizeSam;
     unsigned char* pCurCodedData;
 
     // Transmit signal ---------------------------------------------------------
@@ -1367,8 +1438,9 @@ void CClient::ProcessAudioDataIntern ( CVector<int16_t>& vecsStereoSndCrd )
     Q_UNUSED ( iUnused )
 }
 
-int CClient::EstimatedOverallDelay ( const int iPingTimeMs )
+int CClient::EstimatedOverallDelay()
 {
+    const int   iPingTimeMs            = Status.iCurPingTimeMs;
     const float fSystemBlockDurationMs = static_cast<float> ( iOPUSFrameSizeSamples ) / SYSTEM_SAMPLE_RATE_HZ * 1000;
 
     // If the jitter buffers are set effectively, i.e. they are exactly the
@@ -1382,7 +1454,7 @@ int CClient::EstimatedOverallDelay ( const int iPingTimeMs )
 
     // consider delay introduced by the sound card conversion buffer by using
     // "GetSndCrdConvBufAdditionalDelayMonoBlSize()"
-    float fTotalSoundCardDelayMs = GetSndCrdConvBufAdditionalDelayMonoBlSize() * 1000.0f / SYSTEM_SAMPLE_RATE_HZ;
+    float fTotalSoundCardDelayMs = Status.GetSndCrdConvBufAdditionalDelayMonoBlSize() * 1000.0f / SYSTEM_SAMPLE_RATE_HZ;
 
     // try to get the actual input/output sound card delay from the audio
     // interface, per definition it is not available if a 0 is returned
@@ -1396,7 +1468,7 @@ int CClient::EstimatedOverallDelay ( const int iPingTimeMs )
         // output, therefore we have "3 *" instead of "2 *" (for input and output)
         // the actual sound card buffer size
         // "GetSndCrdConvBufAdditionalDelayMonoBlSize"
-        fTotalSoundCardDelayMs += ( 3 * GetSndCrdActualMonoBlSize() ) * 1000.0f / SYSTEM_SAMPLE_RATE_HZ;
+        fTotalSoundCardDelayMs += ( 3 * Status.GetSndCrdActualBufferSize() ) * 1000.0f / SYSTEM_SAMPLE_RATE_HZ;
     }
     else
     {
@@ -1415,4 +1487,630 @@ int CClient::EstimatedOverallDelay ( const int iPingTimeMs )
         fDelayToFillNetworkPacketsMs + fTotalJitterBufferDelayMs + fTotalSoundCardDelayMs + fAdditionalAudioCodecDelayMs;
 
     return MathUtils::round ( fTotalBufferDelayMs + iPingTimeMs );
+}
+
+// Client settings -------------------------------------------------------------
+
+CClientSettings::CClientSettings ( bool bUseGUI ) :
+    CSettings ( true, bUseGUI, APP_NAME, "client" ),
+    cAudioDevice(),
+    vecStoredFaderTags ( MAX_NUM_STORED_FADER_SETTINGS, "" ),
+    vecStoredFaderLevels ( MAX_NUM_STORED_FADER_SETTINGS, AUD_MIX_FADER_MAX ),
+    vecStoredPanValues ( MAX_NUM_STORED_FADER_SETTINGS, AUD_MIX_PAN_MAX / 2 ),
+    vecStoredFaderIsSolo ( MAX_NUM_STORED_FADER_SETTINGS, false ),
+    vecStoredFaderIsMute ( MAX_NUM_STORED_FADER_SETTINGS, false ),
+    vecStoredFaderGroupID ( MAX_NUM_STORED_FADER_SETTINGS, INVALID_INDEX ),
+    vstrIPAddress ( MAX_NUM_SERVER_ADDR_ITEMS, "" ),
+    iNewClientFaderLevel ( 100 ),
+    iSettingsTab ( SETTING_TAB_AUDIONET ),
+    bConnectDlgShowAllMusicians ( true ),
+    eChannelSortType ( ST_NO_SORT ),
+    iNumMixerPanelRows ( 1 ),
+    vstrDirectoryAddress ( MAX_NUM_SERVER_ADDR_ITEMS, "" ),
+    eDirectoryType ( AT_DEFAULT ),
+    bEnableFeedbackDetection ( true ),
+    vecWindowPosSettings(), // empty array
+    vecWindowPosChat(),     // empty array
+    vecWindowPosConnect(),  // empty array
+    bWindowWasShownSettings ( false ),
+    bWindowWasShownChat ( false ),
+    bWindowWasShownConnect ( false ),
+    bOwnFaderFirst ( false ),
+    ChannelInfo(),
+    eAudioQuality ( AQ_NORMAL ),
+    eAudioChannelConfig ( CC_MONO ),
+    eGUIDesign ( GD_ORIGINAL ),
+    eMeterStyle ( MT_LED_STRIPE ),
+    bEnableOPUS64 ( false ),
+    iAudioInputBalance ( AUD_FADER_IN_MIDDLE ),
+    bReverbOnLeftChan ( false ),
+    iReverbLevel ( 0 ),
+    iServerSockBufNumFrames ( DEF_NET_BUF_SIZE_NUM_BL ),
+    bFraSiFactPrefSupported ( false ),
+    bFraSiFactDefSupported ( false ),
+    bFraSiFactSafeSupported ( false ),
+    bMuteOutStream ( false )
+{
+    SetFileName ( CommandlineOptions.inifile.Value(), DEFAULT_INI_FILE_NAME );
+    Load();
+    // SelectSoundCard ( strCurrentAudioDevice );
+}
+
+CClientSettings::~CClientSettings()
+{
+    // Save settings on exit...
+    Save();
+}
+
+void CClientSettings::LoadFaderSettings ( const QString& strCurFileName )
+{
+    // prepare file name for loading initialization data from XML file and read
+    // data from file if possible
+    QDomDocument IniXMLDocument;
+    ReadFromFile ( strCurFileName, IniXMLDocument );
+    const QDomNode& section = IniXMLDocument.firstChild();
+
+    // read the settings from the given XML file
+    ReadFaderSettingsFromXML ( section );
+}
+
+void CClientSettings::SaveFaderSettings ( const QString& strCurFileName )
+{
+    // create XML document for storing initialization parameters
+    QDomDocument IniXMLDocument;
+    QDomNode     section = GetSectionForWrite ( IniXMLDocument, "client", false );
+
+    // write the settings in the XML file
+    WriteFaderSettingsToXML ( section );
+
+    // prepare file name for storing initialization data in XML file and store
+    // XML data in file
+    WriteToFile ( strCurFileName, IniXMLDocument );
+}
+
+bool CClientSettings::ReadSettingsFromXML ( const QDomNode& root )
+{
+    int  iIdx;
+    int  iValue;
+    bool bValue;
+
+    QDomNode section = GetSectionForRead ( root, "client", false );
+
+    ReadCommandlineArgumentsFromXML ( section );
+
+    // IP addresses
+    for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
+    {
+        vstrIPAddress[iIdx] = GetIniSetting ( section, QString ( "ipaddress%1" ).arg ( iIdx ), "" );
+    }
+
+    // new client level
+    if ( GetNumericIniSet ( section, "newclientlevel", 0, 100, iValue ) )
+    {
+        iNewClientFaderLevel = iValue;
+    }
+
+    if ( GetFlagIniSet ( section, "enablefeedbackdetection", bValue ) )
+    {
+        bEnableFeedbackDetection = bValue;
+    }
+
+    // connect dialog show all musicians
+    if ( GetFlagIniSet ( section, "connectdlgshowallmusicians", bValue ) )
+    {
+        bConnectDlgShowAllMusicians = bValue;
+    }
+
+    // language
+    strLanguage = GetIniSetting ( section, "language", CLocale::FindSysLangTransFileName ( CLocale::GetAvailableTranslations() ).first );
+
+    // fader channel sorting
+    if ( GetNumericIniSet ( section, "channelsort", 0, 4 /* ST_BY_CITY */, iValue ) )
+    {
+        eChannelSortType = static_cast<EChSortType> ( iValue );
+    }
+
+    // own fader first sorting
+    if ( GetFlagIniSet ( section, "ownfaderfirst", bValue ) )
+    {
+        bOwnFaderFirst = bValue;
+    }
+
+    // number of mixer panel rows
+    if ( GetNumericIniSet ( section, "numrowsmixpan", 1, 8, iValue ) )
+    {
+        iNumMixerPanelRows = iValue;
+    }
+
+    // name
+    ChannelInfo.strName =
+        FromBase64ToString ( GetIniSetting ( section, "name_base64", ToBase64 ( QCoreApplication::translate ( "CMusProfDlg", "No Name" ) ) ) );
+
+    // instrument
+    if ( GetNumericIniSet ( section, "instrument", 0, CInstPictures::GetNumAvailableInst() - 1, iValue ) )
+    {
+        ChannelInfo.iInstrument = iValue;
+    }
+
+    // country
+    if ( GetNumericIniSet ( section, "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
+    {
+        ChannelInfo.eCountry = static_cast<QLocale::Country> ( iValue );
+    }
+    else
+    {
+        // if no country is given, use the one from the operating system
+        ChannelInfo.eCountry = QLocale::system().country();
+    }
+
+    // city
+    ChannelInfo.strCity = FromBase64ToString ( GetIniSetting ( section, "city_base64" ) );
+
+    // skill level
+    if ( GetNumericIniSet ( section, "skill", 0, 3 /* SL_PROFESSIONAL */, iValue ) )
+    {
+        ChannelInfo.eSkillLevel = static_cast<ESkillLevel> ( iValue );
+    }
+
+    // audio fader
+    if ( GetNumericIniSet ( section, "audfad", AUD_FADER_IN_MIN, AUD_FADER_IN_MAX, iValue ) )
+    {
+        iAudioInputBalance = iValue;
+    }
+
+    // reverberation level
+    if ( GetNumericIniSet ( section, "revlev", 0, AUD_REVERB_MAX, iValue ) )
+    {
+        iReverbLevel = iValue;
+    }
+
+    // reverberation channel assignment
+    if ( GetFlagIniSet ( section, "reverblchan", bValue ) )
+    {
+        bReverbOnLeftChan = bValue;
+    }
+
+    // sound card selection
+    cAudioDevice.strName = FromBase64ToString ( GetIniSetting ( section, "auddev_base64", "" ) );
+
+    //### TODO: BEGIN ###//
+    // sound card channel mapping settings: make sure these settings are
+    // set AFTER the sound card device is set, otherwise the settings are
+    // overwritten by the defaults
+    //
+    // sound card left input channel mapping
+    // Soundcard settings should be stored per AudioDevice
+
+    if ( GetNumericIniSet ( section, "sndcrdinlch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
+    {
+        cAudioDevice.iLeftInputChannel = iValue;
+    }
+
+    // sound card right input channel mapping
+    if ( GetNumericIniSet ( section, "sndcrdinrch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
+    {
+        cAudioDevice.iRightInputChannel = iValue;
+    }
+
+    // sound card left output channel mapping
+    if ( GetNumericIniSet ( section, "sndcrdoutlch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
+    {
+        cAudioDevice.iLeftOutputChannel = iValue;
+    }
+
+    // sound card right output channel mapping
+    if ( GetNumericIniSet ( section, "sndcrdoutrch", 0, MAX_NUM_IN_OUT_CHANNELS - 1, iValue ) )
+    {
+        cAudioDevice.iRightOutputChannel = iValue;
+    }
+
+    // input boost
+    if ( GetNumericIniSet ( section, "inputboost", 1, 10, iValue ) )
+    {
+        cAudioDevice.iInputBoost = iValue;
+    }
+
+    //### TODO:END ###//
+
+    // sound card preferred buffer size index
+    if ( GetNumericIniSet ( section, "prefsndcrdbufidx", FRAME_SIZE_FACTOR_PREFERRED, FRAME_SIZE_FACTOR_SAFE, iValue ) )
+    {
+        // additional check required since only a subset of factors are
+        // defined
+        if ( ( iValue == FRAME_SIZE_FACTOR_PREFERRED ) || ( iValue == FRAME_SIZE_FACTOR_DEFAULT ) || ( iValue == FRAME_SIZE_FACTOR_SAFE ) )
+        {
+            cAudioDevice.iPrefFrameSizeFactor = iValue;
+        }
+    }
+
+    // automatic network jitter buffer size setting
+    if ( GetFlagIniSet ( section, "autojitbuf", bValue ) )
+    {
+        bAutoSockBufSize = bValue;
+    }
+
+    // network jitter buffer size
+    if ( GetNumericIniSet ( section, "jitbuf", MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL, iValue ) )
+    {
+        iClientSockBufNumFrames = iValue;
+    }
+
+    // network jitter buffer size for server
+    if ( GetNumericIniSet ( section, "jitbufserver", MIN_NET_BUF_SIZE_NUM_BL, MAX_NET_BUF_SIZE_NUM_BL, iValue ) )
+    {
+        iServerSockBufNumFrames = iValue;
+    }
+
+    // enable OPUS64 setting
+    if ( GetFlagIniSet ( section, "enableopussmall", bValue ) )
+    {
+        bEnableOPUS64 = bValue;
+    }
+
+    // GUI design
+    if ( GetNumericIniSet ( section, "guidesign", 0, 2 /* GD_SLIMFADER */, iValue ) )
+    {
+        eGUIDesign = static_cast<EGUIDesign> ( iValue );
+    }
+
+    // MeterStyle
+    if ( GetNumericIniSet ( section, "meterstyle", 0, 4 /* MT_LED_ROUND_BIG */, iValue ) )
+    {
+        eMeterStyle = static_cast<EMeterStyle> ( iValue );
+    }
+    else
+    {
+        // if MeterStyle is not found in the ini, set it based on the GUI design
+        if ( GetNumericIniSet ( section, "guidesign", 0, 2 /* GD_SLIMFADER */, iValue ) )
+        {
+            switch ( iValue )
+            {
+            case GD_STANDARD:
+                eMeterStyle = MT_BAR_WIDE;
+                break;
+
+            case GD_ORIGINAL:
+                eMeterStyle = MT_LED_STRIPE;
+                break;
+
+            case GD_SLIMFADER:
+                eMeterStyle = MT_BAR_NARROW;
+                break;
+
+            default:
+                eMeterStyle = MT_LED_STRIPE;
+                break;
+            }
+        }
+    }
+
+    // audio channels
+    if ( GetNumericIniSet ( section, "audiochannels", 0, 2 /* CC_STEREO */, iValue ) )
+    {
+        eAudioChannelConfig = static_cast<EAudChanConf> ( iValue );
+    }
+
+    // audio quality
+    if ( GetNumericIniSet ( section, "audioquality", 0, 2 /* AQ_HIGH */, iValue ) )
+    {
+        eAudioQuality = static_cast<EAudioQuality> ( iValue );
+    }
+
+    // custom directories
+    //
+    //### TODO: BEGIN ###//
+    // TODO compatibility to old version (< 3.6.1)
+
+    QString strDirectoryAddress = GetIniSetting ( section, "centralservaddr", "" );
+
+    //### TODO: END ###//
+
+    for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
+    {
+        //### TODO: BEGIN ###//
+        // compatibility to old version (< 3.8.2)
+
+        strDirectoryAddress = GetIniSetting ( section, QString ( "centralservaddr%1" ).arg ( iIdx ), strDirectoryAddress );
+
+        //### TODO: END ###//
+
+        vstrDirectoryAddress[iIdx] = GetIniSetting ( section, QString ( "directoryaddress%1" ).arg ( iIdx ), strDirectoryAddress );
+        strDirectoryAddress        = "";
+    }
+
+    // directory type
+    //
+    //### TODO: BEGIN ###//
+    // compatibility to old version (<3.4.7)
+    // only the case that "centralservaddr" was set in old ini must be considered
+
+    if ( !vstrDirectoryAddress[0].isEmpty() && GetFlagIniSet ( section, "defcentservaddr", bValue ) && !bValue )
+    {
+        eDirectoryType = AT_CUSTOM;
+    }
+    else if ( GetNumericIniSet ( section, "centservaddrtype", 0, static_cast<int> ( AT_CUSTOM ), iValue ) )
+    {
+        eDirectoryType = static_cast<EDirectoryType> ( iValue );
+    }
+
+    //### TODO: END ###//
+
+    else if ( GetNumericIniSet ( section, "directorytype", 0, static_cast<int> ( AT_CUSTOM ), iValue ) )
+    {
+        eDirectoryType = static_cast<EDirectoryType> ( iValue );
+    }
+    else
+    {
+        // if no address type is given, choose one from the operating system locale
+        eDirectoryType = AT_DEFAULT;
+    }
+
+    // custom directory index
+    if ( ( eDirectoryType == AT_CUSTOM ) && GetNumericIniSet ( section, "customdirectoryindex", 0, MAX_NUM_SERVER_ADDR_ITEMS, iValue ) )
+    {
+        iCustomDirectoryIndex = iValue;
+    }
+    else
+    {
+        // if directory is not set to custom, or if no custom directory index is found in the settings .ini file, then initialize to zero
+        iCustomDirectoryIndex = 0;
+    }
+
+    // window position of the main window
+    vecWindowPosMain = FromBase64ToByteArray ( GetIniSetting ( section, "winposmain_base64" ) );
+
+    // window position of the settings window
+    vecWindowPosSettings = FromBase64ToByteArray ( GetIniSetting ( section, "winposset_base64" ) );
+
+    // window position of the chat window
+    vecWindowPosChat = FromBase64ToByteArray ( GetIniSetting ( section, "winposchat_base64" ) );
+
+    // window position of the connect window
+    vecWindowPosConnect = FromBase64ToByteArray ( GetIniSetting ( section, "winposcon_base64" ) );
+
+    // visibility state of the settings window
+    if ( GetFlagIniSet ( section, "winvisset", bValue ) )
+    {
+        bWindowWasShownSettings = bValue;
+    }
+
+    // visibility state of the chat window
+    if ( GetFlagIniSet ( section, "winvischat", bValue ) )
+    {
+        bWindowWasShownChat = bValue;
+    }
+
+    // visibility state of the connect window
+    if ( GetFlagIniSet ( section, "winviscon", bValue ) )
+    {
+        bWindowWasShownConnect = bValue;
+    }
+
+    // selected Settings Tab
+    if ( GetNumericIniSet ( section, "settingstab", 0, 2, iValue ) )
+    {
+        iSettingsTab = iValue;
+    }
+
+    // fader settings
+    ReadFaderSettingsFromXML ( section );
+
+    return true;
+}
+
+void CClientSettings::ReadFaderSettingsFromXML ( const QDomNode& section )
+{
+    int  iIdx;
+    int  iValue;
+    bool bValue;
+
+    for ( iIdx = 0; iIdx < MAX_NUM_STORED_FADER_SETTINGS; iIdx++ )
+    {
+        // stored fader tags
+        vecStoredFaderTags[iIdx] = FromBase64ToString ( GetIniSetting ( section, QString ( "storedfadertag%1_base64" ).arg ( iIdx ), "" ) );
+
+        // stored fader levels
+        if ( GetNumericIniSet ( section, QString ( "storedfaderlevel%1" ).arg ( iIdx ), 0, AUD_MIX_FADER_MAX, iValue ) )
+        {
+            vecStoredFaderLevels[iIdx] = iValue;
+        }
+
+        // stored pan values
+        if ( GetNumericIniSet ( section, QString ( "storedpanvalue%1" ).arg ( iIdx ), 0, AUD_MIX_PAN_MAX, iValue ) )
+        {
+            vecStoredPanValues[iIdx] = iValue;
+        }
+
+        // stored fader solo state
+        if ( GetFlagIniSet ( section, QString ( "storedfaderissolo%1" ).arg ( iIdx ), bValue ) )
+        {
+            vecStoredFaderIsSolo[iIdx] = bValue;
+        }
+
+        // stored fader muted state
+        if ( GetFlagIniSet ( section, QString ( "storedfaderismute%1" ).arg ( iIdx ), bValue ) )
+        {
+            vecStoredFaderIsMute[iIdx] = bValue;
+        }
+
+        // stored fader group ID
+        if ( GetNumericIniSet ( section, QString ( "storedgroupid%1" ).arg ( iIdx ), INVALID_INDEX, MAX_NUM_FADER_GROUPS - 1, iValue ) )
+        {
+            vecStoredFaderGroupID[iIdx] = iValue;
+        }
+    }
+}
+
+void CClientSettings::WriteSettingsToXML ( QDomNode& root )
+{
+    int      iIdx;
+    QDomNode section = GetSectionForWrite ( root, "client", false );
+
+    // IP addresses
+    for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
+    {
+        PutIniSetting ( section, QString ( "ipaddress%1" ).arg ( iIdx ), vstrIPAddress[iIdx] );
+    }
+
+    // new client level
+    SetNumericIniSet ( section, "newclientlevel", iNewClientFaderLevel );
+
+    // feedback detection
+    SetFlagIniSet ( section, "enablefeedbackdetection", bEnableFeedbackDetection );
+
+    // connect dialog show all musicians
+    SetFlagIniSet ( section, "connectdlgshowallmusicians", bConnectDlgShowAllMusicians );
+
+    // language
+    PutIniSetting ( section, "language", strLanguage );
+
+    // fader channel sorting
+    SetNumericIniSet ( section, "channelsort", static_cast<int> ( eChannelSortType ) );
+
+    // own fader first sorting
+    SetFlagIniSet ( section, "ownfaderfirst", bOwnFaderFirst );
+
+    // number of mixer panel rows
+    SetNumericIniSet ( section, "numrowsmixpan", iNumMixerPanelRows );
+
+    // name
+    PutIniSetting ( section, "name_base64", ToBase64 ( ChannelInfo.strName ) );
+
+    // instrument
+    SetNumericIniSet ( section, "instrument", ChannelInfo.iInstrument );
+
+    // country
+    SetNumericIniSet ( section, "country", CLocale::QtCountryToWireFormatCountryCode ( ChannelInfo.eCountry ) );
+
+    // city
+    PutIniSetting ( section, "city_base64", ToBase64 ( ChannelInfo.strCity ) );
+
+    // skill level
+    SetNumericIniSet ( section, "skill", static_cast<int> ( ChannelInfo.eSkillLevel ) );
+
+    // audio fader
+    SetNumericIniSet ( section, "audfad", iAudioInputBalance );
+
+    // reverberation level
+    SetNumericIniSet ( section, "revlev", iReverbLevel );
+
+    // reverberation channel assignment
+    SetFlagIniSet ( section, "reverblchan", bReverbOnLeftChan );
+
+    //### TODO: BEGIN ###//
+    // Soundcard settings should be stored per Audio device.
+
+    // sound card selection
+    PutIniSetting ( section, "auddev_base64", ToBase64 ( cAudioDevice.strName ) );
+
+    // sound card left input channel mapping
+    SetNumericIniSet ( section, "sndcrdinlch", cAudioDevice.iLeftInputChannel );
+
+    // sound card right input channel mapping
+    SetNumericIniSet ( section, "sndcrdinrch", cAudioDevice.iRightInputChannel );
+
+    // sound card left output channel mapping
+    SetNumericIniSet ( section, "sndcrdoutlch", cAudioDevice.iLeftOutputChannel );
+
+    // sound card right output channel mapping
+    SetNumericIniSet ( section, "sndcrdoutrch", cAudioDevice.iRightOutputChannel );
+
+    // sound card input boost
+    SetNumericIniSet ( section, "inputboost", cAudioDevice.iInputBoost );
+
+    // sound card preferred buffer size index
+    SetNumericIniSet ( section, "prefsndcrdbufidx", cAudioDevice.iPrefFrameSizeFactor );
+
+    //### TODO: END ###//
+
+    // automatic network jitter buffer size setting
+    SetFlagIniSet ( section, "autojitbuf", bAutoSockBufSize );
+
+    // network jitter buffer size
+    SetNumericIniSet ( section, "jitbuf", iClientSockBufNumFrames );
+
+    // network jitter buffer size for server
+    SetNumericIniSet ( section, "jitbufserver", iServerSockBufNumFrames );
+
+    // enable OPUS64 setting
+    SetFlagIniSet ( section, "enableopussmall", bEnableOPUS64 );
+
+    // GUI design
+    SetNumericIniSet ( section, "guidesign", static_cast<int> ( eGUIDesign ) );
+
+    // MeterStyle
+    SetNumericIniSet ( section, "meterstyle", static_cast<int> ( eMeterStyle ) );
+
+    // audio channels
+    SetNumericIniSet ( section, "audiochannels", static_cast<int> ( eAudioChannelConfig ) );
+
+    // audio quality
+    SetNumericIniSet ( section, "audioquality", static_cast<int> ( eAudioQuality ) );
+
+    // custom directories
+    for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
+    {
+        PutIniSetting ( section, QString ( "directoryaddress%1" ).arg ( iIdx ), vstrDirectoryAddress[iIdx] );
+    }
+
+    // directory type
+    SetNumericIniSet ( section, "directorytype", static_cast<int> ( eDirectoryType ) );
+
+    // custom directory index
+    SetNumericIniSet ( section, "customdirectoryindex", iCustomDirectoryIndex );
+
+    // window position of the main window
+    PutIniSetting ( section, "winposmain_base64", ToBase64 ( vecWindowPosMain ) );
+
+    // window position of the settings window
+    PutIniSetting ( section, "winposset_base64", ToBase64 ( vecWindowPosSettings ) );
+
+    // window position of the chat window
+    PutIniSetting ( section, "winposchat_base64", ToBase64 ( vecWindowPosChat ) );
+
+    // window position of the connect window
+    PutIniSetting ( section, "winposcon_base64", ToBase64 ( vecWindowPosConnect ) );
+
+    // visibility state of the settings window
+    SetFlagIniSet ( section, "winvisset", bWindowWasShownSettings );
+
+    // visibility state of the chat window
+    SetFlagIniSet ( section, "winvischat", bWindowWasShownChat );
+
+    // visibility state of the connect window
+    SetFlagIniSet ( section, "winviscon", bWindowWasShownConnect );
+
+    // Settings Tab
+    SetNumericIniSet ( section, "settingstab", iSettingsTab );
+
+    // fader settings
+    WriteFaderSettingsToXML ( section );
+
+    WriteCommandlineArgumentsToXML ( section );
+}
+
+void CClientSettings::WriteFaderSettingsToXML ( QDomNode& section )
+{
+    int iIdx;
+
+    for ( iIdx = 0; iIdx < MAX_NUM_STORED_FADER_SETTINGS; iIdx++ )
+    {
+        // stored fader tags
+        PutIniSetting ( section, QString ( "storedfadertag%1_base64" ).arg ( iIdx ), ToBase64 ( vecStoredFaderTags[iIdx] ) );
+
+        // stored fader levels
+        SetNumericIniSet ( section, QString ( "storedfaderlevel%1" ).arg ( iIdx ), vecStoredFaderLevels[iIdx] );
+
+        // stored pan values
+        SetNumericIniSet ( section, QString ( "storedpanvalue%1" ).arg ( iIdx ), vecStoredPanValues[iIdx] );
+
+        // stored fader solo states
+        SetFlagIniSet ( section, QString ( "storedfaderissolo%1" ).arg ( iIdx ), vecStoredFaderIsSolo[iIdx] != 0 );
+
+        // stored fader muted states
+        SetFlagIniSet ( section, QString ( "storedfaderismute%1" ).arg ( iIdx ), vecStoredFaderIsMute[iIdx] != 0 );
+
+        // stored fader group ID
+        SetNumericIniSet ( section, QString ( "storedgroupid%1" ).arg ( iIdx ), vecStoredFaderGroupID[iIdx] );
+    }
 }

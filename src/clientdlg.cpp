@@ -29,12 +29,11 @@ CClientDlg::CClientDlg ( CClient& cClient, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Window ), // use Qt::Window to get min/max window buttons
     Client ( cClient ),
     Settings ( cClient.Settings ),
+    Status ( cClient.Status ),
     bConnectDlgWasShown ( false ),
-    bMIDICtrlUsed ( !Settings.CommandlineOptions.ctrlmidich.Value().isEmpty() ),
-    bDetectFeedback ( false ),
     eLastRecorderState ( RS_UNDEFINED ), // for SetMixerBoardDeco
     eLastDesign ( GD_ORIGINAL ),         //          "
-    ClientSettingsDlg ( Client, Settings, parent ),
+    ClientSettingsDlg ( cClient, parent ),
     ChatDlg ( parent ),
     ConnectDlg ( Settings, parent ),
     AnalyzerConsole ( &cClient, parent )
@@ -254,10 +253,6 @@ CClientDlg::CClientDlg ( CClient& cClient, QWidget* parent ) :
     lblUpdateCheck->setText ( "<font color=\"red\"><b>" + APP_UPGRADE_AVAILABLE_MSG_TEXT.arg ( APP_NAME ).arg ( VERSION ) + "</b></font>" );
     lblUpdateCheck->hide();
 
-    // setup timers
-    TimerCheckAudioDeviceOk.setSingleShot ( true ); // only check once after connection
-    TimerDetectFeedback.setSingleShot ( true );
-
     // File menu  --------------------------------------------------------------
     QMenu* pFileMenu = new QMenu ( tr ( "&File" ), this );
 
@@ -418,12 +413,8 @@ CClientDlg::CClientDlg ( CClient& cClient, QWidget* parent ) :
     QObject::connect ( chbLocalMute, &QCheckBox::stateChanged, this, &CClientDlg::OnLocalMuteStateChanged );
 
     // timers
-    QObject::connect ( &TimerSigMet, &QTimer::timeout, this, &CClientDlg::OnTimerSigMet );
     QObject::connect ( &TimerBuffersLED, &QTimer::timeout, this, &CClientDlg::OnTimerBuffersLED );
     QObject::connect ( &TimerStatus, &QTimer::timeout, this, &CClientDlg::OnTimerStatus );
-    QObject::connect ( &TimerPing, &QTimer::timeout, this, &CClientDlg::OnTimerPing );
-    QObject::connect ( &TimerCheckAudioDeviceOk, &QTimer::timeout, this, &CClientDlg::OnTimerCheckAudioDeviceOk );
-    QObject::connect ( &TimerDetectFeedback, &QTimer::timeout, this, &CClientDlg::OnTimerDetectFeedback );
 
     // sliders
     QObject::connect ( sldAudioReverb, &QSlider::valueChanged, this, &CClientDlg::OnAudioReverbValueChanged );
@@ -437,38 +428,42 @@ CClientDlg::CClientDlg ( CClient& cClient, QWidget* parent ) :
     // protocol, a modal licence dialog is opened. Since this blocks the thread, we need
     // a queued connection to make sure the core protocol mechanism is not blocked, too.
     qRegisterMetaType<ELicenceType> ( "ELicenceType" );
-    QObject::connect ( &Client, &CClient::LicenceRequired, this, &CClientDlg::OnLicenceRequired, Qt::QueuedConnection );
+    QObject::connect ( &cClient, &CClient::LicenceRequired, this, &CClientDlg::OnLicenceRequired, Qt::QueuedConnection );
 
-    QObject::connect ( &Client, &CClient::ConClientListMesReceived, this, &CClientDlg::OnConClientListMesReceived );
-    QObject::connect ( &Client, &CClient::ChatTextReceived, this, &CClientDlg::OnChatTextReceived );
-    QObject::connect ( &Client, &CClient::ClientIDReceived, this, &CClientDlg::OnClientIDReceived );
-    QObject::connect ( &Client, &CClient::MuteStateHasChangedReceived, this, &CClientDlg::OnMuteStateHasChangedReceived );
-    QObject::connect ( &Client, &CClient::RecorderStateReceived, this, &CClientDlg::OnRecorderStateReceived );
-    QObject::connect ( &Client, &CClient::PingTimeReceived, this, &CClientDlg::OnPingTimeResult );
-    QObject::connect ( &Client, &CClient::CLServerListReceived, this, &CClientDlg::OnCLServerListReceived );
-    QObject::connect ( &Client, &CClient::CLRedServerListReceived, this, &CClientDlg::OnCLRedServerListReceived );
-    QObject::connect ( &Client, &CClient::CLConnClientsListMesReceived, this, &CClientDlg::OnCLConnClientsListMesReceived );
-    QObject::connect ( &Client, &CClient::CLPingTimeWithNumClientsReceived, this, &CClientDlg::OnCLPingTimeWithNumClientsReceived );
-    QObject::connect ( &Client, &CClient::ControllerInFaderLevel, this, &CClientDlg::OnControllerInFaderLevel );
-    QObject::connect ( &Client, &CClient::ControllerInPanValue, this, &CClientDlg::OnControllerInPanValue );
-    QObject::connect ( &Client, &CClient::ControllerInFaderIsSolo, this, &CClientDlg::OnControllerInFaderIsSolo );
-    QObject::connect ( &Client, &CClient::ControllerInFaderIsMute, this, &CClientDlg::OnControllerInFaderIsMute );
-    QObject::connect ( &Client, &CClient::ControllerInMuteMyself, this, &CClientDlg::OnControllerInMuteMyself );
-    QObject::connect ( &Client, &CClient::CLChannelLevelListReceived, this, &CClientDlg::OnCLChannelLevelListReceived );
-    QObject::connect ( &Client, &CClient::VersionAndOSReceived, this, &CClientDlg::OnVersionAndOSReceived );
-    QObject::connect ( &Client, &CClient::CLVersionAndOSReceived, this, &CClientDlg::OnCLVersionAndOSReceived );
-    QObject::connect ( &Client, &CClient::SoundDeviceChanged, this, &CClientDlg::OnSoundDeviceChanged );
+    QObject::connect ( &cClient, &CClient::ConClientListMesReceived, this, &CClientDlg::OnConClientListMesReceived );
+    QObject::connect ( &cClient, &CClient::ChatTextReceived, this, &CClientDlg::OnChatTextReceived );
+    QObject::connect ( &cClient, &CClient::ClientIDReceived, this, &CClientDlg::OnClientIDReceived );
+    QObject::connect ( &cClient, &CClient::MuteStateHasChangedReceived, this, &CClientDlg::OnMuteStateHasChangedReceived );
+    QObject::connect ( &cClient, &CClient::RecorderStateReceived, this, &CClientDlg::OnRecorderStateReceived );
+    QObject::connect ( &cClient, &CClient::StatusUpdated, this, &CClientDlg::OnClientStatusUpdate );
+    QObject::connect ( &cClient, &CClient::PingTimeReceived, this, &CClientDlg::OnClientStatusUpdate );
+    QObject::connect ( &cClient, &CClient::CLServerListReceived, this, &CClientDlg::OnCLServerListReceived );
+    QObject::connect ( &cClient, &CClient::CLRedServerListReceived, this, &CClientDlg::OnCLRedServerListReceived );
+    QObject::connect ( &cClient, &CClient::CLConnClientsListMesReceived, this, &CClientDlg::OnCLConnClientsListMesReceived );
+    QObject::connect ( &cClient, &CClient::CLPingTimeWithNumClientsReceived, this, &CClientDlg::OnCLPingTimeWithNumClientsReceived );
+    QObject::connect ( &cClient, &CClient::ControllerInFaderLevel, this, &CClientDlg::OnControllerInFaderLevel );
+    QObject::connect ( &cClient, &CClient::ControllerInPanValue, this, &CClientDlg::OnControllerInPanValue );
+    QObject::connect ( &cClient, &CClient::ControllerInFaderIsSolo, this, &CClientDlg::OnControllerInFaderIsSolo );
+    QObject::connect ( &cClient, &CClient::ControllerInFaderIsMute, this, &CClientDlg::OnControllerInFaderIsMute );
+    QObject::connect ( &cClient, &CClient::ControllerInMuteMyself, this, &CClientDlg::OnControllerInMuteMyself );
+    QObject::connect ( &cClient, &CClient::CLChannelLevelListReceived, this, &CClientDlg::OnCLChannelLevelListReceived );
+    QObject::connect ( &cClient, &CClient::VersionAndOSReceived, this, &CClientDlg::OnVersionAndOSReceived );
+    QObject::connect ( &cClient, &CClient::CLVersionAndOSReceived, this, &CClientDlg::OnCLVersionAndOSReceived );
+    QObject::connect ( &cClient, &CClient::SoundDeviceChanged, this, &CClientDlg::OnSoundDeviceChanged );
+    QObject::connect ( &cClient, &CClient::AudioFeedbackDetected, this, &CClientDlg::onAudioFeedbackDetected );
+    QObject::connect ( &cClient, &CClient::AudioFeedbackStateChange, this, &CClientDlg::OnFeedbackDetectionChanged );
+    QObject::connect ( &cClient, &CClient::SignalLeveldbUpdated, this, &CClientDlg::OnSignalMetersUpdate );
 
-    QObject::connect ( &Settings, &CClientSettings::Connecting, this, &CClientDlg::OnConnecting );
-    QObject::connect ( &Settings, &CClientSettings::Disconnecting, this, &CClientDlg::OnDisconnecting );
-    QObject::connect ( &Settings, &CClientSettings::Connected, this, &CClientDlg::OnConnected );
-    QObject::connect ( &Settings, &CClientSettings::Disconnected, this, &CClientDlg::OnDisconnected );
+    QObject::connect ( &Status, &CClientStatus::Connecting, this, &CClientDlg::OnConnecting );
+    QObject::connect ( &Status, &CClientStatus::Disconnecting, this, &CClientDlg::OnDisconnecting );
+    QObject::connect ( &Status, &CClientStatus::Connected, this, &CClientDlg::OnConnected );
+    QObject::connect ( &Status, &CClientStatus::Disconnected, this, &CClientDlg::OnDisconnected );
+
     QObject::connect ( &Settings, &CClientSettings::GUIDesignChanged, this, &CClientDlg::OnGUIDesignChanged );
     QObject::connect ( &Settings, &CClientSettings::MeterStyleChanged, this, &CClientDlg::OnMeterStyleChanged );
     QObject::connect ( &Settings, &CClientSettings::AudioChannelConfigChanged, this, &CClientDlg::OnAudioChannelConfigChanged );
     QObject::connect ( &Settings, &CClientSettings::NumMixerPanelRowsChanged, this, &CClientDlg::OnNumMixerPanelRowsChanged );
     QObject::connect ( &Settings, &CClientSettings::OwnFaderFirstChanged, this, &CClientDlg::OnOwnFaderFirstChanged );
-
     QObject::connect ( &Settings, &CClientSettings::CustomDirectoriesChanged, &ConnectDlg, &CConnectDlg::OnCustomDirectoriesChanged );
 
     QObject::connect ( this, &CClientDlg::SendTabChange, &ClientSettingsDlg, &CClientSettingsDlg::OnTabSelection );
@@ -516,12 +511,12 @@ CClientDlg::CClientDlg ( CClient& cClient, QWidget* parent ) :
 
         if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK1_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
         {
-            Client.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
+            cClient.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
         }
 
         if ( NetworkUtil().ParseNetworkAddress ( UPDATECHECK2_ADDRESS, UpdateServerHostAddress, bEnableIPv6 ) )
         {
-            Client.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
+            cClient.CreateCLServerListReqVerAndOSMes ( UpdateServerHostAddress );
         }
     }
 }
@@ -529,9 +524,9 @@ CClientDlg::CClientDlg ( CClient& cClient, QWidget* parent ) :
 void CClientDlg::closeEvent ( QCloseEvent* Event )
 {
     // if connected, terminate connection
-    if ( Settings.GetConnectionEnabled() )
+    if ( Status.GetConnectionEnabled() )
     {
-        Settings.EndConnection();
+        Status.EndConnection();
         QCoreApplication::processEvents ( QEventLoop::ExcludeUserInputEvents, 100 );
     }
 
@@ -648,9 +643,9 @@ void CClientDlg::OnConnectDlgAccepted()
     {
         // first check if we are already connected, if this is the case we have to
         // disconnect the old server first
-        if ( Settings.GetConnectionEnabled() )
+        if ( Status.GetConnectionEnabled() )
         {
-            Settings.EndConnection();
+            Status.EndConnection();
         }
 
         // get the address from the connect dialog
@@ -694,7 +689,7 @@ void CClientDlg::OnConnectDlgAccepted()
         }
 
         // initiate connection
-        Settings.StartConnection ( strSelectedAddress, strMixerBoardLabel );
+        Status.StartConnection ( strSelectedAddress, strMixerBoardLabel );
 
         // reset flag
         bConnectDlgWasShown = false;
@@ -704,9 +699,9 @@ void CClientDlg::OnConnectDlgAccepted()
 void CClientDlg::OnConnectDisconBut()
 {
     // the connect/disconnect button implements a toggle functionality
-    if ( Settings.GetConnectionEnabled() )
+    if ( Status.GetConnectionEnabled() )
     {
-        Settings.EndConnection();
+        Status.EndConnection();
         SetMixerBoardDeco ( RS_UNDEFINED );
     }
     else
@@ -791,7 +786,13 @@ void CClientDlg::OnChatTextReceived ( QString strChatText )
     // always when a new message arrives since this is annoying.
     ShowChatWindow ( ( strChatText.indexOf ( WELCOME_MESSAGE_PREFIX ) == 0 ) );
 
-    UpdateDisplay();
+    UpdateWindowCheckboxes();
+}
+
+void CClientDlg::onAudioFeedbackDetected()
+{
+    chbLocalMute->setCheckState ( Qt::Checked );
+    MainMixerBoard->MuteMyChannel();
 }
 
 void CClientDlg::OnLicenceRequired ( ELicenceType eLicenceType )
@@ -809,7 +810,7 @@ void CClientDlg::OnLicenceRequired ( ELicenceType eLicenceType )
         // disconnect from that server.
         if ( !LicenceDlg.exec() )
         {
-            Settings.EndConnection();
+            Status.EndConnection();
         }
 
         // unmute the client output stream if local mute button is not pressed
@@ -823,7 +824,7 @@ void CClientDlg::OnLicenceRequired ( ELicenceType eLicenceType )
 void CClientDlg::OnConClientListMesReceived ( CVector<CChannelInfo> vecChanInfo )
 {
     // show channel numbers if --ctrlmidich is used (#241, #95)
-    if ( bMIDICtrlUsed )
+    if ( Settings.CommandlineOptions.ctrlmidich.IsSet() )
     {
         for ( int i = 0; i < vecChanInfo.Size(); i++ )
         {
@@ -852,7 +853,7 @@ void CClientDlg::SetMyWindowTitle ( const int iNumClients )
     // set the window title (and therefore also the task bar icon text of the OS)
     // according to the following specification (#559):
     // <ServerName> - <N> users - Jamulus
-    QString strWinTitle = Settings.GetWindowTitle();
+    QString strWinTitle = GetAppName();
 
     if ( iNumClients > 0 )
     {
@@ -913,7 +914,7 @@ void CClientDlg::ShowGeneralSettings ( int iTab )
 void CClientDlg::ShowChatWindow ( const bool bForceRaise )
 {
     ChatDlg.show();
-    ChatDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Chat" ), Client.Settings.GetClientName() ) );
+    ChatDlg.setWindowTitle ( MakeClientNameTitle ( tr ( "Chat" ), Settings.GetClientName() ) );
 
     if ( bForceRaise )
     {
@@ -923,7 +924,7 @@ void CClientDlg::ShowChatWindow ( const bool bForceRaise )
         ChatDlg.activateWindow();
     }
 
-    UpdateDisplay();
+    UpdateWindowCheckboxes();
 }
 
 void CClientDlg::ShowAnalyzerConsole()
@@ -975,42 +976,11 @@ void CClientDlg::OnLocalMuteStateChanged ( int value )
     }
 }
 
-void CClientDlg::OnTimerSigMet()
+void CClientDlg::OnSignalMetersUpdate()
 {
-    //### TODO: BEGIN ###//
-    // DetectFeedback is a client duty !!
-    // should also work in headless mode !!!
-    // Levelmeter updates should come from an OnInputLevelChanged slot !
-    //### TODO: END ###//
-
     // show current level
-    lbrInputLevelL->SetValue ( Client.GetLevelForMeterdBLeft() );
-    lbrInputLevelR->SetValue ( Client.GetLevelForMeterdBRight() );
-
-    if ( bDetectFeedback &&
-         ( Client.GetLevelForMeterdBLeft() > NUM_STEPS_LED_BAR - 0.5 || Client.GetLevelForMeterdBRight() > NUM_STEPS_LED_BAR - 0.5 ) )
-    {
-        //
-        // mute locally and mute channel
-        chbLocalMute->setCheckState ( Qt::Checked );
-        MainMixerBoard->MuteMyChannel();
-
-        // show message box about feedback issue
-        QCheckBox* chb = new QCheckBox ( tr ( "Enable feedback detection" ) );
-        chb->setCheckState ( Settings.bEnableFeedbackDetection ? Qt::Checked : Qt::Unchecked );
-        QMessageBox msgbox;
-        msgbox.setText ( tr ( "Audio feedback or loud signal detected.\n\n"
-                              "We muted your channel and activated 'Mute Myself'. Please solve "
-                              "the feedback issue first and unmute yourself afterwards." ) );
-        msgbox.setIcon ( QMessageBox::Icon::Warning );
-        msgbox.addButton ( QMessageBox::Ok );
-        msgbox.setDefaultButton ( QMessageBox::Ok );
-        msgbox.setCheckBox ( chb );
-
-        QObject::connect ( chb, &QCheckBox::stateChanged, this, &CClientDlg::OnFeedbackDetectionChanged );
-
-        msgbox.exec();
-    }
+    lbrInputLevelL->SetValue ( Status.GetSignalLeveldBLeft() );
+    lbrInputLevelR->SetValue ( Status.GetSignalLeveldBRight() );
 }
 
 void CClientDlg::OnTimerBuffersLED()
@@ -1018,7 +988,7 @@ void CClientDlg::OnTimerBuffersLED()
     CMultiColorLED::ELightColor eCurStatus;
 
     // get and reset current buffer state and set LED from that flag
-    if ( Client.GetAndResetbJitterBufferOKFlag() )
+    if ( Status.GetJitBufOK() )
     {
         eCurStatus = CMultiColorLED::RL_GREEN;
     }
@@ -1031,16 +1001,11 @@ void CClientDlg::OnTimerBuffersLED()
     ledBuffers->SetLight ( eCurStatus );
 }
 
-void CClientDlg::OnTimerPing()
-{
-    // send ping message to the server
-    Client.CreateCLPingMes();
-}
-
-void CClientDlg::OnPingTimeResult ( int iPingTime )
+void CClientDlg::OnClientStatusUpdate()
 {
     // calculate overall delay
-    const int iOverallDelayMs = Client.EstimatedOverallDelay ( iPingTime );
+    const int iPingTime       = Status.GetPingTimeMs();
+    const int iOverallDelayMs = Status.GetTotalDelayMs();
 
     // color definition: <= 43 ms green, <= 68 ms yellow, otherwise red
     CMultiColorLED::ELightColor eOverallDelayLEDColor;
@@ -1074,47 +1039,18 @@ void CClientDlg::OnPingTimeResult ( int iPingTime )
     ledDelay->SetLight ( eOverallDelayLEDColor );
 }
 
-void CClientDlg::OnTimerCheckAudioDeviceOk()
-{
-    // check if the audio device entered the audio callback after a pre-defined
-    // timeout to check if a valid device is selected and if we do not have
-    // fundamental settings errors (in which case the GUI would only show that
-    // it is trying to connect the server which does not help to solve the problem (#129))
-    if ( !Client.IsCallbackEntered() )
-    {
-        QMessageBox::warning ( this,
-                               APP_NAME,
-                               tr ( "Your sound card is not working correctly. "
-                                    "Please open the settings dialog and check the device selection and the driver settings." ) );
-    }
-}
-
-void CClientDlg::OnTimerDetectFeedback() { bDetectFeedback = false; }
-
 void CClientDlg::OnSoundDeviceChanged ( QString strError )
 {
     if ( !strError.isEmpty() )
     {
         // the sound device setup has a problem, disconnect any active connection
-        if ( Settings.GetConnectionEnabled() )
+        if ( Status.GetConnectionEnabled() )
         {
-            Settings.EndConnection();
+            Status.EndConnection();
         }
 
         // show the error message of the device setup
         QMessageBox::critical ( this, APP_NAME, strError, tr ( "Ok" ), nullptr );
-    }
-
-    // if the check audio device timer is running, it must be restarted on a device change
-    if ( TimerCheckAudioDeviceOk.isActive() )
-    {
-        TimerCheckAudioDeviceOk.start ( CHECK_AUDIO_DEV_OK_TIME_MS );
-    }
-
-    if ( Settings.bEnableFeedbackDetection && TimerDetectFeedback.isActive() )
-    {
-        TimerDetectFeedback.start ( DETECT_FEEDBACK_TIME_MS );
-        bDetectFeedback = true;
     }
 
     // update the settings dialog
@@ -1150,20 +1086,10 @@ void CClientDlg::OnConnected()
     butConnect->setText ( tr ( "&Disconnect" ) );
 
     // set server name in audio mixer group box title
-    MainMixerBoard->SetServerName ( Settings.GetServerName() );
+    MainMixerBoard->SetServerName ( Status.GetServerName() );
 
-    // start timer for level meter bar and ping time measurement
-    TimerSigMet.start ( LEVELMETER_UPDATE_TIME_MS );
+    // start timer
     TimerBuffersLED.start ( BUFFER_LED_UPDATE_TIME_MS );
-    TimerPing.start ( PING_UPDATE_TIME_MS );
-    TimerCheckAudioDeviceOk.start ( CHECK_AUDIO_DEV_OK_TIME_MS ); // is single shot timer
-
-    // audio feedback detection
-    if ( Settings.bEnableFeedbackDetection )
-    {
-        TimerDetectFeedback.start ( DETECT_FEEDBACK_TIME_MS ); // single shot timer
-        bDetectFeedback = true;
-    }
 
     lbrInputLevelL->setEnabled ( true );
     lbrInputLevelR->setEnabled ( true );
@@ -1179,7 +1105,6 @@ void CClientDlg::OnDisconnected()
     MainMixerBoard->SetServerName ( "" );
 
     // stop timer for level meter bars and reset them
-    TimerSigMet.stop();
     lbrInputLevelL->setEnabled ( false );
     lbrInputLevelR->setEnabled ( false );
     lbrInputLevelL->SetValue ( 0 );
@@ -1190,10 +1115,6 @@ void CClientDlg::OnDisconnected()
 
     // stop other timers
     TimerBuffersLED.stop();
-    TimerPing.stop();
-    TimerCheckAudioDeviceOk.stop();
-    TimerDetectFeedback.stop();
-    bDetectFeedback = false;
 
     // clang-format off
 // TODO is this still required???
@@ -1217,7 +1138,7 @@ OnTimerStatus();
     butConnect->setEnabled ( true );
 }
 
-void CClientDlg::UpdateDisplay()
+void CClientDlg::UpdateWindowCheckboxes()
 {
     // update settings/chat buttons (do not fire signals since it is an update)
     if ( chbSettings->isChecked() && !ClientSettingsDlg.isVisible() )

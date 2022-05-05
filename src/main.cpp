@@ -40,6 +40,7 @@
 #include "settings.h"
 #include "util.h"
 #include <memory>
+#include <QScopedPointer>
 
 #ifndef HEADLESS
 #    include <QApplication>
@@ -69,29 +70,37 @@ extern void qt_set_sequence_auto_mnemonic ( bool bEnable );
 
 static QString strAppName = APP_NAME; // Will be appended by " - ClientName" or "Server - ServerName" if those names are defined
 
-void SetClientAppName ( QString strClientname ) { strAppName = QString ( APP_NAME ) + " - " + strClientname; }
+// SetClientAppName is called by CClient constructor;
+void SetClientAppName ( QString strClientname )
+{
+    if ( !strClientname.isEmpty() )
+    {
+        strAppName = QString ( APP_NAME ) + " - " + strClientname;
+    }
+    else
+    {
+        strAppName = QString ( APP_NAME );
+    }
+}
 
-void SetServerAppName ( QString strServername ) { strAppName = QString ( APP_NAME ) + "Server - " + strServername; }
+// SetServerAppName is called by CServer constructor;
+void SetServerAppName ( QString strServername )
+{
+    if ( !strServername.isEmpty() )
+    {
+        strAppName = QString ( APP_NAME ) + "Server - " + strServername;
+    }
+    else
+    {
+        strAppName = QString ( APP_NAME ) + "Server";
+    }
+}
 
 const QString GetAppName() { return strAppName; }
 
 // Helpers *********************************************************************
 
 QString UsageArguments ( char* argv );
-
-const QString getServerNameFromInfo ( const QString strServerInfo )
-{
-    if ( !strServerInfo.isEmpty() )
-    {
-        QStringList servInfoParams = strServerInfo.split ( ";" );
-        if ( servInfoParams.count() > 0 )
-        {
-            return servInfoParams[0];
-        }
-    }
-
-    return QString();
-}
 
 void OnFatalError ( QString errMsg ) { throw CErrorExit ( qUtf8Printable ( errMsg ) ); }
 
@@ -114,13 +123,13 @@ int main ( int argc, char** argv )
 #ifdef HEADLESS
     // note: pApplication will never be used in headless mode,
     // but if we define it here we can use the same source code
-    // with far less ifdef's
+    // with less ifdef's
 #    define QApplication QCoreApplication
 #    define pApplication pCoreApplication
 #else
-    QApplication* pApplication = NULL;
+    QScopedPointer<QApplication> pApplication;
 #endif
-    QCoreApplication* pCoreApplication = NULL;
+    QScopedPointer<QCoreApplication> pCoreApplication;
 
     try
     {
@@ -187,11 +196,11 @@ int main ( int argc, char** argv )
 
         if ( bUseGUI )
         {
-            pApplication = new QApplication ( argc, argv );
+            pApplication.reset ( new QApplication ( argc, argv ) );
         }
         else
         {
-            pCoreApplication = new QCoreApplication ( argc, argv );
+            pCoreApplication.reset ( new QCoreApplication ( argc, argv ) );
         }
 
 #ifdef ANDROID
@@ -344,20 +353,6 @@ int main ( int argc, char** argv )
         qCritical() << qUtf8Printable ( QString ( "%1: Unhandled Exception, Exiting" ).arg ( strAppName ) );
         exit_code = -1;
     }
-
-    if ( pCoreApplication )
-    {
-        delete pCoreApplication;
-    }
-
-#ifndef HEADLESS
-    // note: pApplication is the same pointer as pCoreApplication in headless mode!
-    //       so pApplication is already deleted!
-    if ( pApplication )
-    {
-        delete pApplication;
-    }
-#endif
 
     return exit_code;
 }
