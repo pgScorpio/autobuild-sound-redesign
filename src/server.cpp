@@ -23,6 +23,9 @@
 \******************************************************************************/
 
 #include "server.h"
+#include "settings.h"
+
+#define SERVER_SETTINGS_VERSION 0
 
 extern void SetServerAppName ( QString strClientname );
 
@@ -258,6 +261,10 @@ CServer::CServer ( bool bUseGUI ) :
 #endif
 
     // JSON-RPC ------------------------------------------------------------
+
+    // NOTE that when throwing an exception from a constructor the destructor will NOT be called !!
+    //      so this has to be done BEFORE allocating resources that are released in the destructor
+    //      or release the resources before throwing the exception !
 
     if ( Settings.CommandlineOptions.jsonrpcport.IsSet() )
     {
@@ -541,6 +548,26 @@ CServer::CServer ( bool bUseGUI ) :
     Socket.Start();
 }
 
+CServer::~CServer()
+{
+    for ( int i = 0; i < iMaxNumChannels; i++ )
+    {
+        // free audio encoders and decoders
+        opus_custom_encoder_destroy ( OpusEncoderMono[i] );
+        opus_custom_decoder_destroy ( OpusDecoderMono[i] );
+        opus_custom_encoder_destroy ( OpusEncoderStereo[i] );
+        opus_custom_decoder_destroy ( OpusDecoderStereo[i] );
+        opus_custom_encoder_destroy ( Opus64EncoderMono[i] );
+        opus_custom_decoder_destroy ( Opus64DecoderMono[i] );
+        opus_custom_encoder_destroy ( Opus64EncoderStereo[i] );
+        opus_custom_decoder_destroy ( Opus64DecoderStereo[i] );
+
+        // free audio modes
+        opus_custom_mode_destroy ( OpusMode[i] );
+        opus_custom_mode_destroy ( Opus64Mode[i] );
+    }
+}
+
 void CServer::OnApplicationStartup() { ApplySettings(); }
 
 void CServer::ApplySettings()
@@ -600,26 +627,6 @@ inline void CServer::connectChannelSignalsToServerSlots<0>()
 {}
 
 void CServer::CreateAndSendJitBufMessage ( const int iCurChanID, const int iNNumFra ) { vecChannels[iCurChanID].CreateJitBufMes ( iNNumFra ); }
-
-CServer::~CServer()
-{
-    for ( int i = 0; i < iMaxNumChannels; i++ )
-    {
-        // free audio encoders and decoders
-        opus_custom_encoder_destroy ( OpusEncoderMono[i] );
-        opus_custom_decoder_destroy ( OpusDecoderMono[i] );
-        opus_custom_encoder_destroy ( OpusEncoderStereo[i] );
-        opus_custom_decoder_destroy ( OpusDecoderStereo[i] );
-        opus_custom_encoder_destroy ( Opus64EncoderMono[i] );
-        opus_custom_decoder_destroy ( Opus64DecoderMono[i] );
-        opus_custom_encoder_destroy ( Opus64EncoderStereo[i] );
-        opus_custom_decoder_destroy ( Opus64DecoderStereo[i] );
-
-        // free audio modes
-        opus_custom_mode_destroy ( OpusMode[i] );
-        opus_custom_mode_destroy ( Opus64Mode[i] );
-    }
-}
 
 void CServer::SendProtMessage ( int iChID, CVector<uint8_t> vecMessage )
 {
@@ -1888,6 +1895,13 @@ CServerSettings::CServerSettings ( bool bUseGUI ) :
     bDelayPan ( false )
 {
     SetFileName ( CommandlineOptions.inifile.Value(), DEFAULT_INI_FILE_NAME_SERVER );
+
+    // NOTE that when throwing an exception from a constructor the destructor will NOT be called !!
+    //      so this has to be done BEFORE allocating resources that are released in the destructor
+    //      or release the resources before throwing the exception !
+    //
+    // Load() can throw an exception !
+
     Load();
 }
 
@@ -1899,22 +1913,32 @@ CServerSettings::~CServerSettings()
 
 bool CServerSettings::ReadSettingsFromXML ( const QDomNode& root )
 {
-    int             iValue;
-    bool            bValue;
+    int  iValue;
+    bool bValue;
+
     const QDomNode& section = GetSectionForRead ( root, "server", false );
 
+    iReadSettingsVersion = -1;
+    GetNumericIniSet ( section, "settingsversion", 0, INT_MAX, iReadSettingsVersion );
+
+    if ( iReadSettingsVersion >= 0 )
+    {
+        ReadCommandlineArgumentsFromXML ( section );
+    }
+
     // language
-    strLanguage = GetIniSetting ( section, "language", CLocale::FindSysLangTransFileName ( CLocale::GetAvailableTranslations() ).first );
+    strLanguage = CLocale::FindSysLangTransFileName ( CLocale::GetAvailableTranslations() ).first;
+    GetStringIniSet ( section, "language", strLanguage );
 
     // window position of the main window
-    vecWindowPosMain = FromBase64ToByteArray ( GetIniSetting ( section, "winposmain_base64" ) );
+    GetBase64ByteArrayIniSet ( section, "winposmain_base64", vecWindowPosMain );
 
     // name/city/country
     // name
-    strServerName = GetIniSetting ( section, "name" );
+    GetStringIniSet ( section, "name", strServerName );
 
     // city
-    strServerCity = GetIniSetting ( section, "city" );
+    GetStringIniSet ( section, "city", strServerCity );
 
     // country
     if ( GetNumericIniSet ( section, "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
@@ -1935,18 +1959,19 @@ bool CServerSettings::ReadSettingsFromXML ( const QDomNode& root )
     }
     else
     {
-        strWelcomeMessage = FromBase64ToString ( GetIniSetting ( section, "welcome" ) );
+        GetBase64StringIniSet ( section, "welcome", strWelcomeMessage );
     }
 
     // base recording directory
-    strRecordingDir = FromBase64ToString ( GetIniSetting ( section, "recordingdir_base64" ) );
+    GetBase64StringIniSet ( section, "recordingdir_base64", strRecordingDir );
 
     // to avoid multiple registrations, must do this after collecting serverinfo
     // custom directory
     // CServerListManager defaults to command line argument (or "" if not passed)
     // Server GUI defaults to ""
 
-    strDirectoryAddress = GetIniSetting ( section, "directoryaddress", "" );
+    strDirectoryAddress = "";
+    GetStringIniSet ( section, "directoryaddress", strDirectoryAddress );
 
     // directory type
     // CServerListManager defaults to AT_NONE
@@ -2002,7 +2027,7 @@ bool CServerSettings::ReadSettingsFromXML ( const QDomNode& root )
     eDirectoryType = directoryType;
 
     // server list persistence file name
-    strServerListFileName = FromBase64ToString ( GetIniSetting ( section, "directoryfile_base64" ) );
+    GetBase64StringIniSet ( section, "directoryfile_base64", strServerListFileName );
 
     // start minimized on OS start
     if ( GetFlagIniSet ( section, "autostartmin", bValue ) )
@@ -2023,17 +2048,19 @@ void CServerSettings::WriteSettingsToXML ( QDomNode& root )
 {
     QDomNode section = GetSectionForWrite ( root, "server", false );
 
+    SetNumericIniSet ( section, "settingsversion", SERVER_SETTINGS_VERSION );
+
     // window position of the main window
-    PutIniSetting ( section, "winposmain_base64", ToBase64 ( vecWindowPosMain ) );
+    SetBase64StringIniSet ( section, "winposmain_base64", vecWindowPosMain );
 
     // directory type
     SetNumericIniSet ( section, "directorytype", static_cast<int> ( eDirectoryType ) );
 
     // name
-    PutIniSetting ( section, "name", strServerName );
+    SetStringIniSet ( section, "name", strServerName );
 
     // city
-    PutIniSetting ( section, "city", strServerCity );
+    SetStringIniSet ( section, "city", strServerCity );
 
     // country
     SetNumericIniSet ( section, "country", CLocale::QtCountryToWireFormatCountryCode ( eServerCountry ) );
@@ -2042,19 +2069,19 @@ void CServerSettings::WriteSettingsToXML ( QDomNode& root )
     SetFlagIniSet ( section, "norecord", !bEnableRecording );
 
     // welcome message
-    PutIniSetting ( section, "welcome", ToBase64 ( strWelcomeMessage ) );
+    SetBase64StringIniSet ( section, "welcome", strWelcomeMessage );
 
     // language
-    PutIniSetting ( section, "language", strLanguage );
+    SetStringIniSet ( section, "language", strLanguage );
 
     // base recording directory
-    PutIniSetting ( section, "recordingdir_base64", ToBase64 ( strRecordingDir ) );
+    SetBase64StringIniSet ( section, "recordingdir_base64", strRecordingDir );
 
     // custom directory
-    PutIniSetting ( section, "directoryaddress", strDirectoryAddress );
+    SetStringIniSet ( section, "directoryaddress", strDirectoryAddress );
 
     // server list persistence file name
-    PutIniSetting ( section, "directoryfile_base64", ToBase64 ( strServerListFileName ) );
+    SetBase64StringIniSet ( section, "directoryfile_base64", strServerListFileName );
 
     // start minimized on OS start
     SetFlagIniSet ( section, "autostartmin", bAutoRunMinimized );

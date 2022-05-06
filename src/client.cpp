@@ -23,7 +23,10 @@
 \******************************************************************************/
 
 #include "client.h"
+#include "settings.h"
 #include "messages.h"
+
+#define CLIENT_SETTINGS_VERSION 0
 
 extern void SetClientAppName ( QString strClientname );
 
@@ -64,12 +67,11 @@ CClient::CClient ( bool bUseGUI ) :
 
     SetClientAppName ( Settings.GetClientName() );
 
-    if ( bUseGUI && !Settings.CommandlineOptions.notranslation.IsSet() )
-    {
-        CInstPictures::UpdateTableOnLanguageChange();
-    }
-
     // JSON-RPC ------------------------------------------------------------
+
+    // NOTE that when throwing an exception from a constructor the destructor will NOT be called !!
+    //      so this has to be done BEFORE allocating resources that are released in the destructor
+    //      or release the resources before throwing the exception !
 
     if ( Settings.CommandlineOptions.jsonrpcport.IsSet() )
     {
@@ -110,6 +112,11 @@ CClient::CClient ( bool bUseGUI ) :
                 pClientRpc.reset ( new CClientRpc ( this, pRpcServer.data(), pRpcServer.data() ) );
             }
         }
+    }
+
+    if ( bUseGUI && !Settings.CommandlineOptions.notranslation.IsSet() )
+    {
+        CInstPictures::UpdateTableOnLanguageChange();
     }
 
     int iOpusError;
@@ -1532,6 +1539,13 @@ CClientSettings::CClientSettings ( bool bUseGUI ) :
     bMuteOutStream ( false )
 {
     SetFileName ( CommandlineOptions.inifile.Value(), DEFAULT_INI_FILE_NAME );
+
+    // NOTE that when throwing an exception from a constructor the destructor will NOT be called !!
+    //      so this has to be done BEFORE allocating resources that are released in the destructor
+    //      or release the resources before throwing the exception !
+    //
+    // Load can throw an exception !
+
     Load();
     // SelectSoundCard ( strCurrentAudioDevice );
 }
@@ -1576,12 +1590,19 @@ bool CClientSettings::ReadSettingsFromXML ( const QDomNode& root )
 
     QDomNode section = GetSectionForRead ( root, "client", false );
 
-    ReadCommandlineArgumentsFromXML ( section );
+    iReadSettingsVersion = -1;
+    GetNumericIniSet ( section, "settingsversion", 0, INT_MAX, iReadSettingsVersion );
+
+    if ( iReadSettingsVersion >= 0 )
+    {
+        ReadCommandlineArgumentsFromXML ( section );
+    }
 
     // IP addresses
     for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
     {
-        vstrIPAddress[iIdx] = GetIniSetting ( section, QString ( "ipaddress%1" ).arg ( iIdx ), "" );
+        vstrIPAddress[iIdx] = "";
+        GetStringIniSet ( section, QString ( "ipaddress%1" ).arg ( iIdx ), vstrIPAddress[iIdx] );
     }
 
     // new client level
@@ -1602,7 +1623,8 @@ bool CClientSettings::ReadSettingsFromXML ( const QDomNode& root )
     }
 
     // language
-    strLanguage = GetIniSetting ( section, "language", CLocale::FindSysLangTransFileName ( CLocale::GetAvailableTranslations() ).first );
+    strLanguage = CLocale::FindSysLangTransFileName ( CLocale::GetAvailableTranslations() ).first;
+    GetStringIniSet ( section, "language", strLanguage );
 
     // fader channel sorting
     if ( GetNumericIniSet ( section, "channelsort", 0, 4 /* ST_BY_CITY */, iValue ) )
@@ -1623,14 +1645,11 @@ bool CClientSettings::ReadSettingsFromXML ( const QDomNode& root )
     }
 
     // name
-    ChannelInfo.strName =
-        FromBase64ToString ( GetIniSetting ( section, "name_base64", ToBase64 ( QCoreApplication::translate ( "CMusProfDlg", "No Name" ) ) ) );
+    ChannelInfo.strName = QCoreApplication::translate ( "CMusProfDlg", "No Name" );
+    GetBase64StringIniSet ( section, "name_base64", ChannelInfo.strName );
 
     // instrument
-    if ( GetNumericIniSet ( section, "instrument", 0, CInstPictures::GetNumAvailableInst() - 1, iValue ) )
-    {
-        ChannelInfo.iInstrument = iValue;
-    }
+    GetNumericIniSet ( section, "instrument", 0, CInstPictures::GetNumAvailableInst() - 1, ChannelInfo.iInstrument );
 
     // country
     if ( GetNumericIniSet ( section, "country", 0, static_cast<int> ( QLocale::LastCountry ), iValue ) )
@@ -1644,7 +1663,7 @@ bool CClientSettings::ReadSettingsFromXML ( const QDomNode& root )
     }
 
     // city
-    ChannelInfo.strCity = FromBase64ToString ( GetIniSetting ( section, "city_base64" ) );
+    GetBase64StringIniSet ( section, "city_base64", ChannelInfo.strCity );
 
     // skill level
     if ( GetNumericIniSet ( section, "skill", 0, 3 /* SL_PROFESSIONAL */, iValue ) )
@@ -1671,7 +1690,8 @@ bool CClientSettings::ReadSettingsFromXML ( const QDomNode& root )
     }
 
     // sound card selection
-    cAudioDevice.strName = FromBase64ToString ( GetIniSetting ( section, "auddev_base64", "" ) );
+    cAudioDevice.strName = "";
+    GetBase64StringIniSet ( section, "auddev_base64", cAudioDevice.strName );
 
     //### TODO: BEGIN ###//
     // sound card channel mapping settings: make sure these settings are
@@ -1801,21 +1821,25 @@ bool CClientSettings::ReadSettingsFromXML ( const QDomNode& root )
     //### TODO: BEGIN ###//
     // TODO compatibility to old version (< 3.6.1)
 
-    QString strDirectoryAddress = GetIniSetting ( section, "centralservaddr", "" );
+    QString strDirectoryAddress;
+    GetStringIniSet ( section, "centralservaddr", strDirectoryAddress );
 
     //### TODO: END ###//
 
     for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
     {
+        vstrDirectoryAddress[iIdx] = strDirectoryAddress;
+
         //### TODO: BEGIN ###//
         // compatibility to old version (< 3.8.2)
 
-        strDirectoryAddress = GetIniSetting ( section, QString ( "centralservaddr%1" ).arg ( iIdx ), strDirectoryAddress );
+        GetStringIniSet ( section, QString ( "centralservaddr%1" ).arg ( iIdx ), vstrDirectoryAddress[iIdx] );
 
         //### TODO: END ###//
 
-        vstrDirectoryAddress[iIdx] = GetIniSetting ( section, QString ( "directoryaddress%1" ).arg ( iIdx ), strDirectoryAddress );
-        strDirectoryAddress        = "";
+        GetStringIniSet ( section, QString ( "directoryaddress%1" ).arg ( iIdx ), vstrDirectoryAddress[iIdx] );
+
+        strDirectoryAddress = "";
     }
 
     // directory type
@@ -1857,16 +1881,16 @@ bool CClientSettings::ReadSettingsFromXML ( const QDomNode& root )
     }
 
     // window position of the main window
-    vecWindowPosMain = FromBase64ToByteArray ( GetIniSetting ( section, "winposmain_base64" ) );
+    GetBase64ByteArrayIniSet ( section, "winposmain_base64", vecWindowPosMain );
 
     // window position of the settings window
-    vecWindowPosSettings = FromBase64ToByteArray ( GetIniSetting ( section, "winposset_base64" ) );
+    GetBase64ByteArrayIniSet ( section, "winposset_base64", vecWindowPosSettings );
 
     // window position of the chat window
-    vecWindowPosChat = FromBase64ToByteArray ( GetIniSetting ( section, "winposchat_base64" ) );
+    GetBase64ByteArrayIniSet ( section, "winposchat_base64", vecWindowPosChat );
 
     // window position of the connect window
-    vecWindowPosConnect = FromBase64ToByteArray ( GetIniSetting ( section, "winposcon_base64" ) );
+    GetBase64ByteArrayIniSet ( section, "winposcon_base64", vecWindowPosConnect );
 
     // visibility state of the settings window
     if ( GetFlagIniSet ( section, "winvisset", bValue ) )
@@ -1907,7 +1931,8 @@ void CClientSettings::ReadFaderSettingsFromXML ( const QDomNode& section )
     for ( iIdx = 0; iIdx < MAX_NUM_STORED_FADER_SETTINGS; iIdx++ )
     {
         // stored fader tags
-        vecStoredFaderTags[iIdx] = FromBase64ToString ( GetIniSetting ( section, QString ( "storedfadertag%1_base64" ).arg ( iIdx ), "" ) );
+        vecStoredFaderTags[iIdx] = "";
+        GetBase64StringIniSet ( section, QString ( "storedfadertag%1_base64" ).arg ( iIdx ), vecStoredFaderTags[iIdx] );
 
         // stored fader levels
         if ( GetNumericIniSet ( section, QString ( "storedfaderlevel%1" ).arg ( iIdx ), 0, AUD_MIX_FADER_MAX, iValue ) )
@@ -1946,10 +1971,12 @@ void CClientSettings::WriteSettingsToXML ( QDomNode& root )
     int      iIdx;
     QDomNode section = GetSectionForWrite ( root, "client", false );
 
+    SetNumericIniSet ( section, "settingsversion", CLIENT_SETTINGS_VERSION );
+
     // IP addresses
     for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
     {
-        PutIniSetting ( section, QString ( "ipaddress%1" ).arg ( iIdx ), vstrIPAddress[iIdx] );
+        SetStringIniSet ( section, QString ( "ipaddress%1" ).arg ( iIdx ), vstrIPAddress[iIdx] );
     }
 
     // new client level
@@ -1962,7 +1989,7 @@ void CClientSettings::WriteSettingsToXML ( QDomNode& root )
     SetFlagIniSet ( section, "connectdlgshowallmusicians", bConnectDlgShowAllMusicians );
 
     // language
-    PutIniSetting ( section, "language", strLanguage );
+    SetStringIniSet ( section, "language", strLanguage );
 
     // fader channel sorting
     SetNumericIniSet ( section, "channelsort", static_cast<int> ( eChannelSortType ) );
@@ -1974,7 +2001,7 @@ void CClientSettings::WriteSettingsToXML ( QDomNode& root )
     SetNumericIniSet ( section, "numrowsmixpan", iNumMixerPanelRows );
 
     // name
-    PutIniSetting ( section, "name_base64", ToBase64 ( ChannelInfo.strName ) );
+    SetBase64StringIniSet ( section, "name_base64", ChannelInfo.strName );
 
     // instrument
     SetNumericIniSet ( section, "instrument", ChannelInfo.iInstrument );
@@ -1983,7 +2010,7 @@ void CClientSettings::WriteSettingsToXML ( QDomNode& root )
     SetNumericIniSet ( section, "country", CLocale::QtCountryToWireFormatCountryCode ( ChannelInfo.eCountry ) );
 
     // city
-    PutIniSetting ( section, "city_base64", ToBase64 ( ChannelInfo.strCity ) );
+    SetBase64StringIniSet ( section, "city_base64", ChannelInfo.strCity );
 
     // skill level
     SetNumericIniSet ( section, "skill", static_cast<int> ( ChannelInfo.eSkillLevel ) );
@@ -2001,7 +2028,7 @@ void CClientSettings::WriteSettingsToXML ( QDomNode& root )
     // Soundcard settings should be stored per Audio device.
 
     // sound card selection
-    PutIniSetting ( section, "auddev_base64", ToBase64 ( cAudioDevice.strName ) );
+    SetBase64StringIniSet ( section, "auddev_base64", cAudioDevice.strName );
 
     // sound card left input channel mapping
     SetNumericIniSet ( section, "sndcrdinlch", cAudioDevice.iLeftInputChannel );
@@ -2050,7 +2077,7 @@ void CClientSettings::WriteSettingsToXML ( QDomNode& root )
     // custom directories
     for ( iIdx = 0; iIdx < MAX_NUM_SERVER_ADDR_ITEMS; iIdx++ )
     {
-        PutIniSetting ( section, QString ( "directoryaddress%1" ).arg ( iIdx ), vstrDirectoryAddress[iIdx] );
+        SetStringIniSet ( section, QString ( "directoryaddress%1" ).arg ( iIdx ), vstrDirectoryAddress[iIdx] );
     }
 
     // directory type
@@ -2060,16 +2087,16 @@ void CClientSettings::WriteSettingsToXML ( QDomNode& root )
     SetNumericIniSet ( section, "customdirectoryindex", iCustomDirectoryIndex );
 
     // window position of the main window
-    PutIniSetting ( section, "winposmain_base64", ToBase64 ( vecWindowPosMain ) );
+    SetBase64StringIniSet ( section, "winposmain_base64", vecWindowPosMain );
 
     // window position of the settings window
-    PutIniSetting ( section, "winposset_base64", ToBase64 ( vecWindowPosSettings ) );
+    SetBase64StringIniSet ( section, "winposset_base64", vecWindowPosSettings );
 
     // window position of the chat window
-    PutIniSetting ( section, "winposchat_base64", ToBase64 ( vecWindowPosChat ) );
+    SetBase64StringIniSet ( section, "winposchat_base64", vecWindowPosChat );
 
     // window position of the connect window
-    PutIniSetting ( section, "winposcon_base64", ToBase64 ( vecWindowPosConnect ) );
+    SetBase64StringIniSet ( section, "winposcon_base64", vecWindowPosConnect );
 
     // visibility state of the settings window
     SetFlagIniSet ( section, "winvisset", bWindowWasShownSettings );
@@ -2096,7 +2123,7 @@ void CClientSettings::WriteFaderSettingsToXML ( QDomNode& section )
     for ( iIdx = 0; iIdx < MAX_NUM_STORED_FADER_SETTINGS; iIdx++ )
     {
         // stored fader tags
-        PutIniSetting ( section, QString ( "storedfadertag%1_base64" ).arg ( iIdx ), ToBase64 ( vecStoredFaderTags[iIdx] ) );
+        SetBase64StringIniSet ( section, QString ( "storedfadertag%1_base64" ).arg ( iIdx ), vecStoredFaderTags[iIdx] );
 
         // stored fader levels
         SetNumericIniSet ( section, QString ( "storedfaderlevel%1" ).arg ( iIdx ), vecStoredFaderLevels[iIdx] );

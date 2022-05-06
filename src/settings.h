@@ -50,10 +50,11 @@ public: // common settings
     QString    strLanguage;
 
 protected:
+    int     iReadSettingsVersion;
+    bool    bSettingsLoaded;
     QString strFileName;
     QString strRootSection;
     QString strDataSection;
-    bool    bSettingsLoaded;
 
 protected:
     void SetFileName ( const QString& sNFiName, const QString& sDefaultFileName );
@@ -81,20 +82,31 @@ protected:
     QByteArray FromBase64ToByteArray ( const QString strIn ) const { return QByteArray::fromBase64 ( strIn.toLatin1() ); }
     QString    FromBase64ToString ( const QString strIn ) const { return QString::fromUtf8 ( FromBase64ToByteArray ( strIn ) ); }
 
+    QDomNode FlushNode ( QDomNode& node );
+
     // xml section access functions for read/write
-    // note: if bForceChild == false section itself will be used if it has a matching name (needed for backwards compatibility)
+    // GetSectionForRead  will only return an existing section, returns a Null node if the section does not exist.
+    // GetSectionForWrite will create a new section if the section does not yet exist
+    // note: if bForceChild == false the given section itself will be returned if it has a matching name (needed for backwards compatibility)
+    //       if bForceChild == true  the returned section must be a child of the given section.
     const QDomNode GetSectionForRead ( const QDomNode& section, QString strSectionName, bool bForceChild = true );
     QDomNode       GetSectionForWrite ( QDomNode& section, QString strSectionName, bool bForceChild = true );
 
     // actual working functions for init-file access
-    QString GetIniSetting ( const QDomNode& section, const QString& sKey, const QString& sDefaultVal = "" );
-    bool    PutIniSetting ( QDomNode& section, const QString& sKey, const QString& sValue = "" );
+    bool GetStringIniSet ( const QDomNode& section, const QString& sKey, QString& sValue );
+    bool SetStringIniSet ( QDomNode& section, const QString& sKey, const QString& sValue );
+
+    bool GetBase64StringIniSet ( const QDomNode& section, const QString& sKey, QString& sValue );
+    bool SetBase64StringIniSet ( QDomNode& section, const QString& sKey, const QString& sValue );
+
+    bool GetBase64ByteArrayIniSet ( const QDomNode& section, const QString& sKey, QByteArray& arrValue );
+    bool SetBase64ByteArrayIniSet ( QDomNode& section, const QString& sKey, const QByteArray& arrValue );
 
     bool GetNumericIniSet ( const QDomNode& section, const QString& strKey, const int iRangeStart, const int iRangeStop, int& iValue );
-    void SetNumericIniSet ( QDomNode& section, const QString& strKey, const int iValue = 0 );
+    bool SetNumericIniSet ( QDomNode& section, const QString& strKey, const int iValue = 0 );
 
     bool GetFlagIniSet ( const QDomNode& section, const QString& strKey, bool& bValue );
-    void SetFlagIniSet ( QDomNode& section, const QString& strKey, const bool bValue = false );
+    bool SetFlagIniSet ( QDomNode& section, const QString& strKey, const bool bValue );
 
 protected:
     virtual void WriteSettingsToXML ( QDomNode& root )        = 0;

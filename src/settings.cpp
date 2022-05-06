@@ -24,11 +24,13 @@
 
 #include "settings.h"
 #include <QSettings>
+#include <QApplication>
 #include "util.h"
 
 /* Implementation *************************************************************/
 
 CSettings::CSettings ( bool bIsClient, bool bUseGUI, const QString& iniRootSection, const QString& iniDataSection ) :
+    iReadSettingsVersion ( -1 ),
     bSettingsLoaded ( false ),
     strRootSection ( iniRootSection ),
     strDataSection ( iniDataSection ),
@@ -40,6 +42,10 @@ CSettings::CSettings ( bool bIsClient, bool bUseGUI, const QString& iniRootSecti
 {
     CCommandline::GetArgumentList ( CommandlineArguments );
 
+    // NOTE that when throwing an exception from a constructor the destructor will NOT be called !!
+    //      so this has to be done BEFORE allocating resources that are released in the destructor
+    //      or release the resources before throwing the exception !
+
     if ( !CommandlineOptions.Load ( bIsClient, bUseGUI, CommandlineArguments, false ) )
     {
 #ifdef HEADLESS
@@ -48,11 +54,7 @@ CSettings::CSettings ( bool bIsClient, bool bUseGUI, const QString& iniRootSecti
     }
 }
 
-CSettings::~CSettings()
-{
-    // Somehow this one is called on an exception
-    // but descendant destuctors are not !
-}
+CSettings::~CSettings() {}
 
 bool CSettings::Load()
 {
@@ -71,10 +73,15 @@ bool CSettings::Load()
     {
         if ( bSettingsLoaded )
         {
-            // Save settings with commandline options
-            // bSettingsLoaded is set to false on successfull save to Prevent Saving again from destructors !
-            bSettingsLoaded = !Save();
+            // NOTE that when throwing an exception from a constructor the destructor will NOT be called !!
+            //
+            // Load will now throw an exception but Load() is called from the descendant constuctor, and normally the
+            // the descendant destructor would save the inifile, so we will have to call Save now !
 
+            // Save settings with commandline options
+            Save();
+
+            // bSettingsLoaded is set to false on a successfull save...
             if ( !bSettingsLoaded )
             {
                 // Successful save !
@@ -105,7 +112,7 @@ bool CSettings::Save()
 {
     if ( !bSettingsLoaded )
     {
-        // Do not save invalid settings !
+        // Do not save invalid settings or already saved settings !
         return false;
     }
     // create XML document for storing initialization parameters
@@ -157,15 +164,12 @@ bool CSettings::Save()
                 root.appendChild ( oldRoot );
             }
 
+            // Force GetSectionForWrite
             section.clear();
         }
         else
         {
             section = root.firstChildElement ( strDataSection );
-            if ( !section.isNull() )
-            {
-                section.clear();
-            }
         }
 
         if ( section.isNull() )
@@ -179,12 +183,17 @@ bool CSettings::Save()
         return false;
     }
 
+    // Make sure the section is empty
+    section = FlushNode ( section );
+
     // write the settings in the XML file
     WriteSettingsToXML ( section );
 
     // prepare file name for storing initialization data in XML file and store
     // XML data in file
     WriteToFile ( strFileName, IniXMLDocument );
+
+    bSettingsLoaded = false;
 
     return true;
 }
@@ -221,7 +230,7 @@ bool CSettings::WriteCommandlineArgumentsToXML ( QDomNode& section )
         SetNumericIniSet ( section, "argumentcount", CommandlineArguments.size() );
         for ( int i = 1; i <= argumentCount; i++ )
         {
-            PutIniSetting ( section, QString ( "argument%1" ).arg ( i ), CommandlineArguments[i - 1] );
+            SetBase64StringIniSet ( section, QString ( "argument%1" ).arg ( i ), CommandlineArguments[i - 1] );
         }
 
         return true;
@@ -248,7 +257,7 @@ bool CSettings::ReadCommandlineArgumentsFromXML ( const QDomNode& section )
     {
         for ( int i = 1; i <= argumentCount; i++ )
         {
-            argument = GetIniSetting ( readSection, QString ( "argument%1" ).arg ( i ) );
+            GetBase64StringIniSet ( readSection, QString ( "argument%1" ).arg ( i ), argument );
             if ( !argument.isEmpty() )
             {
                 CommandlineArguments.append ( argument );
@@ -289,58 +298,24 @@ void CSettings::SetFileName ( const QString& sNFiName, const QString& sDefaultFi
     }
 }
 
-void CSettings::SetNumericIniSet ( QDomNode& section, const QString& strKey, const int iValue )
-{
-    // convert input parameter which is an integer to string and store
-    PutIniSetting ( section, strKey, QString::number ( iValue ) );
-}
-
-bool CSettings::GetNumericIniSet ( const QDomNode& section, const QString& strKey, const int iRangeStart, const int iRangeStop, int& iValue )
-{
-    // init return value
-    bool bReturn = false;
-
-    const QString strGetIni = GetIniSetting ( section, strKey );
-
-    // check if it is a valid parameter
-    if ( !strGetIni.isEmpty() )
-    {
-        // convert string from init file to integer
-        iValue = strGetIni.toInt();
-
-        // check range
-        if ( ( iValue >= iRangeStart ) && ( iValue <= iRangeStop ) )
-        {
-            bReturn = true;
-        }
-    }
-
-    return bReturn;
-}
-
-void CSettings::SetFlagIniSet ( QDomNode& section, const QString& strKey, const bool bValue )
-{
-    // we encode true -> "1" and false -> "0"
-    PutIniSetting ( section, strKey, bValue ? "1" : "0" );
-}
-
-bool CSettings::GetFlagIniSet ( const QDomNode& section, const QString& strKey, bool& bValue )
-{
-    // init return value
-    bool bReturn = false;
-
-    const QString strGetIni = GetIniSetting ( section, strKey );
-
-    if ( !strGetIni.isEmpty() )
-    {
-        bValue  = ( strGetIni.toInt() != 0 );
-        bReturn = true;
-    }
-
-    return bReturn;
-}
-
 // Init-file routines using XML ***********************************************
+
+QDomNode CSettings::FlushNode ( QDomNode& node )
+{
+    if ( !node.isNull() )
+    {
+        QDomDocumentFragment toDelete = node.ownerDocument().createDocumentFragment();
+
+        while ( !node.firstChild().isNull() )
+        {
+            toDelete.appendChild ( node.removeChild ( node.firstChild() ) );
+        }
+
+        // Destructor of toDelete should actually delete the children
+    }
+
+    return node;
+}
 
 const QDomNode CSettings::GetSectionForRead ( const QDomNode& section, QString strSectionName, bool bForceChild )
 {
@@ -382,11 +357,9 @@ QDomNode CSettings::GetSectionForWrite ( QDomNode& section, QString strSectionNa
     return section;
 }
 
-QString CSettings::GetIniSetting ( const QDomNode& section, const QString& sKey, const QString& sDefaultVal )
+bool CSettings::GetStringIniSet ( const QDomNode& section, const QString& sKey, QString& sValue )
 {
     // init return parameter with default value
-    QString sResult ( sDefaultVal );
-
     if ( !section.isNull() )
     {
         // get key
@@ -395,14 +368,15 @@ QString CSettings::GetIniSetting ( const QDomNode& section, const QString& sKey,
         if ( !xmlKey.isNull() )
         {
             // get value
-            sResult = xmlKey.text();
+            sValue = xmlKey.text();
+            return true;
         }
     }
 
-    return sResult;
+    return false;
 }
 
-bool CSettings::PutIniSetting ( QDomNode& section, const QString& sKey, const QString& sValue )
+bool CSettings::SetStringIniSet ( QDomNode& section, const QString& sKey, const QString& sValue )
 {
     if ( section.isNull() )
     {
@@ -430,6 +404,89 @@ bool CSettings::PutIniSetting ( QDomNode& section, const QString& sKey, const QS
     {
         // Child should be a text node !
         xmlKey.firstChild().setNodeValue ( sValue );
+        return true;
+    }
+}
+
+bool CSettings::GetBase64StringIniSet ( const QDomNode& section, const QString& sKey, QString& sValue )
+{
+    QString strGetIni;
+
+    if ( GetStringIniSet ( section, sKey, strGetIni ) )
+    {
+        sValue = FromBase64ToString ( strGetIni );
+        return true;
+    }
+
+    return false;
+}
+
+bool CSettings::SetBase64StringIniSet ( QDomNode& section, const QString& sKey, const QString& sValue )
+{
+    return SetStringIniSet ( section, sKey, ToBase64 ( sValue ) );
+}
+
+bool CSettings::GetBase64ByteArrayIniSet ( const QDomNode& section, const QString& sKey, QByteArray& arrValue )
+{
+    QString strGetIni;
+
+    if ( GetStringIniSet ( section, sKey, strGetIni ) )
+    {
+        arrValue = FromBase64ToByteArray ( strGetIni );
+        return true;
+    }
+
+    return false;
+}
+
+bool CSettings::SetBase64ByteArrayIniSet ( QDomNode& section, const QString& sKey, const QByteArray& arrValue )
+{
+    return SetStringIniSet ( section, sKey, ToBase64 ( arrValue ) );
+}
+
+bool CSettings::SetNumericIniSet ( QDomNode& section, const QString& strKey, const int iValue )
+{
+    // convert input parameter which is an integer to string and store
+    return SetStringIniSet ( section, strKey, QString::number ( iValue ) );
+}
+
+bool CSettings::GetNumericIniSet ( const QDomNode& section, const QString& strKey, const int iRangeStart, const int iRangeStop, int& iValue )
+{
+    QString strGetIni;
+
+    if ( GetStringIniSet ( section, strKey, strGetIni ) )
+    {
+        // check if it is a valid parameter
+        if ( !strGetIni.isEmpty() )
+        {
+            // convert string from init file to integer
+            iValue = strGetIni.toInt();
+
+            // check range
+            if ( ( iValue >= iRangeStart ) && ( iValue <= iRangeStop ) )
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool CSettings::SetFlagIniSet ( QDomNode& section, const QString& strKey, const bool bValue )
+{
+    // we encode true -> "1" and false -> "0"
+    return SetStringIniSet ( section, strKey, bValue ? "1" : "0" );
+}
+
+bool CSettings::GetFlagIniSet ( const QDomNode& section, const QString& strKey, bool& bValue )
+{
+    QString strGetIni = "0";
+
+    // we decode true -> number != 0 and false otherwise
+    if ( GetStringIniSet ( section, strKey, strGetIni ) )
+    {
+        bValue = ( strGetIni.toInt() != 0 );
         return true;
     }
 
