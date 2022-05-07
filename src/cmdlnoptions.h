@@ -54,21 +54,20 @@ enum class ECmdlnOptValType
 
 enum class ECmdlnOptCheckResult
 {
-    InvalidLength = -6, // strValue is truncated (CCmndlnStringOption::check result only)
 
     // CCmdlnOptBase::check results
-    InvalidDest = -5, // parameter Ok, but not applicable for destType(s)
-                      // (strParam and strValue will be set, dblValue is set only if it was a number parameter)
-
+    InvalidDest   = -7, // parameter Ok, but not applicable for destType(s)
+    InvalidType   = -6, // defined parameter eValueType is invalid (coding error!)
+    InvalidLength = -5, // strValue is truncated (CCmndlnStringOption::check result only)
     InvalidRange  = -4, // number is out of range
-    InvalidNumber = -3, // parameteris not a number as expected
+    InvalidNumber = -3, // parameter is not a (integer) number as expected
     NoValue       = -2, // missing value (end of commandline after parameter)
     NoParam       = -1, // end of commandline
     NoMatch       = 0,  // no parameter name match
 
     OkFlag   = 1, // name match, flag parameter
     OkString = 2, // name match, String parameter
-    OkNumber = 3  // name match, Ok Number parameter
+    OkNumber = 3  // name match, Ok Number parameter (dblValue param is set to the number by baseCheck)
 };
 
 /******************************************************************************
@@ -85,18 +84,15 @@ public:
         strShortName ( shortName ),
         strLongName ( longName ),
         bDepricated ( false ),
-        strDepricated(),
         pReplacedBy ( NULL )
     {}
 
-    inline bool           IsDepricated() const { return bDepricated; };
-    inline const QString& GetDepricatedMsg() const { return strDepricated; };
+    inline bool IsDepricated() const { return bDepricated; };
 
 protected:
     friend class CCommandlineOptions;
 
     bool                    bDepricated;
-    QString                 strDepricated;
     CCmdlnOptBase*          pReplacedBy;
     bool                    bSet;
     const ECmdlnOptValType  eValueType;
@@ -105,33 +101,40 @@ protected:
     const QString           strLongName;
 
 protected:
-    ECmdlnOptCheckResult doCheck ( ECmdlnOptDestType destType,
-                                   QStringList&      arguments,
-                                   int&              i,
-                                   QString&          strParam,
-                                   QString&          strValue,
-                                   double&           dblValue );
+    ECmdlnOptCheckResult baseCheck ( ECmdlnOptDestType destType,
+                                     QStringList&      arguments,
+                                     int&              i,
+                                     QString&          strParam,
+                                     QString&          strValue,
+                                     double&           dblValue );
 
 protected:
     friend class CSettings;
     friend class CClientSettings;
     friend class CServerSettings;
 
-    void SetIsDepricated ( const QString& strDep, CCmdlnOptBase* pReplacement = NULL )
+    void setIsDepricated ( CCmdlnOptBase* pReplacement = NULL )
     {
-        strDepricated = strDep;
-        pReplacedBy   = pReplacement;
-        bDepricated   = true;
+        pReplacedBy = pReplacement;
+        bDepricated = true;
     }
 
-    void Set();
-    void Unset() { bSet = false; }
+    void set();
+    void unset() { bSet = false; }
 
 public:
     inline bool IsSet() const { return bSet; }
     inline bool IsOption ( const QString& argument ) const { return ( ( argument == strShortName ) || ( argument == strLongName ) ); }
 
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) = 0;
+protected:
+    friend class CCommandlineOptions;
+
+    virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
+                                         ECmdlnOptDestType destType,
+                                         QStringList&      arguments,
+                                         int&              i,
+                                         QString&          strParam,
+                                         QString&          strValue ) = 0;
 };
 
 /******************************************************************************
@@ -148,13 +151,17 @@ public:
 protected:
     friend class CCommandlineOptions;
 
-    inline void SetDepricated ( const QString& strDep, CCmndlnFlagOption* pReplacement = NULL )
-    {
-        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
-    }
+    inline void setDepricated ( CCmndlnFlagOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
+protected:
+    friend class CCommandlineOptions;
+
+    virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
+                                         ECmdlnOptDestType destType,
+                                         QStringList&      arguments,
+                                         int&              i,
+                                         QString&          strParam,
+                                         QString&          strValue ) override;
 };
 
 /******************************************************************************
@@ -188,19 +195,16 @@ protected:
     int     iMaxLen;
     QString strValue;
 
-    inline void SetDepricated ( const QString& strDep, CCmndlnStringOption* pReplacement = NULL )
-    {
-        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
-    }
+    inline void setDepricated ( CCmndlnStringOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-    bool Set ( QString val )
+    bool set ( QString val )
     {
         bool res = true;
 
         if ( pReplacedBy )
         {
             // Set replacement instead...
-            res      = static_cast<CCmndlnStringOption*> ( pReplacedBy )->Set ( val );
+            res      = static_cast<CCmndlnStringOption*> ( pReplacedBy )->set ( val );
             strValue = static_cast<CCmndlnStringOption*> ( pReplacedBy )->strValue;
         }
         else
@@ -214,13 +218,20 @@ protected:
             }
         }
 
-        CCmdlnOptBase::Set();
+        CCmdlnOptBase::set();
 
         return res;
     }
 
-public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
+protected:
+    friend class CCommandlineOptions;
+
+    virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
+                                         ECmdlnOptDestType destType,
+                                         QStringList&      arguments,
+                                         int&              i,
+                                         QString&          strParam,
+                                         QString&          strValue ) override;
 };
 
 /******************************************************************************
@@ -251,19 +262,16 @@ protected:
     double dMin;
     double dMax;
 
-    inline void SetDepricated ( const QString& strDep, CCmndlnDoubleOption* pReplacement = NULL )
-    {
-        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
-    }
+    inline void SetDepricated ( CCmndlnDoubleOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-    bool Set ( double val )
+    bool set ( double val )
     {
         bool res = true;
 
         if ( pReplacedBy )
         {
             // Set replacement instead...
-            res    = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->Set ( val );
+            res    = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->set ( val );
             dValue = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->dValue;
         }
         else
@@ -283,13 +291,20 @@ protected:
             }
         }
 
-        CCmdlnOptBase::Set();
+        CCmdlnOptBase::set();
 
         return res;
     }
 
-public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
+protected:
+    friend class CCommandlineOptions;
+
+    virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
+                                         ECmdlnOptDestType destType,
+                                         QStringList&      arguments,
+                                         int&              i,
+                                         QString&          strParam,
+                                         QString&          strValue ) override;
 };
 
 /******************************************************************************
@@ -320,19 +335,16 @@ protected:
     int iMin;
     int iMax;
 
-    inline void SetDepricated ( const QString& strDep, CCmndlnIntOption* pReplacement = NULL )
-    {
-        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
-    }
+    inline void SetDepricated ( CCmndlnIntOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-    bool Set ( int val )
+    bool set ( int val )
     {
         bool res = true;
 
         if ( pReplacedBy )
         {
             // Set replacement instead...
-            res    = static_cast<CCmndlnIntOption*> ( pReplacedBy )->Set ( val );
+            res    = static_cast<CCmndlnIntOption*> ( pReplacedBy )->set ( val );
             iValue = static_cast<CCmndlnIntOption*> ( pReplacedBy )->iValue;
         }
         else
@@ -352,13 +364,20 @@ protected:
             }
         }
 
-        CCmdlnOptBase::Set();
+        CCmdlnOptBase::set();
 
         return res;
     }
 
-public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
+protected:
+    friend class CCommandlineOptions;
+
+    virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
+                                         ECmdlnOptDestType destType,
+                                         QStringList&      arguments,
+                                         int&              i,
+                                         QString&          strParam,
+                                         QString&          strValue ) override;
 };
 
 /******************************************************************************
@@ -389,19 +408,16 @@ protected:
     unsigned int uiMin;
     unsigned int uiMax;
 
-    inline void SetDepricated ( const QString& strDep, CCmndlnUIntOption* pReplacement = NULL )
-    {
-        CCmdlnOptBase::SetIsDepricated ( strDep, pReplacement );
-    }
+    inline void SetDepricated ( CCmndlnUIntOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-    bool Set ( unsigned int val )
+    bool set ( unsigned int val )
     {
         bool res = true;
 
         if ( pReplacedBy )
         {
             // Set replacement instead...
-            res     = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->Set ( val );
+            res     = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->set ( val );
             uiValue = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->uiValue;
         }
         else
@@ -420,13 +436,20 @@ protected:
             }
         }
 
-        CCmdlnOptBase::Set();
+        CCmdlnOptBase::set();
 
         return res;
     }
 
-public:
-    virtual ECmdlnOptCheckResult check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue ) override;
+protected:
+    friend class CCommandlineOptions;
+
+    virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
+                                         ECmdlnOptDestType destType,
+                                         QStringList&      arguments,
+                                         int&              i,
+                                         QString&          strParam,
+                                         QString&          strValue ) override;
 };
 
 class CCommandlineOptions
@@ -445,7 +468,8 @@ protected:
     bool CCommandlineOptions::showErrorMessage ( ECmdlnOptDestType eDestType,
                                                  const QString&    unknowOptions,
                                                  const QString&    invalidDests,
-                                                 const QString&    invalidParams );
+                                                 const QString&    invalidParams,
+                                                 const QString&    depricatedParams );
 
 public:
     // NOTE: when adding commandline options:

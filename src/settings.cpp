@@ -230,7 +230,7 @@ bool CSettings::WriteCommandlineArgumentsToXML ( QDomNode& section )
         SetNumericIniSet ( section, "argumentcount", CommandlineArguments.size() );
         for ( int i = 1; i <= argumentCount; i++ )
         {
-            SetBase64StringIniSet ( section, QString ( "argument%1" ).arg ( i ), CommandlineArguments[i - 1] );
+            SetBase64StringIniSet ( section, QString ( "arg%1_Base64" ).arg ( i ), CommandlineArguments[i - 1] );
         }
 
         return true;
@@ -257,7 +257,7 @@ bool CSettings::ReadCommandlineArgumentsFromXML ( const QDomNode& section )
     {
         for ( int i = 1; i <= argumentCount; i++ )
         {
-            GetBase64StringIniSet ( readSection, QString ( "argument%1" ).arg ( i ), argument );
+            GetBase64StringIniSet ( readSection, QString ( "arg%1_Base64" ).arg ( i ), argument );
             if ( !argument.isEmpty() )
             {
                 CommandlineArguments.append ( argument );

@@ -180,7 +180,7 @@ public:
     bool GetEnableRecording() const { return CommandlineOptions.norecord.IsSet() ? false : bEnableRecording; }
     void SetEnableRecording ( bool newEnableRecording )
     {
-        CommandlineOptions.norecord.Unset();
+        CommandlineOptions.norecord.unset();
 
         if ( bEnableRecording != newEnableRecording )
         {
@@ -195,7 +195,7 @@ public:
     }
     void SetWelcomeMessage ( const QString& newWelcomeMessage )
     {
-        CommandlineOptions.welcomemessage.Unset();
+        CommandlineOptions.welcomemessage.unset();
 
         if ( strWelcomeMessage != newWelcomeMessage )
         {
@@ -207,7 +207,7 @@ public:
     const QString GetRecordingDir() const { return CommandlineOptions.recording.IsSet() ? CommandlineOptions.recording.Value() : strRecordingDir; }
     void          SetRecordingDir ( const QString& newRecordingDir )
     {
-        CommandlineOptions.recording.Unset();
+        CommandlineOptions.recording.unset();
 
         if ( strRecordingDir != newRecordingDir )
         {
@@ -223,7 +223,7 @@ public:
 
     void SetDirectoryAddress ( const QString& strNewAddress )
     {
-        CommandlineOptions.directoryserver.Unset();
+        CommandlineOptions.directoryserver.unset();
 
         if ( strDirectoryAddress != strNewAddress )
         {
@@ -248,7 +248,7 @@ public:
     }
     void SetServerListFileName ( const QString& strNewServerListFileName )
     {
-        CommandlineOptions.directoryfile.Unset();
+        CommandlineOptions.directoryfile.unset();
 
         if ( strServerListFileName != strNewServerListFileName )
         {
@@ -259,7 +259,7 @@ public:
     bool GetAutoRunMinimized() const { return CommandlineOptions.startminimized.IsSet() ? true : bAutoRunMinimized; }
     void SetAutoRunMinimized ( bool newAutoRunMinimized )
     {
-        CommandlineOptions.startminimized.Unset();
+        CommandlineOptions.startminimized.unset();
 
         if ( bAutoRunMinimized != newAutoRunMinimized )
         {
@@ -271,7 +271,7 @@ public:
     bool GetDelayPan() const { return CommandlineOptions.delaypan.IsSet() ? true : bDelayPan; }
     void SetDelayPan ( bool newDelayPan )
     {
-        CommandlineOptions.delaypan.Unset();
+        CommandlineOptions.delaypan.unset();
 
         if ( bDelayPan != newDelayPan )
         {

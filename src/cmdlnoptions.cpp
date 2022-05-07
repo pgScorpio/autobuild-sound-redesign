@@ -27,10 +27,12 @@
 #include "messages.h"
 
 // Translations:
+//  define a macro for translation here so we can easily turn on/off translation
+//  for all messages created here.
 //  note that translation is probably not yet initialized anyway when loading the commandline options.
 
 #ifdef HEADLESS
-// Do NOT translate in headless mode !
+// Do never translate in headless mode !
 #    define TR( s ) QString ( s )
 #else
 #    define TR( s ) QObject::tr ( s )
@@ -40,20 +42,12 @@
  CCmdlnOptBase: base class for all commandline option classes
  ******************************************************************************/
 
-void CCmdlnOptBase::Set()
+void CCmdlnOptBase::set()
 {
-    if ( bDepricated )
+    if ( bDepricated && pReplacedBy )
     {
-        if ( pReplacedBy )
-        {
-            // if pReplacedBy is set *pReplacedBy should already be set instead !
-            bSet = !pReplacedBy->bSet;
-        }
-
-        if ( !strDepricated.isEmpty() )
-        {
-            CMessages::ShowWarningWait ( strDepricated );
-        }
+        // if pReplacedBy is set and *pReplacedBy is already set don't set this one !
+        bSet = !pReplacedBy->bSet;
     }
     else
     {
@@ -61,12 +55,12 @@ void CCmdlnOptBase::Set()
     }
 }
 
-ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
-                                              QStringList&      arguments,
-                                              int&              i,
-                                              QString&          strParam,
-                                              QString&          strValue,
-                                              double&           dblValue )
+ECmdlnOptCheckResult CCmdlnOptBase::baseCheck ( ECmdlnOptDestType destType,
+                                                QStringList&      arguments,
+                                                int&              i,
+                                                QString&          strParam,
+                                                QString&          strValue,
+                                                double&           dblValue )
 {
     if ( ( i < 0 ) || ( i >= arguments.count() ) )
     {
@@ -102,7 +96,7 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
         }
         else if ( strValue[0] == "-" )
         {
-            // One should use "" if string starts with - !
+            // One should use quotes if a string parameter value starts with - !
             strValue.clear();
             res = ECmdlnOptCheckResult::NoValue;
         }
@@ -121,9 +115,9 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
         }
         else
         {
-            char* p;
-            dblValue = strtod ( arguments[iValue].toLocal8Bit(), &p );
-            if ( *p )
+            bool dblOk;
+            dblValue = strValue.toDouble ( &dblOk );
+            if ( !dblOk )
             {
                 res = ECmdlnOptCheckResult::InvalidNumber;
             }
@@ -142,7 +136,7 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
                     }
                     else
                     {
-                        unsigned int n = dblValue;
+                        unsigned int n = static_cast<unsigned int> ( dblValue );
                         if ( n != dblValue )
                         {
                             // not an integer !
@@ -158,7 +152,7 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
                     }
                     else
                     {
-                        int n = dblValue;
+                        int n = static_cast<int> ( dblValue );
                         if ( n != dblValue )
                         {
                             // not an integer !
@@ -168,7 +162,10 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
                     break;
 
                 case ECmdlnOptValType::Double:
+                    break;
+
                 default:
+                    res = ECmdlnOptCheckResult::InvalidType;
                     break;
                 }
             }
@@ -188,15 +185,20 @@ ECmdlnOptCheckResult CCmdlnOptBase::doCheck ( ECmdlnOptDestType destType,
  CCmndlnFlagOption: Defines a Flag commandline option
  ******************************************************************************/
 
-ECmdlnOptCheckResult CCmndlnFlagOption::check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue )
+ECmdlnOptCheckResult CCmndlnFlagOption::check ( bool              bNoOverride,
+                                                ECmdlnOptDestType destType,
+                                                QStringList&      arguments,
+                                                int&              i,
+                                                QString&          strParam,
+                                                QString&          strValue )
 {
     double dblValue;
 
-    ECmdlnOptCheckResult CheckRes = doCheck ( destType, arguments, i, strParam, strValue, dblValue );
+    ECmdlnOptCheckResult CheckRes = baseCheck ( destType, arguments, i, strParam, strValue, dblValue );
 
-    if ( CheckRes == ECmdlnOptCheckResult::OkFlag )
+    if ( ( CheckRes == ECmdlnOptCheckResult::OkFlag ) && !( bSet && bNoOverride ) )
     {
-        Set();
+        set();
     }
 
     return CheckRes;
@@ -206,17 +208,48 @@ ECmdlnOptCheckResult CCmndlnFlagOption::check ( ECmdlnOptDestType destType, QStr
 CCmndlnStringOption: Defines a String commandline option
 ******************************************************************************/
 
-ECmdlnOptCheckResult CCmndlnStringOption::check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue )
+ECmdlnOptCheckResult CCmndlnStringOption::check ( bool              bNoOverride,
+                                                  ECmdlnOptDestType destType,
+                                                  QStringList&      arguments,
+                                                  int&              i,
+                                                  QString&          strParam,
+                                                  QString&          strValue )
 {
     double dblValue;
 
-    ECmdlnOptCheckResult CheckRes = doCheck ( destType, arguments, i, strParam, strValue, dblValue );
+    ECmdlnOptCheckResult CheckRes = baseCheck ( destType, arguments, i, strParam, strValue, dblValue );
 
-    if ( CheckRes == ECmdlnOptCheckResult::OkString )
+    if ( ( CheckRes == ECmdlnOptCheckResult::OkString ) && !( bSet && bNoOverride ) )
     {
-        if ( !Set ( strValue ) )
+        if ( !set ( strValue ) )
         {
             CheckRes = ECmdlnOptCheckResult::InvalidLength;
+        }
+    }
+
+    return CheckRes;
+}
+
+/******************************************************************************
+CCmndlnDoubleOption: Defines a real number commandline option
+******************************************************************************/
+
+ECmdlnOptCheckResult CCmndlnDoubleOption::check ( bool              bNoOverride,
+                                                  ECmdlnOptDestType destType,
+                                                  QStringList&      arguments,
+                                                  int&              i,
+                                                  QString&          strParam,
+                                                  QString&          strValue )
+{
+    double dblValue;
+
+    ECmdlnOptCheckResult CheckRes = baseCheck ( destType, arguments, i, strParam, strValue, dblValue );
+
+    if ( ( CheckRes == ECmdlnOptCheckResult::OkNumber ) && !( bSet && bNoOverride ) )
+    {
+        if ( !set ( dblValue ) )
+        {
+            CheckRes = ECmdlnOptCheckResult::InvalidRange;
         }
     }
 
@@ -227,15 +260,20 @@ ECmdlnOptCheckResult CCmndlnStringOption::check ( ECmdlnOptDestType destType, QS
 CCmndlnIntOption: Defines an integer commandline option
 ******************************************************************************/
 
-ECmdlnOptCheckResult CCmndlnIntOption::check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue )
+ECmdlnOptCheckResult CCmndlnIntOption::check ( bool              bNoOverride,
+                                               ECmdlnOptDestType destType,
+                                               QStringList&      arguments,
+                                               int&              i,
+                                               QString&          strParam,
+                                               QString&          strValue )
 {
     double dblValue;
 
-    ECmdlnOptCheckResult CheckRes = doCheck ( destType, arguments, i, strParam, strValue, dblValue );
+    ECmdlnOptCheckResult CheckRes = baseCheck ( destType, arguments, i, strParam, strValue, dblValue );
 
-    if ( CheckRes == ECmdlnOptCheckResult::OkNumber )
+    if ( ( CheckRes == ECmdlnOptCheckResult::OkNumber ) && !( bSet && bNoOverride ) )
     {
-        if ( !Set ( static_cast<int> ( dblValue ) ) )
+        if ( !set ( static_cast<int> ( dblValue ) ) )
         {
             CheckRes = ECmdlnOptCheckResult::InvalidRange;
         }
@@ -248,24 +286,21 @@ ECmdlnOptCheckResult CCmndlnIntOption::check ( ECmdlnOptDestType destType, QStri
  CCmndlnUIntOption: Defines a unsigned int commandline option
  ******************************************************************************/
 
-ECmdlnOptCheckResult CCmndlnUIntOption::check ( ECmdlnOptDestType destType, QStringList& arguments, int& i, QString& strParam, QString& strValue )
+ECmdlnOptCheckResult CCmndlnUIntOption::check ( bool              bNoOverride,
+                                                ECmdlnOptDestType destType,
+                                                QStringList&      arguments,
+                                                int&              i,
+                                                QString&          strParam,
+                                                QString&          strValue )
 {
     double dblValue;
 
-    ECmdlnOptCheckResult CheckRes = doCheck ( destType, arguments, i, strParam, strValue, dblValue );
+    ECmdlnOptCheckResult CheckRes = baseCheck ( destType, arguments, i, strParam, strValue, dblValue );
 
-    if ( CheckRes == ECmdlnOptCheckResult::OkNumber )
+    if ( ( CheckRes == ECmdlnOptCheckResult::OkNumber ) && !( bSet && bNoOverride ) )
     {
-        uiValue = static_cast<int> ( dblValue );
-        bSet    = true;
-        if ( uiValue < uiMin )
+        if ( !set ( static_cast<unsigned int> ( dblValue ) ) )
         {
-            uiValue  = uiMin;
-            CheckRes = ECmdlnOptCheckResult::InvalidRange;
-        }
-        else if ( uiValue > uiMax )
-        {
-            uiValue  = uiMax;
             CheckRes = ECmdlnOptCheckResult::InvalidRange;
         }
     }
@@ -331,50 +366,67 @@ CCommandlineOptions::CCommandlineOptions() :
     special ( ECmdlnOptDestType::Common, CMDLN_SPECIAL ),
     store ( ECmdlnOptDestType::Common, "--store", "--store" )
 {
-    centralserver.SetDepricated ( "--centralserver is depricated, please use --directoryserver instead", &directoryserver );
+    centralserver.setDepricated ( &directoryserver );
 }
 
 bool CCommandlineOptions::showErrorMessage ( ECmdlnOptDestType eDestType,
                                              const QString&    unknowOptions,
                                              const QString&    invalidDests,
-                                             const QString&    invalidParams )
+                                             const QString&    invalidParams,
+                                             const QString&    depricatedParams )
 {
-    bool    ok      = !( unknowOptions.size() || invalidDests.size() || invalidParams.size() || unknowOptions.size() );
-    QString msgHelp = QString ( htmlNewLine() htmlNewLine() ) + TR ( "Run %1 %2 for the valid commandline parameters." ).arg ( APP_NAME, "--help" );
+    bool ok = !( unknowOptions.size() || invalidDests.size() || invalidParams.size() || unknowOptions.size() || depricatedParams.size() );
 
-    if ( !ok )
+    if ( ok )
     {
-        QString message;
-
-        if ( invalidDests.size() )
-        {
-            if ( eDestType == ECmdlnOptDestType::Client )
-            {
-                message = TR ( "These commandline option(s) are not valid for %1 mode" ).arg ( TR ( "Client" ) );
-            }
-            else if ( eDestType == ECmdlnOptDestType::Server )
-            {
-                message = TR ( "These commandline option(s) are not valid for %1 mode" ).arg ( TR ( "Server" ) );
-            }
-            else
-            {
-                message = TR ( "Invalid commandline option(s)" );
-            }
-            CMessages::ShowErrorWait ( htmlBold ( message + ":" ) htmlNewLine() + invalidDests + msgHelp );
-        }
-        else if ( invalidParams.size() )
-        {
-            message = TR ( "Commandline option(s) with invalid values" );
-            CMessages::ShowErrorWait ( htmlBold ( message + ":" ) htmlNewLine() + invalidParams );
-        }
-        else if ( unknowOptions.size() )
-        {
-            message = TR ( "Unknown commandline option(s)" );
-            CMessages::ShowErrorWait ( htmlBold ( message + ":" ) htmlNewLine() + unknowOptions + msgHelp );
-        }
+        return false;
     }
 
-    return !ok;
+    QString message = htmlBold ( TR ( "Commandline option errors" ) + ":" ) + htmlNewLine() htmlNewLine();
+    QString msgHelp = QString ( htmlNewLine() ) + TR ( "Run %1 %2 for help on commandline options." ).arg ( APP_NAME, "--help" );
+
+    if ( invalidDests.size() )
+    {
+        if ( eDestType == ECmdlnOptDestType::Client )
+        {
+            message += htmlBold ( TR ( "These commandline option(s) are not valid for %1 mode" ).arg ( TR ( "Client" ) ) );
+        }
+        else if ( eDestType == ECmdlnOptDestType::Server )
+        {
+            message += htmlBold ( TR ( "These commandline option(s) are not valid for %1 mode" ).arg ( TR ( "Server" ) ) );
+        }
+        else
+        {
+            message += htmlBold ( TR ( "Invalid commandline option(s)" ) );
+        }
+        message += ":" htmlNewLine() + invalidDests + htmlNewLine();
+    }
+
+    if ( invalidParams.size() )
+    {
+        message += htmlBold ( TR ( "Commandline option(s) with invalid values" ) );
+        message += ":" htmlNewLine() + invalidParams + htmlNewLine();
+    }
+
+    if ( depricatedParams.size() )
+    {
+        message += htmlBold ( TR ( "Depricated commandline option(s)" ) );
+        message += ":" htmlNewLine() + depricatedParams + htmlNewLine();
+    }
+
+    if ( unknowOptions.size() )
+    {
+        message += htmlBold ( TR ( "Unknown commandline option(s)" ) );
+        message += ":" htmlNewLine() + unknowOptions + htmlNewLine();
+    }
+
+    message += msgHelp;
+    if ( !CMessages::ShowErrorWait ( message, TR ( "Ignore" ), TR ( "Exit" ), false ) )
+    {
+        throw CErrorExit ( TR ( "Aborted on Commandline Option errors" ), 1 );
+    }
+
+    return true;
 }
 
 bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& arguments, bool bIsStored )
@@ -434,6 +486,7 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
     QString unknowOptions;
     QString invalidDests;
     QString invalidParams;
+    QString depricatedParams;
 
     for ( int i = 0; i < arguments.size(); i++ )
     {
@@ -441,7 +494,7 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
 
         for ( int option = 0; option < optionsCount; option++ )
         {
-            ECmdlnOptCheckResult res = cmdLineOption[option]->check ( eDestType, arguments, i, strParam, strValue );
+            ECmdlnOptCheckResult res = cmdLineOption[option]->check ( bIsStored, eDestType, arguments, i, strParam, strValue );
             optionFound              = ( res != ECmdlnOptCheckResult::NoMatch );
 
             switch ( res )
@@ -460,7 +513,7 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
             case ECmdlnOptCheckResult::InvalidLength:
             case ECmdlnOptCheckResult::InvalidRange:
             case ECmdlnOptCheckResult::InvalidNumber:
-                invalidParams += " " + strParam;
+                invalidParams += " " + strParam + " " + strValue;
                 break;
 
             case ECmdlnOptCheckResult::OkFlag:
@@ -473,6 +526,10 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
 
             if ( optionFound )
             {
+                if ( cmdLineOption[option]->IsDepricated() )
+                {
+                    depricatedParams += " " + strParam;
+                }
                 break;
             }
         }
@@ -486,10 +543,12 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
         }
     }
 
-    if ( !showErrorMessage ( eDestType, unknowOptions, invalidDests, invalidParams ) )
+    // Check for errors
+    if ( !showErrorMessage ( eDestType, unknowOptions, invalidDests, invalidParams, depricatedParams ) )
     {
         if ( !bIsStored )
         {
+            // Check for commandline arguments to store
             if ( store.IsSet() )
             {
                 QString argument;
@@ -511,6 +570,7 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
                     }
                     else
                     {
+                        // return arguments to be stored
                         StoreCommandlineArguments.append ( argument );
                     }
                 }
@@ -519,6 +579,7 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
             }
             else
             {
+                // return NO arguments to be stored
                 arguments.clear();
             }
         }
@@ -527,23 +588,23 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
 
         if ( bIsClient && server.IsSet() )
         {
-            server.Unset();
+            server.unset();
             CMessages::ShowWarningWait ( message.arg ( TR ( "Client" ) ) );
         }
         else if ( !bIsClient && !server.IsSet() )
         {
-            server.Set();
+            server.set();
             CMessages::ShowWarningWait ( message.arg ( TR ( "Server" ) ) );
         }
 
         if ( bUseGUI && nogui.IsSet() )
         {
-            nogui.Unset();
+            nogui.unset();
             CMessages::ShowWarningWait ( message.arg ( TR ( "GUI" ) ) );
         }
         else if ( !bUseGUI && !nogui.IsSet() )
         {
-            nogui.Set();
+            nogui.set();
             CMessages::ShowWarningWait ( message.arg ( TR ( "HEADLESS" ) ) );
         }
 
@@ -552,6 +613,7 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
 
     if ( !bIsStored )
     {
+        // return NO arguments to be stored
         arguments.clear();
     }
 
