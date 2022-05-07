@@ -28,6 +28,16 @@
 #include <float.h>
 
 /******************************************************************************
+ Helpers:
+ ******************************************************************************/
+
+extern bool GetServerInfo ( const QString strServerInfo, QString& strServerName, QString& strServerCity, QLocale::Country& eServerCountry );
+extern void SetServerInfo ( QString&               strServerInfo,
+                            const QString&         strServerName,
+                            const QString&         strServerCity,
+                            const QLocale::Country eServerCountry );
+
+/******************************************************************************
  CmdlnOptions classes:
  ******************************************************************************/
 
@@ -58,7 +68,7 @@ enum class ECmdlnOptCheckResult
     // CCmdlnOptBase::check results
     InvalidDest   = -7, // parameter Ok, but not applicable for destType(s)
     InvalidType   = -6, // defined parameter eValueType is invalid (coding error!)
-    InvalidLength = -5, // strValue is truncated (CCmndlnStringOption::check result only)
+    InvalidString = -5, // string content invalid (truncated ?)
     InvalidRange  = -4, // number is out of range
     InvalidNumber = -3, // parameter is not a (integer) number as expected
     NoValue       = -2, // missing value (end of commandline after parameter)
@@ -76,6 +86,11 @@ enum class ECmdlnOptCheckResult
 
 class CCmdlnOptBase
 {
+    friend class CCommandlineOptions;
+    friend class CSettings;
+    friend class CClientSettings;
+    friend class CServerSettings;
+
 public:
     CCmdlnOptBase ( ECmdlnOptValType valueType, ECmdlnOptDestType destType, const QString& shortName, const QString& longName ) :
         bSet ( false ),
@@ -109,17 +124,13 @@ protected:
                                      double&           dblValue );
 
 protected:
-    friend class CSettings;
-    friend class CClientSettings;
-    friend class CServerSettings;
-
     void setIsDepricated ( CCmdlnOptBase* pReplacement = NULL )
     {
         pReplacedBy = pReplacement;
         bDepricated = true;
     }
 
-    void set();
+    bool set();
     void unset() { bSet = false; }
 
 public:
@@ -127,7 +138,7 @@ public:
     inline bool IsOption ( const QString& argument ) const { return ( ( argument == strShortName ) || ( argument == strLongName ) ); }
 
 protected:
-    friend class CCommandlineOptions;
+    virtual void clear() { unset(); }
 
     virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
                                          ECmdlnOptDestType destType,
@@ -143,18 +154,20 @@ protected:
 
 class CCmndlnFlagOption : public CCmdlnOptBase
 {
+    friend class CCommandlineOptions;
+
 public:
     CCmndlnFlagOption ( ECmdlnOptDestType destType, const QString& shortName, const QString& longName ) :
         CCmdlnOptBase ( ECmdlnOptValType::Flag, destType, shortName, longName )
     {}
 
 protected:
-    friend class CCommandlineOptions;
-
     inline void setDepricated ( CCmndlnFlagOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
 protected:
-    friend class CCommandlineOptions;
+    virtual void clear() { unset(); }
+
+    virtual bool set() { return CCmdlnOptBase::set(); }
 
     virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
                                          ECmdlnOptDestType destType,
@@ -170,6 +183,8 @@ protected:
 
 class CCmndlnStringOption : public CCmdlnOptBase
 {
+    friend class CCommandlineOptions;
+
 public:
     CCmndlnStringOption ( ECmdlnOptDestType destType,
                           const QString&    shortName,
@@ -181,50 +196,22 @@ public:
         strValue ( defVal )
     {}
 
-    void Clear()
-    {
-        strValue.clear();
-        bSet = false;
-    }
-
     inline const QString& Value() const { return strValue; }
 
 protected:
-    friend class CCommandlineOptions;
-
     int     iMaxLen;
     QString strValue;
 
     inline void setDepricated ( CCmndlnStringOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-    bool set ( QString val )
+protected:
+    virtual void clear()
     {
-        bool res = true;
-
-        if ( pReplacedBy )
-        {
-            // Set replacement instead...
-            res      = static_cast<CCmndlnStringOption*> ( pReplacedBy )->set ( val );
-            strValue = static_cast<CCmndlnStringOption*> ( pReplacedBy )->strValue;
-        }
-        else
-        {
-            strValue = val;
-
-            if ( strValue > iMaxLen )
-            {
-                strValue.truncate ( iMaxLen );
-                res = false;
-            }
-        }
-
-        CCmdlnOptBase::set();
-
-        return res;
+        strValue.clear();
+        bSet = false;
     }
 
-protected:
-    friend class CCommandlineOptions;
+    virtual bool set ( QString val );
 
     virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
                                          ECmdlnOptDestType destType,
@@ -235,11 +222,76 @@ protected:
 };
 
 /******************************************************************************
+ CCmndlnStringListOption: Defines a commandline option containing a ; separated stringlist
+ ******************************************************************************/
+
+class CCmndlnStringListOption : public CCmndlnStringOption
+{
+    friend class CCommandlineOptions;
+
+public:
+    CCmndlnStringListOption ( ECmdlnOptDestType destType,
+                              const QString&    shortName,
+                              const QString&    longName,
+                              const QString     defVal = "",
+                              int               maxLen = -1 ) :
+        CCmndlnStringOption ( destType, shortName, longName, defVal, maxLen ),
+        strList()
+    {}
+
+    inline const QStringList& Value() const { return strList; }
+    inline int                Size() const { return strList.size(); }
+
+    inline const QString operator[] ( int index ) const
+    {
+        if ( ( index >= 0 ) && ( index < strList.size() ) )
+        {
+            return strList[index];
+        }
+
+        return QString();
+    }
+
+protected:
+    QStringList strList;
+
+protected:
+    virtual void clear()
+    {
+        CCmndlnStringOption::clear();
+        strList.clear();
+    }
+
+    virtual bool set ( QString val )
+    {
+        bool res = CCmndlnStringOption::set ( val );
+
+        if ( bSet )
+        {
+            strList = strValue.split ( ";" );
+            strValue.clear();
+        }
+
+        return res;
+    }
+    /*
+        virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
+                                             ECmdlnOptDestType destType,
+                                             QStringList&      arguments,
+                                             int&              i,
+                                             QString&          strParam,
+                                             QString&          strValue ) override;
+    */
+};
+
+/******************************************************************************
  CCmndlnDoubleOption: Defines a double commandline option
  ******************************************************************************/
 
 class CCmndlnDoubleOption : public CCmdlnOptBase
 {
+    friend class CCommandlineOptions;
+
 public:
     CCmndlnDoubleOption ( ECmdlnOptDestType destType,
                           const QString&    shortName,
@@ -256,48 +308,20 @@ public:
     inline double Value() { return dValue; };
 
 protected:
-    friend class CCommandlineOptions;
-
     double dValue;
     double dMin;
     double dMax;
 
     inline void SetDepricated ( CCmndlnDoubleOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-    bool set ( double val )
+protected:
+    virtual void clear()
     {
-        bool res = true;
-
-        if ( pReplacedBy )
-        {
-            // Set replacement instead...
-            res    = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->set ( val );
-            dValue = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->dValue;
-        }
-        else
-        {
-            dValue = val;
-            bSet   = true;
-
-            if ( dValue < dMin )
-            {
-                dValue = dMin;
-                res    = false;
-            }
-            else if ( dValue > dMax )
-            {
-                dValue = dMax;
-                res    = false;
-            }
-        }
-
-        CCmdlnOptBase::set();
-
-        return res;
+        unset();
+        dValue = 0;
     }
 
-protected:
-    friend class CCommandlineOptions;
+    virtual bool set ( double val );
 
     virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
                                          ECmdlnOptDestType destType,
@@ -313,6 +337,8 @@ protected:
 
 class CCmndlnIntOption : public CCmdlnOptBase
 {
+    friend class CCommandlineOptions;
+
 public:
     CCmndlnIntOption ( ECmdlnOptDestType destType,
                        const QString&    shortName,
@@ -329,48 +355,21 @@ public:
     inline unsigned int Value() { return iValue; };
 
 protected:
-    friend class CCommandlineOptions;
-
     int iValue;
     int iMin;
     int iMax;
 
     inline void SetDepricated ( CCmndlnIntOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-    bool set ( int val )
+public:
+    virtual void clear()
     {
-        bool res = true;
-
-        if ( pReplacedBy )
-        {
-            // Set replacement instead...
-            res    = static_cast<CCmndlnIntOption*> ( pReplacedBy )->set ( val );
-            iValue = static_cast<CCmndlnIntOption*> ( pReplacedBy )->iValue;
-        }
-        else
-        {
-            iValue = val;
-            bSet   = true;
-
-            if ( iValue < iMin )
-            {
-                iValue = iMin;
-                res    = false;
-            }
-            else if ( iValue > iMax )
-            {
-                iValue = iMax;
-                res    = false;
-            }
-        }
-
-        CCmdlnOptBase::set();
-
-        return res;
+        unset();
+        iValue = 0;
     }
 
 protected:
-    friend class CCommandlineOptions;
+    virtual bool set ( int val );
 
     virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
                                          ECmdlnOptDestType destType,
@@ -402,47 +401,20 @@ public:
     inline unsigned int Value() { return uiValue; };
 
 protected:
-    friend class CCommandlineOptions;
-
     unsigned int uiValue;
     unsigned int uiMin;
     unsigned int uiMax;
 
     inline void SetDepricated ( CCmndlnUIntOption* pReplacement = NULL ) { CCmdlnOptBase::setIsDepricated ( pReplacement ); }
 
-    bool set ( unsigned int val )
+protected:
+    virtual void clear()
     {
-        bool res = true;
-
-        if ( pReplacedBy )
-        {
-            // Set replacement instead...
-            res     = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->set ( val );
-            uiValue = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->uiValue;
-        }
-        else
-        {
-            uiValue = val;
-
-            if ( uiValue < uiMin )
-            {
-                uiValue = uiMin;
-                res     = false;
-            }
-            else if ( uiValue > uiMax )
-            {
-                uiValue = uiMax;
-                res     = false;
-            }
-        }
-
-        CCmdlnOptBase::set();
-
-        return res;
+        unset();
+        uiValue = 0;
     }
 
-protected:
-    friend class CCommandlineOptions;
+    virtual bool set ( unsigned int val );
 
     virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
                                          ECmdlnOptDestType destType,
@@ -452,14 +424,67 @@ protected:
                                          QString&          strValue ) override;
 };
 
+/******************************************************************************
+ CCmndlnServerInfoOption: Compound StringOption with server info
+ ******************************************************************************/
+
+class CCmndlnServerInfoOption : public CCmndlnStringOption
+{
+    friend class CCommandlineOptions;
+
+public:
+    CCmndlnServerInfoOption ( ECmdlnOptDestType destType,
+                              const QString&    shortName,
+                              const QString&    longName,
+                              const QString     defVal = "",
+                              int               maxLen = -1 ) :
+        CCmndlnStringOption ( destType, shortName, longName, defVal, maxLen ),
+        strServerName(),
+        strServerCity(),
+        eServerCountry ( QLocale::AnyCountry )
+    {}
+
+    const QString&   GetServerName() const { return strServerName; }
+    const QString&   GetServerCity() const { return strServerCity; }
+    QLocale::Country GetServerCountry() const { return eServerCountry; }
+
+protected:
+    QString          strServerName;
+    QString          strServerCity;
+    QLocale::Country eServerCountry;
+
+public:
+    virtual void clear()
+    {
+        CCmndlnStringOption::clear();
+        strServerName.clear();
+        strServerCity.clear();
+        eServerCountry = QLocale::AnyCountry;
+    }
+
+protected:
+    virtual bool set ( QString val ) override;
+
+    virtual ECmdlnOptCheckResult check ( bool              bNoOverride,
+                                         ECmdlnOptDestType destType,
+                                         QStringList&      arguments,
+                                         int&              i,
+                                         QString&          strParam,
+                                         QString&          strValue ) override;
+};
+
+/******************************************************************************
+ CCommandlineOptions: The class containing all commandline options
+ ******************************************************************************/
+
 class CCommandlineOptions
 {
 public:
     CCommandlineOptions();
 
     // Load: Parses commandline and sets all given options.
-    //       if bIsStored == false we are parsing the real commandline and arguments will contain the arguments to store on return
-    //       if bIsStored == true we are parsing the stored commandline arguments and arguments will be unchanged on return
+    //       if bIsStored == false we are parsing the real commandline and on return arguments will contain any arguments to store
+    //       if bIsStored == true we are parsing the stored commandline arguments and on return arguments will be unchanged
     bool Load ( bool bIsClient, bool bUseGUI, QStringList& arguments, bool bIsStored );
 
 protected:
@@ -476,17 +501,16 @@ public:
     //       first add short/long option name definitions in cmdline.h
     //       then add the appropriate option class here (name should be the same as the option long name)
     //       init the option class in the CCommandlineOptions constructor
-    //       add the option to the array in the CCommandlineOptions::Load function
+    //       and add the option to the array in the CCommandlineOptions::Load function
 
     // NOTE: server and nogui are read seperately in main. main corrects them depending on build configurarion
     //       and passes bIsClientand bUseGui to the Load function which will adjust server and nogui accordingly
 
     // NOTE: since the server option itself is already checked in main and, if it is present,
-    //       CommandlineOptions are loaded as Server, as so --server is a server-only option here
+    //       CommandlineOptions are loaded for Server mode, as so --server is a server-only option here
 
-    // NOTE: help and version are not in this list, since they are handled in main
-    //       and CommandlineOptions are never loaded when any of those are on the commandline
-    //       since main will exit before that.
+    // NOTE: help and version are not in this list, since they are already handled in main
+    //       and, since main will exit with one of these parameters, CommandlineOptions will never be created/loaded.
 
     // Common options:
     CCmndlnStringOption inifile;
@@ -511,25 +535,25 @@ public:
     CCmndlnFlagOption showanalyzerconsole;
 
     // Server Only options:
-    CCmndlnFlagOption   server;
-    CCmndlnFlagOption   discononquit;
-    CCmndlnStringOption directoryserver;
-    CCmndlnStringOption directoryfile;
-    CCmndlnStringOption listfilter;
-    CCmndlnFlagOption   fastupdate;
-    CCmndlnStringOption log;
-    CCmndlnFlagOption   licence;
-    CCmndlnStringOption htmlstatus;
-    CCmndlnStringOption serverinfo;
-    CCmndlnStringOption serverpublicip;
-    CCmndlnFlagOption   delaypan;
-    CCmndlnStringOption recording;
-    CCmndlnFlagOption   norecord;
-    CCmndlnStringOption serverbindip;
-    CCmndlnFlagOption   multithreading;
-    CCmndlnUIntOption   numchannels;
-    CCmndlnStringOption welcomemessage;
-    CCmndlnFlagOption   startminimized;
+    CCmndlnFlagOption       server;
+    CCmndlnFlagOption       discononquit;
+    CCmndlnStringOption     directoryserver;
+    CCmndlnStringOption     directoryfile;
+    CCmndlnStringOption     listfilter;
+    CCmndlnFlagOption       fastupdate;
+    CCmndlnStringOption     log;
+    CCmndlnFlagOption       licence;
+    CCmndlnStringOption     htmlstatus;
+    CCmndlnServerInfoOption serverinfo;
+    CCmndlnStringOption     serverpublicip;
+    CCmndlnFlagOption       delaypan;
+    CCmndlnStringOption     recording;
+    CCmndlnFlagOption       norecord;
+    CCmndlnStringOption     serverbindip;
+    CCmndlnFlagOption       multithreading;
+    CCmndlnUIntOption       numchannels;
+    CCmndlnStringOption     welcomemessage;
+    CCmndlnFlagOption       startminimized;
 
     // Special options:
     CCmndlnFlagOption special;

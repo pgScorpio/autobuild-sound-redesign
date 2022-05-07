@@ -39,10 +39,64 @@
 #endif
 
 /******************************************************************************
+ Helpers:
+ ******************************************************************************/
+
+bool GetServerInfo ( const QString strServerInfo, QString& strServerName, QString& strServerCity, QLocale::Country& eServerCountry )
+{
+    bool ok = false;
+
+    strServerName.clear();
+    strServerCity.clear();
+    eServerCountry = QLocale::AnyCountry;
+
+    if ( !strServerInfo.isEmpty() )
+    {
+        // split the info string
+        QStringList slServInfoSeparateParams = strServerInfo.split ( ";" );
+        int         iServInfoNumSplitItems   = slServInfoSeparateParams.count();
+
+        if ( iServInfoNumSplitItems >= 1 )
+        {
+            ok            = ( !strServerName.isEmpty() && strServerName.length() <= MAX_LEN_SERVER_NAME );
+            strServerName = slServInfoSeparateParams[0].left ( MAX_LEN_SERVER_NAME );
+
+            if ( iServInfoNumSplitItems >= 2 )
+            {
+                ok &= ( strServerCity.length() <= MAX_LEN_SERVER_CITY );
+                strServerCity = slServInfoSeparateParams[1].left ( MAX_LEN_SERVER_CITY );
+
+                if ( iServInfoNumSplitItems >= 3 )
+                {
+                    bool      countryOk;
+                    const int iCountry = slServInfoSeparateParams[2].toInt ( &countryOk );
+                    ok &= countryOk;
+                    if ( countryOk && ( iCountry >= 0 ) && ( iCountry <= QLocale::LastCountry ) )
+                    {
+                        eServerCountry = static_cast<QLocale::Country> ( iCountry );
+                    }
+                }
+            }
+        }
+    }
+
+    return ok;
+}
+
+void SetServerInfo ( QString& strServerInfo, const QString& strServerName, const QString& strServerCity, const QLocale::Country eServerCountry )
+{
+    strServerInfo = strServerName;
+    strServerInfo += ";";
+    strServerInfo += strServerCity;
+    strServerInfo += ";";
+    strServerInfo += (int) eServerCountry;
+}
+
+/******************************************************************************
  CCmdlnOptBase: base class for all commandline option classes
  ******************************************************************************/
 
-void CCmdlnOptBase::set()
+bool CCmdlnOptBase::set()
 {
     if ( bDepricated && pReplacedBy )
     {
@@ -53,6 +107,8 @@ void CCmdlnOptBase::set()
     {
         bSet = true;
     }
+
+    return bSet;
 }
 
 ECmdlnOptCheckResult CCmdlnOptBase::baseCheck ( ECmdlnOptDestType destType,
@@ -208,6 +264,32 @@ ECmdlnOptCheckResult CCmndlnFlagOption::check ( bool              bNoOverride,
 CCmndlnStringOption: Defines a String commandline option
 ******************************************************************************/
 
+bool CCmndlnStringOption::set ( QString val )
+{
+    bool res = true;
+
+    if ( pReplacedBy )
+    {
+        // Set replacement instead...
+        res      = static_cast<CCmndlnStringOption*> ( pReplacedBy )->set ( val );
+        strValue = static_cast<CCmndlnStringOption*> ( pReplacedBy )->strValue;
+    }
+    else
+    {
+        strValue = val;
+
+        if ( strValue > iMaxLen )
+        {
+            strValue.truncate ( iMaxLen );
+            res = false;
+        }
+    }
+
+    CCmdlnOptBase::set();
+
+    return res;
+}
+
 ECmdlnOptCheckResult CCmndlnStringOption::check ( bool              bNoOverride,
                                                   ECmdlnOptDestType destType,
                                                   QStringList&      arguments,
@@ -223,7 +305,7 @@ ECmdlnOptCheckResult CCmndlnStringOption::check ( bool              bNoOverride,
     {
         if ( !set ( strValue ) )
         {
-            CheckRes = ECmdlnOptCheckResult::InvalidLength;
+            CheckRes = ECmdlnOptCheckResult::InvalidString;
         }
     }
 
@@ -233,6 +315,38 @@ ECmdlnOptCheckResult CCmndlnStringOption::check ( bool              bNoOverride,
 /******************************************************************************
 CCmndlnDoubleOption: Defines a real number commandline option
 ******************************************************************************/
+
+bool CCmndlnDoubleOption::set ( double val )
+{
+    bool res = true;
+
+    if ( pReplacedBy )
+    {
+        // Set replacement instead...
+        res    = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->set ( val );
+        dValue = static_cast<CCmndlnDoubleOption*> ( pReplacedBy )->dValue;
+    }
+    else
+    {
+        dValue = val;
+        bSet   = true;
+
+        if ( dValue < dMin )
+        {
+            dValue = dMin;
+            res    = false;
+        }
+        else if ( dValue > dMax )
+        {
+            dValue = dMax;
+            res    = false;
+        }
+    }
+
+    CCmdlnOptBase::set();
+
+    return res;
+}
 
 ECmdlnOptCheckResult CCmndlnDoubleOption::check ( bool              bNoOverride,
                                                   ECmdlnOptDestType destType,
@@ -260,6 +374,38 @@ ECmdlnOptCheckResult CCmndlnDoubleOption::check ( bool              bNoOverride,
 CCmndlnIntOption: Defines an integer commandline option
 ******************************************************************************/
 
+bool CCmndlnIntOption::set ( int val )
+{
+    bool res = true;
+
+    if ( pReplacedBy )
+    {
+        // Set replacement instead...
+        res    = static_cast<CCmndlnIntOption*> ( pReplacedBy )->set ( val );
+        iValue = static_cast<CCmndlnIntOption*> ( pReplacedBy )->iValue;
+    }
+    else
+    {
+        iValue = val;
+        bSet   = true;
+
+        if ( iValue < iMin )
+        {
+            iValue = iMin;
+            res    = false;
+        }
+        else if ( iValue > iMax )
+        {
+            iValue = iMax;
+            res    = false;
+        }
+    }
+
+    CCmdlnOptBase::set();
+
+    return res;
+}
+
 ECmdlnOptCheckResult CCmndlnIntOption::check ( bool              bNoOverride,
                                                ECmdlnOptDestType destType,
                                                QStringList&      arguments,
@@ -286,6 +432,37 @@ ECmdlnOptCheckResult CCmndlnIntOption::check ( bool              bNoOverride,
  CCmndlnUIntOption: Defines a unsigned int commandline option
  ******************************************************************************/
 
+bool CCmndlnUIntOption::set ( unsigned int val )
+{
+    bool res = true;
+
+    if ( pReplacedBy )
+    {
+        // Set replacement instead...
+        res     = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->set ( val );
+        uiValue = static_cast<CCmndlnUIntOption*> ( pReplacedBy )->uiValue;
+    }
+    else
+    {
+        uiValue = val;
+
+        if ( uiValue < uiMin )
+        {
+            uiValue = uiMin;
+            res     = false;
+        }
+        else if ( uiValue > uiMax )
+        {
+            uiValue = uiMax;
+            res     = false;
+        }
+    }
+
+    CCmdlnOptBase::set();
+
+    return res;
+}
+
 ECmdlnOptCheckResult CCmndlnUIntOption::check ( bool              bNoOverride,
                                                 ECmdlnOptDestType destType,
                                                 QStringList&      arguments,
@@ -309,7 +486,46 @@ ECmdlnOptCheckResult CCmndlnUIntOption::check ( bool              bNoOverride,
 }
 
 /******************************************************************************
- CCommandlineOptions:
+ CCmndlnServerInfoOption: Compound StringOption with server info
+ ******************************************************************************/
+
+bool CCmndlnServerInfoOption::set ( QString val )
+{
+    CCmndlnStringOption::set ( val );
+
+    if ( bSet )
+    {
+        return GetServerInfo ( strValue, strServerName, strServerCity, eServerCountry );
+    }
+
+    return false;
+}
+
+ECmdlnOptCheckResult CCmndlnServerInfoOption::check ( bool              bNoOverride,
+                                                      ECmdlnOptDestType destType,
+                                                      QStringList&      arguments,
+                                                      int&              i,
+                                                      QString&          strParam,
+                                                      QString&          strValue )
+{
+    ECmdlnOptCheckResult res = CCmndlnStringOption::check ( bNoOverride, destType, arguments, i, strParam, strValue );
+
+    if ( res == ECmdlnOptCheckResult::OkString )
+    {
+        QString strCheckInfo;
+        SetServerInfo ( strCheckInfo, strServerName, strServerCity, eServerCountry );
+        if ( strCheckInfo != strValue )
+        {
+            // Name, City truncated or invalid Country number !
+            res = ECmdlnOptCheckResult::InvalidString;
+        }
+    }
+
+    return res;
+}
+
+/******************************************************************************
+ CCommandlineOptions: The class containing all commandline options
  ******************************************************************************/
 
 CCommandlineOptions::CCommandlineOptions() :
@@ -510,7 +726,7 @@ bool CCommandlineOptions::Load ( bool bIsClient, bool bUseGUI, QStringList& argu
                 invalidParams += " " + strParam + " ???";
                 break;
 
-            case ECmdlnOptCheckResult::InvalidLength:
+            case ECmdlnOptCheckResult::InvalidString:
             case ECmdlnOptCheckResult::InvalidRange:
             case ECmdlnOptCheckResult::InvalidNumber:
                 invalidParams += " " + strParam + " " + strValue;
