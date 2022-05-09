@@ -61,7 +61,7 @@ class CServerDlg : public CBaseDlg, private Ui_CServerDlgBase
     Q_OBJECT
 
 public:
-    CServerDlg ( CServer* pNServP, CServerSettings* pNSetP, const bool bStartMinimized, QWidget* parent = nullptr );
+    CServerDlg ( CServer* pNServP, CServerSettings* pNSetP, QWidget* parent = nullptr );
 
 protected:
     virtual void changeEvent ( QEvent* pEvent );

@@ -31,7 +31,6 @@
 #include <QImage>
 #include <QPainter>
 #include <QTimer>
-#include "client.h"
 #include "util.h"
 
 /* Definitions ****************************************************************/
@@ -39,6 +38,9 @@
 #define ERR_RATE_GRAPH_UPDATE_TIME_MS 200 // ms
 
 /* Classes ********************************************************************/
+
+class CClient;
+
 class CAnalyzerConsole : public CBaseDlg
 {
     Q_OBJECT

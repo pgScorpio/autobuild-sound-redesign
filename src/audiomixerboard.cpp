@@ -1124,7 +1124,7 @@ void CAudioMixerBoard::ChangeFaderOrder ( const EChSortType eChSortType )
     std::stable_sort ( PairList.begin(), PairList.end() );
 
     // move my fader to first position
-    if ( pSettings->bOwnFaderFirst )
+    if ( pSettings->GetOwnMixerFirst() )
     {
         for ( int i = 0; i < MAX_NUM_CHANNELS; i++ )
         {
@@ -1243,10 +1243,10 @@ void CAudioMixerBoard::ApplyNewConClientList ( CVector<CChannelInfo>& vecChanInf
                         // The fader level of 100 % is the default in the
                         // server, in that case we do not have to do anything here.
                         if ( ( !bNoFaderVisible || ( ( iMyChannelID != INVALID_INDEX ) && ( iMyChannelID != i ) ) ) &&
-                             ( pSettings->iNewClientFaderLevel != 100 ) )
+                             ( pSettings->GetNewClientFaderLevel() != 100 ) )
                         {
                             // the value is in percent -> convert range
-                            vecpChanFader[i]->SetFaderLevel ( pSettings->iNewClientFaderLevel / 100.0 * AUD_MIX_FADER_MAX );
+                            vecpChanFader[i]->SetFaderLevel ( pSettings->GetNewClientFaderLevel() / 100.0 * AUD_MIX_FADER_MAX );
                         }
                     }
 
@@ -1370,7 +1370,7 @@ void CAudioMixerBoard::SetAllFaderLevelsToNewClientLevel()
             // the value is in percent -> convert range, also use the group
             // update flag to make sure the group values are all set to the
             // same fader level now
-            vecpChanFader[i]->SetFaderLevel ( pSettings->iNewClientFaderLevel / 100.0 * AUD_MIX_FADER_MAX, true );
+            vecpChanFader[i]->SetFaderLevel ( pSettings->GetNewClientFaderLevel() / 100.0 * AUD_MIX_FADER_MAX, true );
         }
     }
 }
@@ -1640,7 +1640,7 @@ void CAudioMixerBoard::StoreFaderSettings ( CChannelFader* pChanFader )
     if ( pChanFader->IsVisible() && !pChanFader->GetReceivedName().isEmpty() )
     {
         CVector<int> viOldStoredFaderLevels ( pSettings->vecStoredFaderLevels );
-        CVector<int> viOldStoredPanValues ( pSettings->vecStoredPanValues );
+        CVector<int> viOldStoredPanValues ( pSettings->vecStoredFaderPanValues );
         CVector<int> vbOldStoredFaderIsSolo ( pSettings->vecStoredFaderIsSolo );
         CVector<int> vbOldStoredFaderIsMute ( pSettings->vecStoredFaderIsMute );
         CVector<int> vbOldStoredFaderGroupID ( pSettings->vecStoredFaderGroupID );
@@ -1649,12 +1649,12 @@ void CAudioMixerBoard::StoreFaderSettings ( CChannelFader* pChanFader )
         const int iOldIdx = pSettings->vecStoredFaderTags.StringFiFoWithCompare ( pChanFader->GetReceivedName() );
 
         // current fader level and solo state is at the top of the list
-        pSettings->vecStoredFaderLevels[0]  = pChanFader->GetFaderLevel();
-        pSettings->vecStoredPanValues[0]    = pChanFader->GetPanValue();
-        pSettings->vecStoredFaderIsSolo[0]  = pChanFader->IsSolo();
-        pSettings->vecStoredFaderIsMute[0]  = pChanFader->IsMute();
-        pSettings->vecStoredFaderGroupID[0] = pChanFader->GetGroupID();
-        int iTempListCnt                    = 1; // current fader is on top, other faders index start at 1
+        pSettings->vecStoredFaderLevels[0]    = pChanFader->GetFaderLevel();
+        pSettings->vecStoredFaderPanValues[0] = pChanFader->GetPanValue();
+        pSettings->vecStoredFaderIsSolo[0]    = pChanFader->IsSolo();
+        pSettings->vecStoredFaderIsMute[0]    = pChanFader->IsMute();
+        pSettings->vecStoredFaderGroupID[0]   = pChanFader->GetGroupID();
+        int iTempListCnt                      = 1; // current fader is on top, other faders index start at 1
 
         for ( int iIdx = 0; iIdx < MAX_NUM_STORED_FADER_SETTINGS; iIdx++ )
         {
@@ -1666,11 +1666,11 @@ void CAudioMixerBoard::StoreFaderSettings ( CChannelFader* pChanFader )
                 // index in case the entry was not present in the vector before
                 if ( iIdx != iOldIdx )
                 {
-                    pSettings->vecStoredFaderLevels[iTempListCnt]  = viOldStoredFaderLevels[iIdx];
-                    pSettings->vecStoredPanValues[iTempListCnt]    = viOldStoredPanValues[iIdx];
-                    pSettings->vecStoredFaderIsSolo[iTempListCnt]  = vbOldStoredFaderIsSolo[iIdx];
-                    pSettings->vecStoredFaderIsMute[iTempListCnt]  = vbOldStoredFaderIsMute[iIdx];
-                    pSettings->vecStoredFaderGroupID[iTempListCnt] = vbOldStoredFaderGroupID[iIdx];
+                    pSettings->vecStoredFaderLevels[iTempListCnt]    = viOldStoredFaderLevels[iIdx];
+                    pSettings->vecStoredFaderPanValues[iTempListCnt] = viOldStoredPanValues[iIdx];
+                    pSettings->vecStoredFaderIsSolo[iTempListCnt]    = vbOldStoredFaderIsSolo[iIdx];
+                    pSettings->vecStoredFaderIsMute[iTempListCnt]    = vbOldStoredFaderIsMute[iIdx];
+                    pSettings->vecStoredFaderGroupID[iTempListCnt]   = vbOldStoredFaderGroupID[iIdx];
 
                     iTempListCnt++;
                 }
@@ -1696,7 +1696,7 @@ bool CAudioMixerBoard::GetStoredFaderSettings ( const QString& strName,
             {
                 // copy stored settings values
                 iStoredFaderLevel  = pSettings->vecStoredFaderLevels[iIdx];
-                iStoredPanValue    = pSettings->vecStoredPanValues[iIdx];
+                iStoredPanValue    = pSettings->vecStoredFaderPanValues[iIdx];
                 bStoredFaderIsSolo = pSettings->vecStoredFaderIsSolo[iIdx] != 0;
                 bStoredFaderIsMute = pSettings->vecStoredFaderIsMute[iIdx] != 0;
                 iGroupID           = pSettings->vecStoredFaderGroupID[iIdx];

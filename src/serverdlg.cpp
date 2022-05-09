@@ -25,7 +25,7 @@
 #include "serverdlg.h"
 
 /* Implementation *************************************************************/
-CServerDlg::CServerDlg ( CServer* pNServP, CServerSettings* pNSetP, const bool bStartMinimized, QWidget* parent ) :
+CServerDlg::CServerDlg ( CServer* pNServP, CServerSettings* pNSetP, QWidget* parent ) :
     CBaseDlg ( parent, Qt::Window ), // use Qt::Window to get min/max window buttons
     pServer ( pNServP ),
     pSettings ( pNSetP ),
@@ -255,7 +255,7 @@ CServerDlg::CServerDlg ( CServer* pNServP, CServerSettings* pNSetP, const bool b
 
     // act on "start minimized" flag (note, this has to be done after setting
     // and acting on the correct value for the system tray icon availablility)
-    if ( bStartMinimized )
+    if ( pSettings->bStartMinimized )
     {
         showMinimized();
     }

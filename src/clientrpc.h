@@ -25,9 +25,10 @@
 
 #pragma once
 
-#include "client.h"
-#include "util.h"
 #include "rpcserver.h"
+#include "util.h"
+
+class CClient;
 
 /* Classes ********************************************************************/
 class CClientRpc : public QObject

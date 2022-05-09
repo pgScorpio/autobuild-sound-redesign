@@ -40,6 +40,7 @@
 #include "util.h"
 #include "buffer.h"
 #include "signalhandler.h"
+#include "settings.h"
 
 #if defined( _WIN32 ) && !defined( JACK_ON_WINDOWS )
 #    include "../windows/sound.h"
@@ -65,13 +66,6 @@
 #endif
 
 /* Definitions ****************************************************************/
-// audio in fader range
-#define AUD_FADER_IN_MIN    0
-#define AUD_FADER_IN_MAX    100
-#define AUD_FADER_IN_MIDDLE ( AUD_FADER_IN_MAX / 2 )
-
-// audio reverberation range
-#define AUD_REVERB_MAX 100
 
 // default delay period between successive gain updates (ms)
 // this will be increased to double the ping time if connected to a distant server
@@ -103,21 +97,18 @@
 #define OPUS_NUM_BYTES_STEREO_HIGH_QUALITY_DBLE_FRAMESIZE   165
 
 /* Classes ********************************************************************/
+
 class CClient : public QObject
 {
     Q_OBJECT
 
 public:
-    CClient ( const quint16  iPortNumber,
-              const quint16  iQosNumber,
-              const QString& strConnOnStartupAddress,
-              const QString& strMIDISetup,
-              const bool     bNoAutoJackConnect,
-              const QString& strNClientName,
-              const bool     bNEnableIPv6,
-              const bool     bNMuteMeInPersonalMix );
+    CClient ( CClientSettings& cSettings );
 
     virtual ~CClient();
+
+public:
+    CClientSettings& Settings;
 
     void Start();
     void Stop();
@@ -132,48 +123,41 @@ public:
 
     bool IsConnected() { return Channel.IsConnected(); }
 
-    EGUIDesign GetGUIDesign() const { return eGUIDesign; }
-    void       SetGUIDesign ( const EGUIDesign eNGD ) { eGUIDesign = eNGD; }
-
-    EMeterStyle GetMeterStyle() const { return eMeterStyle; }
-    void        SetMeterStyle ( const EMeterStyle eNMT ) { eMeterStyle = eNMT; }
-
-    EAudioQuality GetAudioQuality() const { return eAudioQuality; }
-    void          SetAudioQuality ( const EAudioQuality eNAudioQuality );
-
-    EAudChanConf GetAudioChannels() const { return eAudioChannelConf; }
-    void         SetAudioChannels ( const EAudChanConf eNAudChanConf );
-
-    int  GetAudioInFader() const { return iAudioInFader; }
-    void SetAudioInFader ( const int iNV ) { iAudioInFader = iNV; }
-
-    int  GetReverbLevel() const { return iReverbLevel; }
-    void SetReverbLevel ( const int iNL ) { iReverbLevel = iNL; }
-
-    bool IsReverbOnLeftChan() const { return bReverbOnLeftChan; }
     void SetReverbOnLeftChan ( const bool bIL )
     {
-        bReverbOnLeftChan = bIL;
+        Settings.SetReverbOnLeftChan ( bIL );
         AudioReverb.Clear();
     }
 
     void SetDoAutoSockBufSize ( const bool bValue );
-    bool GetDoAutoSockBufSize() const { return Channel.GetDoAutoSockBufSize(); }
+    bool GetDoAutoSockBufSize() const
+    {
+        Settings.SetAutoSockBufSize ( Channel.GetDoAutoSockBufSize() );
+        return Settings.GetAutoSockBufSize();
+    }
 
-    void SetSockBufNumFrames ( const int iNumBlocks, const bool bPreserve = false ) { Channel.SetSockBufNumFrames ( iNumBlocks, bPreserve ); }
-    int  GetSockBufNumFrames() { return Channel.GetSockBufNumFrames(); }
+    void SetClientSockBufNumFrames ( const int iNumBlocks, const bool bPreserve = false )
+    {
+        Channel.SetSockBufNumFrames ( iNumBlocks, bPreserve );
+        Settings.SetClientSockBufSize ( Channel.GetSockBufNumFrames() );
+    }
+
+    int GetClientSockBufNumFrames()
+    {
+        Settings.SetClientSockBufSize ( Channel.GetSockBufNumFrames() );
+        return Settings.GetClientSockBufSize();
+    }
 
     void SetServerSockBufNumFrames ( const int iNumBlocks )
     {
-        iServerSockBufNumFrames = iNumBlocks;
+        Settings.SetServerSockBufSize ( iNumBlocks );
 
         // if auto setting is disabled, inform the server about the new size
         if ( !GetDoAutoSockBufSize() )
         {
-            Channel.CreateJitBufMes ( iServerSockBufNumFrames );
+            Channel.CreateJitBufMes ( Settings.iServerSockBufSize );
         }
     }
-    int GetServerSockBufNumFrames() { return iServerSockBufNumFrames; }
 
     int GetUploadRateKbps() { return Channel.GetUploadRateKbps(); }
 
@@ -198,12 +182,6 @@ public:
     void    SetSndCrdRightOutputChannel ( const int iNewChan );
     int     GetSndCrdLeftOutputChannel() { return Sound.GetLeftOutputChannel(); }
     int     GetSndCrdRightOutputChannel() { return Sound.GetRightOutputChannel(); }
-
-    void SetSndCrdPrefFrameSizeFactor ( const int iNewFactor );
-    int  GetSndCrdPrefFrameSizeFactor() { return iSndCrdPrefFrameSizeFactor; }
-
-    void SetEnableOPUS64 ( const bool eNEnableOPUS64 );
-    bool GetEnableOPUS64() { return bEnableOPUS64; }
 
     int GetSndCrdActualMonoBlSize()
     {
@@ -245,9 +223,7 @@ public:
 
     void SetRemoteChanPan ( const int iId, const float fPan ) { Channel.SetRemoteChanPan ( iId, fPan ); }
 
-    void SetInputBoost ( const int iNewBoost ) { iInputBoost = iNewBoost; }
-
-    void SetRemoteInfo() { Channel.SetRemoteInfo ( ChannelInfo ); }
+    void SetRemoteInfo() { Channel.SetRemoteInfo ( Settings.ChannelInfo ); }
 
     void CreateChatTextMes ( const QString& strChatText ) { Channel.CreateChatTextMes ( strChatText ); }
 
@@ -270,10 +246,6 @@ public:
     {
         Channel.GetBufErrorRates ( vecErrRates, dLimit, dMaxUpLimit );
     }
-
-    // settings
-    CChannelCoreInfo ChannelInfo;
-    QString          strClientName;
 
 protected:
     // callback function must be static, otherwise it does not work
@@ -307,8 +279,6 @@ protected:
     EAudComprType          eAudioCompressionType;
     int                    iCeltNumCodedBytes;
     int                    iOPUSFrameSizeSamples;
-    EAudioQuality          eAudioQuality;
-    EAudChanConf           eAudioChannelConf;
     int                    iNumAudioChannels;
     bool                   bIsInitializationPhase;
     bool                   bMuteOutStream;
@@ -321,14 +291,7 @@ protected:
 
     CVector<uint8_t> vecbyNetwData;
 
-    int          iAudioInFader;
-    bool         bReverbOnLeftChan;
-    int          iReverbLevel;
     CAudioReverb AudioReverb;
-    int          iInputBoost;
-
-    int iSndCrdPrefFrameSizeFactor;
-    int iSndCrdFrameSizeFactor;
 
     bool             bSndCrdConversionBufferRequired;
     int              iSndCardMonoBlockSizeSamConvBuff;
@@ -345,17 +308,8 @@ protected:
     int iMonoBlockSizeSam;
     int iStereoBlockSizeSam;
 
-    EGUIDesign  eGUIDesign;
-    EMeterStyle eMeterStyle;
-    bool        bEnableOPUS64;
-
     bool   bJitterBufferOK;
-    bool   bEnableIPv6;
-    bool   bMuteMeInPersonalMix;
     QMutex MutexDriverReinit;
-
-    // server settings
-    int iServerSockBufNumFrames;
 
     // for ping measurement
     QElapsedTimer PreciseTime;
@@ -371,7 +325,12 @@ protected:
 
     CSignalHandler* pSignalHandler;
 
+protected:
+    void ApplySettings();
+
 protected slots:
+    void OnApplicationStartup();
+
     void OnHandledSignal ( int sigNum );
     void OnSendProtMessage ( CVector<uint8_t> vecMessage );
     void OnInvalidPacketReceived ( CHostAddress RecHostAddr );
@@ -380,7 +339,7 @@ protected slots:
 
     void OnReqJittBufSize() { CreateServerJitterBufferMessage(); }
     void OnJittBufSizeChanged ( int iNewJitBufSize );
-    void OnReqChanInfo() { Channel.SetRemoteInfo ( ChannelInfo ); }
+    void OnReqChanInfo() { Channel.SetRemoteInfo ( Settings.ChannelInfo ); }
     void OnNewConnection();
     void OnCLDisconnection ( CHostAddress InetAddr )
     {
@@ -404,6 +363,8 @@ protected slots:
     void OnClientIDReceived ( int iChanID );
 
 signals:
+    void ApplicationStartup();
+
     void ConClientListMesReceived ( CVector<CChannelInfo> vecChanInfo );
     void ChatTextReceived ( QString strChatText );
     void ClientIDReceived ( int iChanID );

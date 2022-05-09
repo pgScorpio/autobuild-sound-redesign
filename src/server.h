@@ -46,6 +46,7 @@
 #include "recorder/jamcontroller.h"
 
 #include "threadpool.h"
+#include "settings.h"
 
 /* Definitions ****************************************************************/
 // no valid channel number
@@ -151,28 +152,12 @@ class CServer : public QObject, public CServerSlots<MAX_NUM_CHANNELS>
     Q_OBJECT
 
 public:
-    CServer ( const int          iNewMaxNumChan,
-              const QString&     strLoggingFileName,
-              const QString&     strServerBindIP,
-              const quint16      iPortNumber,
-              const quint16      iQosNumber,
-              const QString&     strHTMLStatusFileName,
-              const QString&     strDirectoryServer,
-              const QString&     strServerListFileName,
-              const QString&     strServerInfo,
-              const QString&     strServerListFilter,
-              const QString&     strServerPublicIP,
-              const QString&     strNewWelcomeMessage,
-              const QString&     strRecordingDirName,
-              const bool         bNDisconnectAllClientsOnQuit,
-              const bool         bNUseDoubleSystemFrameSize,
-              const bool         bNUseMultithreading,
-              const bool         bDisableRecording,
-              const bool         bNDelayPan,
-              const bool         bNEnableIPv6,
-              const ELicenceType eNLicenceType );
+    CServer ( CServerSettings& cSettings );
 
     virtual ~CServer();
+
+public:
+    CServerSettings& Settings;
 
     void Start();
     void Stop();
@@ -373,7 +358,12 @@ protected:
 
     std::unique_ptr<CThreadPool> pThreadPool;
 
+protected:
+    void ApplySettings();
+
 signals:
+    void ApplicationStartup();
+
     void Started();
     void Stopped();
     void ClientDisconnected ( const int iChID );
@@ -391,6 +381,9 @@ signals:
     void StopRecorder();
     void RecordingSessionStarted ( QString sessionDir );
     void EndRecorderThread();
+
+protected slots:
+    void OnApplicationStartup();
 
 public slots:
     void OnTimer();

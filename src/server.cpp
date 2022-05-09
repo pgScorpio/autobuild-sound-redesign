@@ -212,54 +212,40 @@ void CHighPrecisionTimer::run()
 #endif
 
 // CServer implementation ******************************************************
-CServer::CServer ( const int          iNewMaxNumChan,
-                   const QString&     strLoggingFileName,
-                   const QString&     strServerBindIP,
-                   const quint16      iPortNumber,
-                   const quint16      iQosNumber,
-                   const QString&     strHTMLStatusFileName,
-                   const QString&     strDirectoryServer,
-                   const QString&     strServerListFileName,
-                   const QString&     strServerInfo,
-                   const QString&     strServerListFilter,
-                   const QString&     strServerPublicIP,
-                   const QString&     strNewWelcomeMessage,
-                   const QString&     strRecordingDirName,
-                   const bool         bNDisconnectAllClientsOnQuit,
-                   const bool         bNUseDoubleSystemFrameSize,
-                   const bool         bNUseMultithreading,
-                   const bool         bDisableRecording,
-                   const bool         bNDelayPan,
-                   const bool         bNEnableIPv6,
-                   const ELicenceType eNLicenceType ) :
-    bUseDoubleSystemFrameSize ( bNUseDoubleSystemFrameSize ),
-    bUseMultithreading ( bNUseMultithreading ),
-    iMaxNumChannels ( iNewMaxNumChan ),
+CServer::CServer ( CServerSettings& cSettings ) :
+    Settings ( cSettings ),
+    bUseDoubleSystemFrameSize ( Settings.bUseDoubleSystemFrameSize ),
+    bUseMultithreading ( Settings.bUseMultithreading ),
+    iMaxNumChannels ( Settings.iMaxNumChan ),
     iCurNumChannels ( 0 ),
-    Socket ( this, iPortNumber, iQosNumber, strServerBindIP, bNEnableIPv6 ),
+    Socket ( this, Settings.iPortNumber, Settings.iQosNumber, Settings.strServerBindIP, Settings.bEnableIPv6 ),
     Logging(),
     iFrameCount ( 0 ),
     bWriteStatusHTMLFile ( false ),
-    strServerHTMLFileListName ( strHTMLStatusFileName ),
-    HighPrecisionTimer ( bNUseDoubleSystemFrameSize ),
-    ServerListManager ( iPortNumber,
-                        strDirectoryServer,
-                        strServerListFileName,
-                        strServerInfo,
-                        strServerPublicIP,
-                        strServerListFilter,
-                        iNewMaxNumChan,
-                        bNEnableIPv6,
+    strServerHTMLFileListName ( Settings.strHTMLStatusFileName ),
+    HighPrecisionTimer ( bUseDoubleSystemFrameSize ),
+    ServerListManager ( Settings.iPortNumber,
+                        Settings.strDirectoryServer,
+                        Settings.strServerListFileName,
+                        Settings.strServerInfo,
+                        Settings.strServerPublicIP,
+                        Settings.strServerListFilter,
+                        Settings.iMaxNumChan,
+                        Settings.bEnableIPv6,
                         &ConnLessProtocol ),
     JamController ( this ),
     bDisableRecording ( bDisableRecording ),
     bAutoRunMinimized ( false ),
-    bDelayPan ( bNDelayPan ),
-    bEnableIPv6 ( bNEnableIPv6 ),
-    eLicenceType ( eNLicenceType ),
-    bDisconnectAllClientsOnQuit ( bNDisconnectAllClientsOnQuit ),
+    bDelayPan ( Settings.bDelayPan ),
+    bEnableIPv6 ( Settings.bEnableIPv6 ),
+    eLicenceType ( Settings.eLicenceType ),
+    bDisconnectAllClientsOnQuit ( Settings.bDisconnectAllClientsOnQuit ),
     pSignalHandler ( CSignalHandler::getSingletonP() )
 {
+    // First emit a queued event to myself so OnApplicationStartup will be called as soon as the application starts running.
+    QObject::connect ( this, &CServer::ApplicationStartup, this, &CServer::OnApplicationStartup, Qt::ConnectionType::QueuedConnection );
+    emit ApplicationStartup();
+
     int iOpusError;
     int i;
 
@@ -373,9 +359,9 @@ CServer::CServer ( const int          iNewMaxNumChan,
     vecChannelLevels.Init ( iMaxNumChannels );
 
     // enable logging (if requested)
-    if ( !strLoggingFileName.isEmpty() )
+    if ( !Settings.strLoggingFileName.isEmpty() )
     {
-        Logging.Start ( strLoggingFileName );
+        Logging.Start ( Settings.strLoggingFileName );
     }
 
     // HTML status file writing
@@ -388,11 +374,11 @@ CServer::CServer ( const int          iNewMaxNumChan,
 
     // manage welcome message: if the welcome message is a valid link to a local
     // file, the content of that file is used as the welcome message (#361)
-    SetWelcomeMessage ( strNewWelcomeMessage ); // first use given text, may be overwritten
+    SetWelcomeMessage ( Settings.strWelcomeMessage ); // first use given text, may be overwritten
 
-    if ( QFileInfo ( strNewWelcomeMessage ).exists() )
+    if ( QFileInfo ( Settings.strWelcomeMessage ).exists() )
     {
-        QFile file ( strNewWelcomeMessage );
+        QFile file ( Settings.strWelcomeMessage );
 
         if ( file.open ( QIODevice::ReadOnly | QIODevice::Text ) )
         {
@@ -404,7 +390,7 @@ CServer::CServer ( const int          iNewMaxNumChan,
     // enable jam recording (if requested) - kicks off the thread (note
     // that jam recorder needs the frame size which is given to the jam
     // recorder in the SetRecordingDir() function)
-    SetRecordingDir ( strRecordingDirName );
+    SetRecordingDir ( Settings.strRecordingDirName );
 
     // enable all channels (for the server all channel must be enabled the
     // entire life time of the software)
@@ -491,6 +477,24 @@ CServer::CServer ( const int          iNewMaxNumChan,
     // start the socket (it is important to start the socket after all
     // initializations and connections)
     Socket.Start();
+}
+
+void CServer::OnApplicationStartup() { ApplySettings(); }
+
+void CServer::ApplySettings()
+{
+    SetServerName ( Settings.strServerName );
+    SetServerCity ( Settings.strServerCity );
+    SetServerCountry ( Settings.eServerCountry );
+    SetEnableRecording ( Settings.bEnableRecording );
+    SetWelcomeMessage ( Settings.strWelcomeMessage );
+
+    SetRecordingDir ( Settings.strRecordingDir );
+    SetDirectoryAddress ( Settings.strDirectoryAddress );
+    SetDirectoryType ( Settings.eDirectoryType );
+    SetServerListFileName ( Settings.strServerListFileName );
+    SetAutoRunMinimized ( Settings.bStartMinimized );
+    SetEnableDelayPanning ( Settings.bDelayPan );
 }
 
 template<unsigned int slotId>

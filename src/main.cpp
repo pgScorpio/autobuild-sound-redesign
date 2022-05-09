@@ -26,6 +26,7 @@
 #include <QDir>
 #include <iostream>
 #include "global.h"
+#include "settings.h"
 #ifndef HEADLESS
 #    include <QApplication>
 #    include <QMessageBox>
@@ -34,7 +35,6 @@
 #        include "clientdlg.h"
 #    endif
 #endif
-#include "settings.h"
 #ifndef SERVER_ONLY
 #    include "testbench.h"
 #endif
@@ -47,9 +47,11 @@
 extern void qt_set_sequence_auto_mnemonic ( bool bEnable );
 #endif
 #include <memory>
+#include "server.h"
 #include "rpcserver.h"
 #include "serverrpc.h"
 #ifndef SERVER_ONLY
+#    include "client.h"
 #    include "clientrpc.h"
 #endif
 
@@ -860,20 +862,24 @@ int main ( int argc, char** argv )
 #ifndef SERVER_ONLY
         if ( bIsClient )
         {
+            // load settings from init-file (command line options override)
+            CClientSettings Settings ( strIniFileName,
+                                       iPortNumber,
+                                       iQosNumber,
+                                       strConnOnStartupAddress,
+                                       strMIDISetup,
+                                       bNoAutoJackConnect,
+                                       strClientName,
+                                       bEnableIPv6,
+                                       bMuteMeInPersonalMix,
+                                       bShowComplRegConnList,
+                                       bShowAnalyzerConsole,
+                                       bMuteStream );
+            Settings.Load ( CommandLineOptions );
+
             // Client:
             // actual client object
-            CClient Client ( iPortNumber,
-                             iQosNumber,
-                             strConnOnStartupAddress,
-                             strMIDISetup,
-                             bNoAutoJackConnect,
-                             strClientName,
-                             bEnableIPv6,
-                             bMuteMeInPersonalMix );
-
-            // load settings from init-file (command line options override)
-            CClientSettings Settings ( &Client, strIniFileName );
-            Settings.Load ( CommandLineOptions );
+            CClient Client ( Settings );
 
             // load translation
             if ( bUseGUI && bUseTranslation )
@@ -891,15 +897,7 @@ int main ( int argc, char** argv )
             if ( bUseGUI )
             {
                 // GUI object
-                CClientDlg ClientDlg ( &Client,
-                                       &Settings,
-                                       strConnOnStartupAddress,
-                                       strMIDISetup,
-                                       bShowComplRegConnList,
-                                       bShowAnalyzerConsole,
-                                       bMuteStream,
-                                       bEnableIPv6,
-                                       nullptr );
+                CClientDlg ClientDlg ( &Client, &Settings, nullptr );
 
                 // show dialog
                 ClientDlg.show();
@@ -917,28 +915,33 @@ int main ( int argc, char** argv )
         else
 #endif
         {
+            CServerSettings Settings ( strIniFileName,
+                                       // Todo: most of next parameters should come from future CCommandlineOptions class
+                                       iNumServerChannels,
+                                       strLoggingFileName,
+                                       strServerBindIP,
+                                       iPortNumber,
+                                       iQosNumber,
+                                       strHTMLStatusFileName,
+                                       strDirectoryServer,
+                                       strServerListFileName,
+                                       strServerInfo,
+                                       strServerListFilter,
+                                       strServerPublicIP,
+                                       strWelcomeMessage,
+                                       strRecordingDirName,
+                                       bDisconnectAllClientsOnQuit,
+                                       bUseDoubleSystemFrameSize,
+                                       bUseMultithreading,
+                                       bDisableRecording,
+                                       bDelayPan,
+                                       bEnableIPv6,
+                                       bStartMinimized,
+                                       eLicenceType );
+
             // Server:
             // actual server object
-            CServer Server ( iNumServerChannels,
-                             strLoggingFileName,
-                             strServerBindIP,
-                             iPortNumber,
-                             iQosNumber,
-                             strHTMLStatusFileName,
-                             strDirectoryServer,
-                             strServerListFileName,
-                             strServerInfo,
-                             strServerPublicIP,
-                             strServerListFilter,
-                             strWelcomeMessage,
-                             strRecordingDirName,
-                             bDisconnectAllClientsOnQuit,
-                             bUseDoubleSystemFrameSize,
-                             bUseMultithreading,
-                             bDisableRecording,
-                             bDelayPan,
-                             bEnableIPv6,
-                             eLicenceType );
+            CServer Server ( Settings );
 
             if ( pRpcServer )
             {
@@ -949,7 +952,6 @@ int main ( int argc, char** argv )
             if ( bUseGUI )
             {
                 // load settings from init-file (command line options override)
-                CServerSettings Settings ( &Server, strIniFileName );
                 Settings.Load ( CommandLineOptions );
 
                 // load translation
@@ -959,7 +961,7 @@ int main ( int argc, char** argv )
                 }
 
                 // GUI object for the server
-                CServerDlg ServerDlg ( &Server, &Settings, bStartMinimized, nullptr );
+                CServerDlg ServerDlg ( &Server, &Settings, nullptr );
 
                 // show dialog (if not the minimized flag is set)
                 if ( !bStartMinimized )
@@ -974,13 +976,6 @@ int main ( int argc, char** argv )
             {
                 // only start application without using the GUI
                 qInfo() << qUtf8Printable ( GetVersionAndNameStr ( false ) );
-
-                // CServerListManager defaults to AT_NONE, so need to switch if
-                // strDirectoryServer is wanted
-                if ( !strDirectoryServer.isEmpty() )
-                {
-                    Server.SetDirectoryType ( AT_CUSTOM );
-                }
 
                 pApp->exec();
             }

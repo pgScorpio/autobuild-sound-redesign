@@ -23,6 +23,7 @@
 \******************************************************************************/
 
 #include "analyzerconsole.h"
+#include "client.h"
 
 // Analyzer console implementation *********************************************
 CAnalyzerConsole::CAnalyzerConsole ( CClient* pNCliP, QWidget* parent ) :

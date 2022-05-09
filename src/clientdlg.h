@@ -73,15 +73,7 @@ class CClientDlg : public CBaseDlg, private Ui_CClientDlgBase
     Q_OBJECT
 
 public:
-    CClientDlg ( CClient*         pNCliP,
-                 CClientSettings* pNSetP,
-                 const QString&   strConnOnStartupAddress,
-                 const QString&   strMIDISetup,
-                 const bool       bNewShowComplRegConnList,
-                 const bool       bShowAnalyzerConsole,
-                 const bool       bMuteStream,
-                 const bool       bNEnableIPv6,
-                 QWidget*         parent = nullptr );
+    CClientDlg ( CClient* pClient, CClientSettings* pClientSettings, QWidget* parent = nullptr );
 
 protected:
     void SetGUIDesign ( const EGUIDesign eNewDesign );
@@ -162,8 +154,8 @@ public slots:
     void OnOpenAnalyzerConsole() { ShowAnalyzerConsole(); }
     void OnOwnFaderFirst()
     {
-        pSettings->bOwnFaderFirst = !pSettings->bOwnFaderFirst;
-        MainMixerBoard->SetFaderSorting ( pSettings->eChannelSortType );
+        pSettings->ToggleOwnFaderFirst();
+        MainMixerBoard->SetFaderSorting ( pSettings->GetChannelSortType() );
     }
     void OnNoSortChannels() { MainMixerBoard->SetFaderSorting ( ST_NO_SORT ); }
     void OnSortChannelsByName() { MainMixerBoard->SetFaderSorting ( ST_BY_NAME ); }
@@ -179,11 +171,11 @@ public slots:
     void OnChatStateChanged ( int value );
     void OnLocalMuteStateChanged ( int value );
 
-    void OnAudioReverbValueChanged ( int value ) { pClient->SetReverbLevel ( value ); }
+    void OnAudioReverbValueChanged ( int value ) { pSettings->SetReverbLevel ( value ); }
 
-    void OnReverbSelLClicked() { pClient->SetReverbOnLeftChan ( true ); }
+    void OnReverbSelLClicked() { pSettings->SetReverbOnLeftChan ( true ); }
 
-    void OnReverbSelRClicked() { pClient->SetReverbOnLeftChan ( false ); }
+    void OnReverbSelRClicked() { pSettings->SetReverbOnLeftChan ( false ); }
 
     void OnFeedbackDetectionChanged ( int state ) { ClientSettingsDlg.SetEnableFeedbackDetection ( state == Qt::Checked ); }
 
