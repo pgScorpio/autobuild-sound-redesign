@@ -23,7 +23,7 @@
 \******************************************************************************/
 
 #include "jackclient.h"
-#include "soundbase.h"
+#include "../soundbase.h"
 
 //================================================
 // CJackClientPort class: a basic Jack client port
