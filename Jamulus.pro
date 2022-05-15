@@ -122,8 +122,10 @@ win32 {
                 error("Error: jack.h was not found in the expected location ($${programfilesdir}). Ensure that the right JACK2 variant is installed (32bit vs. 64bit).")
             }
 
-            HEADERS += src/sound/jack/sound.h
-            SOURCES += src/sound/jack/sound.cpp
+            HEADERS += src/sound/jack/sound.h \
+                src/sound/jack/jackclient.h
+            SOURCES += src/sound/jack/sound.cpp \
+                src/sound/jack/jackclient.cpp
             DEFINES += WITH_JACK
             DEFINES += JACK_ON_WINDOWS
             DEFINES += _STDINT_H # supposed to solve compilation error in systemdeps.h
@@ -138,11 +140,11 @@ win32 {
             }
             # Important: Keep those ASIO includes local to this build target in
             # order to avoid poisoning other builds license-wise.
-            HEADERS += src/sound/asio/sound.h
+            HEADERS += src/sound/asio/sound.h \
+                src/sound/asio/asiodriver.h \
+                src/sound/asio/asiosys.h
             SOURCES += src/sound/asio/sound.cpp \
-                libs/ASIOSDK2/common/asio.cpp \
-                libs/ASIOSDK2/host/asiodrivers.cpp \
-                libs/ASIOSDK2/host/pc/asiolist.cpp
+                src/sound/asio/asiodriver.cpp
             INCLUDEPATH += libs/ASIOSDK2/common \
                 libs/ASIOSDK2/host \
                 libs/ASIOSDK2/host/pc
@@ -202,8 +204,10 @@ win32 {
                  error("Error: jack.h was not found at the usual place, maybe JACK is not installed")
             }
         }
-        HEADERS += src/sound/jack/sound.h
-        SOURCES += src/sound/jack/sound.cpp
+        HEADERS += src/sound/jack/sound.h \
+            src/sound/jack/jackclient.h
+        SOURCES += src/sound/jack/sound.cpp \
+            src/sound/jack/jackclient.cpp
         DEFINES += WITH_JACK
         DEFINES += JACK_REPLACES_COREAUDIO
         INCLUDEPATH += /usr/local/include
@@ -290,8 +294,10 @@ win32 {
     } else {
         message(JACK Audio Interface Enabled.)
 
-        HEADERS += src/sound/jack/sound.h
-        SOURCES += src/sound/jack/sound.cpp
+        HEADERS += src/sound/jack/sound.h \
+            src/sound/jack/jackclient.h
+        SOURCES += src/sound/jack/sound.cpp \
+            src/sound/jack/jackclient.cpp
 
         contains(CONFIG, "raspijamulus") {
             message(Using JACK Audio in raspijamulus.sh mode.)
